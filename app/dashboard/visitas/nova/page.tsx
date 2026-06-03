@@ -1,0 +1,156 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+
+type Cliente = { id: string; nome: string; nome_fazenda: string }
+
+export default function NovaVisitaPage() {
+  const [clientes, setClientes] = useState<Cliente[]>([])
+  const [form, setForm] = useState({
+    cliente_id: '',
+    data_visita: new Date().toISOString().split('T')[0],
+    hora_visita: '',
+    status: 'agendada',
+    descricao: '',
+    recomendacoes: '',
+    proximo_contato: ''
+  })
+  const [carregando, setCarregando] = useState(false)
+  const [erro, setErro] = useState('')
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const supabase = createClient()
+
+  useEffect(() => {
+    async function carregar() {
+      const { data } = await supabase.from('clientes').select('id, nome, nome_fazenda').order('nome')
+      setClientes(data || [])
+      const clienteParam = searchParams.get('cliente')
+      if (clienteParam) setForm(f => ({ ...f, cliente_id: clienteParam }))
+    }
+    carregar()
+  }, [])
+
+  function atualizar(campo: string, valor: string) {
+    setForm(f => ({ ...f, [campo]: valor }))
+  }
+
+  async function salvar(e: React.FormEvent) {
+    e.preventDefault()
+    if (!form.cliente_id) { setErro('Selecione um cliente.'); return }
+    setCarregando(true)
+    setErro('')
+
+    const { data: { user } } = await supabase.auth.getUser()
+
+    const { error } = await supabase.from('visitas').insert({
+      ...form,
+      funcionario_id: user?.id,
+      hora_visita: form.hora_visita || null,
+      proximo_contato: form.proximo_contato || null
+    })
+
+    if (error) { setErro('Erro ao salvar. Tente novamente.'); setCarregando(false); return }
+    router.push('/dashboard/visitas')
+  }
+
+  return (
+    <>
+      <style>{`
+        .voltar{display:inline-flex;align-items:center;gap:.4rem;color:#E67E22;font-size:.82rem;font-weight:700;text-decoration:none;margin-bottom:1.2rem}
+        .page-title{font-size:1.3rem;font-weight:700;color:#162a1e;margin-bottom:1.5rem}
+        .form-card{background:#fff;border-radius:12px;padding:1.8rem;box-shadow:0 2px 8px rgba(0,0,0,.05);max-width:720px;margin:0 auto}
+        .form-section{font-size:.7rem;font-weight:700;color:#E67E22;letter-spacing:.08em;text-transform:uppercase;margin:1.2rem 0 .8rem;padding-bottom:.4rem;border-bottom:1px solid #f0ede8}
+        .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+        .form-full{grid-column:1/-1}
+        .campo label{display:block;font-size:.72rem;font-weight:700;color:#555;letter-spacing:.04em;margin-bottom:.35rem}
+        .campo input,.campo select,.campo textarea{width:100%;padding:.7rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;outline:none;transition:border-color .2s;background:#fafaf8}
+        .campo input:focus,.campo select:focus,.campo textarea:focus{border-color:#E67E22;background:#fff}
+        .campo textarea{resize:vertical;min-height:100px}
+        .status-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
+        .status-opt{border:1.5px solid #eae5de;border-radius:8px;padding:.6rem;text-align:center;cursor:pointer;font-size:.78rem;font-weight:700;color:#888;transition:all .2s;background:#fafaf8}
+        .status-opt.sel-agendada{border-color:#E67E22;background:#fff8f3;color:#E67E22}
+        .status-opt.sel-realizada{border-color:#27ae60;background:#f0fdf4;color:#27ae60}
+        .status-opt.sel-cancelada{border-color:#e74c3c;background:#fef2f2;color:#e74c3c}
+        .err{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:.6rem 1rem;border-radius:8px;font-size:.8rem;margin-bottom:1rem}
+        .form-actions{display:flex;gap:.8rem;margin-top:1.5rem}
+        .btn-salvar{background:#E67E22;color:#fff;border:none;padding:.8rem 1.8rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;transition:background .2s}
+        .btn-salvar:hover{background:#d35400}
+        .btn-salvar:disabled{opacity:.6;cursor:not-allowed}
+        .btn-cancelar{background:transparent;color:#888;border:1.5px solid #eae5de;padding:.8rem 1.8rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer}
+        @media(max-width:600px){.form-grid{grid-template-columns:1fr}}
+      `}</style>
+
+      <Link href="/dashboard/visitas" className="voltar">← Voltar</Link>
+      <h1 className="page-title">Nova Visita</h1>
+
+      <div className="form-card">
+        <form onSubmit={salvar}>
+          <div className="form-section">Cliente</div>
+          <div className="campo">
+            <label>SELECIONAR CLIENTE *</label>
+            <select value={form.cliente_id} onChange={e => atualizar('cliente_id', e.target.value)} required>
+              <option value="">Selecione o cliente...</option>
+              {clientes.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}{c.nome_fazenda ? ` — ${c.nome_fazenda}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-section">Data e Horário</div>
+          <div className="form-grid">
+            <div className="campo">
+              <label>DATA DA VISITA *</label>
+              <input type="date" value={form.data_visita} onChange={e => atualizar('data_visita', e.target.value)} required/>
+            </div>
+            <div className="campo">
+              <label>HORA</label>
+              <input type="time" value={form.hora_visita} onChange={e => atualizar('hora_visita', e.target.value)}/>
+            </div>
+          </div>
+
+          <div className="form-section">Status</div>
+          <div className="status-grid">
+            {['agendada','realizada','cancelada'].map(s => (
+              <div
+                key={s}
+                className={`status-opt ${form.status === s ? `sel-${s}` : ''}`}
+                onClick={() => atualizar('status', s)}
+              >
+                {s === 'agendada' ? '📅' : s === 'realizada' ? '✅' : '❌'} {s.charAt(0).toUpperCase() + s.slice(1)}
+              </div>
+            ))}
+          </div>
+
+          <div className="form-section">Detalhes</div>
+          <div className="campo">
+            <label>DESCRIÇÃO DA VISITA</label>
+            <textarea value={form.descricao} onChange={e => atualizar('descricao', e.target.value)} placeholder="O que foi feito na visita..."/>
+          </div>
+          <div className="campo">
+            <label>RECOMENDAÇÕES</label>
+            <textarea value={form.recomendacoes} onChange={e => atualizar('recomendacoes', e.target.value)} placeholder="Recomendações para o produtor..." style={{minHeight:'80px'}}/>
+          </div>
+          <div className="campo">
+            <label>PRÓXIMO CONTATO</label>
+            <input type="date" value={form.proximo_contato} onChange={e => atualizar('proximo_contato', e.target.value)}/>
+          </div>
+
+          {erro && <div className="err">{erro}</div>}
+
+          <div className="form-actions">
+            <button type="submit" className="btn-salvar" disabled={carregando}>
+              {carregando ? 'Salvando...' : '✓ Salvar Visita'}
+            </button>
+            <button type="button" className="btn-cancelar" onClick={() => router.back()}>Cancelar</button>
+          </div>
+        </form>
+      </div>
+    </>
+  )
+}
