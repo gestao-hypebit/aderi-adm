@@ -98,10 +98,14 @@ export default function RelatorioVisitaPage() {
 
         /* IMPRESSÃO */
         @media print {
-          .acoes-tela{display:none !important}
-          .relatorio{box-shadow:none !important;border-radius:0 !important;padding:1.5rem !important;max-width:100% !important}
-          body{background:#fff !important}
-          .sidebar,.topbar,.main > *:not(.relatorio){display:none !important}
+            .acoes-tela { display: none !important; }
+            .sidebar { display: none !important; }
+            .topbar { display: none !important; }
+            .main { margin-left: 0 !important; width: 100% !important; }
+            .content { padding: 0 !important; }
+            .content > *:not(.relatorio) { display: none !important; }
+            .relatorio { box-shadow: none !important; border-radius: 0 !important; padding: 1.5rem !important; max-width: 100% !important; }
+            body { background: #fff !important; }
         }
       `}</style>
 
