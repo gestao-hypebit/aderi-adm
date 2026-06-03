@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 type Cliente = { id: string; nome: string; nome_fazenda: string }
 
-export default function NovaVisitaPage() {
+function NovaVisitaForm() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [form, setForm] = useState({
     cliente_id: '',
@@ -152,5 +152,13 @@ export default function NovaVisitaPage() {
         </form>
       </div>
     </>
+  )
+}
+
+export default function NovaVisitaPage() {
+  return (
+    <Suspense fallback={<div style={{textAlign:'center',padding:'3rem',color:'#aaa'}}>Carregando...</div>}>
+      <NovaVisitaForm />
+    </Suspense>
   )
 }
