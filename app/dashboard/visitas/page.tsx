@@ -32,6 +32,7 @@ function NovaVisitaForm() {
     motivo_outro: '',
   })
   const [carregando, setCarregando] = useState(false)
+  const [salvo, setSalvo] = useState(false)
   const [erro, setErro] = useState('')
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -78,8 +79,18 @@ function NovaVisitaForm() {
       motivo_outro: motivoOutroFinal,
     })
 
-    if (error) { setErro('Erro ao salvar. Tente novamente.'); setCarregando(false); return }
-    router.push('/dashboard/visitas')
+    if (error) {
+      setErro('Erro ao salvar. Tente novamente.')
+      setCarregando(false)
+      return
+    }
+
+    // Mostrar sucesso e redirecionar após 1.5s
+    setSalvo(true)
+    setCarregando(false)
+    setTimeout(() => {
+      router.push('/dashboard/visitas')
+    }, 1500)
   }
 
   return (
@@ -105,10 +116,12 @@ function NovaVisitaForm() {
         .motivo-outro-box{margin-top:.6rem;animation:fadeIn .2s ease}
         @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
         .err{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:.6rem 1rem;border-radius:8px;font-size:.8rem;margin-bottom:1rem}
+        .sucesso{background:#f0fdf4;border:1px solid #86efac;color:#166534;padding:.8rem 1rem;border-radius:8px;font-size:.85rem;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem;animation:fadeIn .3s ease}
         .form-actions{display:flex;gap:.8rem;margin-top:1.5rem}
-        .btn-salvar{background:#E67E22;color:#fff;border:none;padding:.8rem 1.8rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;transition:background .2s}
+        .btn-salvar{background:#E67E22;color:#fff;border:none;padding:.8rem 1.8rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:.5rem}
         .btn-salvar:hover{background:#d35400}
         .btn-salvar:disabled{opacity:.6;cursor:not-allowed}
+        .btn-salvar.salvo{background:#27ae60}
         .btn-cancelar{background:transparent;color:#888;border:1.5px solid #eae5de;padding:.8rem 1.8rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer}
         @media(max-width:600px){.form-grid{grid-template-columns:1fr}}
       `}</style>
@@ -146,7 +159,7 @@ function NovaVisitaForm() {
             </div>
           </div>
 
-          {/* MOTIVO E KM — NOVO */}
+          {/* MOTIVO E KM */}
           <div className="form-section">Motivo e Deslocamento</div>
           <div className="form-grid">
             <div className="campo form-full">
@@ -214,13 +227,20 @@ function NovaVisitaForm() {
             <input type="date" value={form.proximo_contato} onChange={e => atualizar('proximo_contato', e.target.value)}/>
           </div>
 
-          {erro && <div className="err">{erro}</div>}
+          {erro && <div className="err">❌ {erro}</div>}
+          {salvo && <div className="sucesso">✅ Visita salva com sucesso! Redirecionando...</div>}
 
           <div className="form-actions">
-            <button type="submit" className="btn-salvar" disabled={carregando}>
-              {carregando ? 'Salvando...' : '✓ Salvar Visita'}
+            <button
+              type="submit"
+              className={`btn-salvar${salvo ? ' salvo' : ''}`}
+              disabled={carregando || salvo}
+            >
+              {carregando ? '⏳ Salvando...' : salvo ? '✅ Salvo!' : '✓ Salvar Visita'}
             </button>
-            <button type="button" className="btn-cancelar" onClick={() => router.back()}>Cancelar</button>
+            <button type="button" className="btn-cancelar" onClick={() => router.back()} disabled={carregando || salvo}>
+              Cancelar
+            </button>
           </div>
         </form>
       </div>
