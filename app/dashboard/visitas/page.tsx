@@ -1,328 +1,237 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useParams, useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
-type Visita = {
-  id: string
-  data_visita: string
-  hora_visita: string
-  status: string
-  descricao: string
-  recomendacoes: string
-  proximo_contato: string
-  km_rodado: number | null
-  motivo_visita: string | null
-  motivo_outro: string | null
-  observacao_finalizacao: string | null
-  cliente: { id: string; nome: string; nome_fazenda: string; cidade: string; estado: string }
-  funcionario: { nome_completo: string }
-}
+type Cliente = { id: string; nome: string; nome_fazenda: string }
 
-export default function VisitaDetalhe() {
-  const { id } = useParams()
+const MOTIVOS = [
+  'Visita de rotina',
+  'Entrega de produtos',
+  'Negociação',
+  'Amostra de solo',
+  'Amostra de folha',
+  'Acompanhamento de entrega de produto',
+  'Outros',
+]
+
+function NovaVisitaForm() {
+  const [clientes, setClientes] = useState<Cliente[]>([])
+  const [form, setForm] = useState({
+    cliente_id: '',
+    data_visita: new Date().toISOString().split('T')[0],
+    hora_visita: '',
+    status: 'agendada',
+    descricao: '',
+    recomendacoes: '',
+    proximo_contato: '',
+    km_rodado: '',
+    motivo_visita: '',
+    motivo_outro: '',
+  })
+  const [carregando, setCarregando] = useState(false)
+  const [erro, setErro] = useState('')
   const router = useRouter()
-  const [visita, setVisita] = useState<Visita | null>(null)
-  const [carregando, setCarregando] = useState(true)
-  const [atualizando, setAtualizando] = useState(false)
+  const searchParams = useSearchParams()
   const supabase = createClient()
-
-  // Modal de finalização
-  const [modalAberto, setModalAberto] = useState(false)
-  const [observacaoModal, setObservacaoModal] = useState('')
-  const [salvandoObs, setSalvandoObs] = useState(false)
-
-  // Modo edição da observação
-  const [editandoObs, setEditandoObs] = useState(false)
-  const [obsEditada, setObsEditada] = useState('')
 
   useEffect(() => {
     async function carregar() {
-      const { data } = await supabase
-        .from('visitas')
-        .select('*, cliente:clientes(id, nome, nome_fazenda, cidade, estado), funcionario:profiles(nome_completo)')
-        .eq('id', id)
-        .single()
-      setVisita(data)
-      setCarregando(false)
+      const { data } = await supabase.from('clientes').select('id, nome, nome_fazenda').order('nome')
+      setClientes(data || [])
+      const clienteParam = searchParams.get('cliente')
+      if (clienteParam) setForm(f => ({ ...f, cliente_id: clienteParam }))
+      const dataParam = searchParams.get('data')
+      if (dataParam) setForm(f => ({ ...f, data_visita: dataParam }))
     }
     carregar()
-  }, [id])
+  }, [])
 
-  // Ao clicar em "Realizada", abre o modal em vez de salvar direto
-  async function mudarStatus(novoStatus: string) {
-    if (novoStatus === 'realizada' && visita?.status !== 'realizada') {
-      setObservacaoModal(visita?.observacao_finalizacao || '')
-      setModalAberto(true)
-      return
-    }
-    setAtualizando(true)
-    await supabase.from('visitas').update({ status: novoStatus }).eq('id', id)
-    setVisita(v => v ? { ...v, status: novoStatus } : v)
-    setAtualizando(false)
+  function atualizar(campo: string, valor: string) {
+    setForm(f => ({ ...f, [campo]: valor }))
   }
 
-  // Confirmar finalização com observação
-  async function confirmarFinalizacao() {
-    setSalvandoObs(true)
-    await supabase.from('visitas').update({
-      status: 'realizada',
-      observacao_finalizacao: observacaoModal || null,
-    }).eq('id', id)
-    setVisita(v => v ? { ...v, status: 'realizada', observacao_finalizacao: observacaoModal || null } : v)
-    setSalvandoObs(false)
-    setModalAberto(false)
-  }
+  async function salvar(e: React.FormEvent) {
+    e.preventDefault()
+    if (!form.cliente_id) { setErro('Selecione um cliente.'); return }
+    setCarregando(true)
+    setErro('')
 
-  // Salvar edição da observação depois
-  async function salvarEdicaoObs() {
-    setSalvandoObs(true)
-    await supabase.from('visitas').update({ observacao_finalizacao: obsEditada || null }).eq('id', id)
-    setVisita(v => v ? { ...v, observacao_finalizacao: obsEditada || null } : v)
-    setSalvandoObs(false)
-    setEditandoObs(false)
-  }
+    const { data: { user } } = await supabase.auth.getUser()
 
-  async function deletar() {
-    if (!confirm('Excluir esta visita?')) return
-    await supabase.from('visitas').delete().eq('id', id)
+    const motivoFinal = form.motivo_visita === 'Outros' ? 'Outros' : form.motivo_visita
+    const motivoOutroFinal = form.motivo_visita === 'Outros' ? form.motivo_outro : null
+
+    const { error } = await supabase.from('visitas').insert({
+      cliente_id: form.cliente_id,
+      data_visita: form.data_visita,
+      hora_visita: form.hora_visita || null,
+      status: form.status,
+      descricao: form.descricao,
+      recomendacoes: form.recomendacoes,
+      proximo_contato: form.proximo_contato || null,
+      funcionario_id: user?.id,
+      km_rodado: form.km_rodado ? parseFloat(form.km_rodado) : null,
+      motivo_visita: motivoFinal || null,
+      motivo_outro: motivoOutroFinal,
+    })
+
+    if (error) { setErro('Erro ao salvar. Tente novamente.'); setCarregando(false); return }
     router.push('/dashboard/visitas')
   }
-
-  const statusCor: Record<string, string> = {
-    agendada: '#E67E22',
-    realizada: '#27ae60',
-    cancelada: '#e74c3c'
-  }
-
-  const motivoExibido = visita?.motivo_visita === 'Outros'
-    ? `Outros — ${visita.motivo_outro || ''}`
-    : visita?.motivo_visita
-
-  if (carregando) return <div style={{textAlign:'center',padding:'3rem',color:'#aaa'}}>Carregando...</div>
-  if (!visita) return <div style={{textAlign:'center',padding:'3rem',color:'#aaa'}}>Visita não encontrada.</div>
-
-  const data = new Date(visita.data_visita + 'T12:00:00')
 
   return (
     <>
       <style>{`
         .voltar{display:inline-flex;align-items:center;gap:.4rem;color:#E67E22;font-size:.82rem;font-weight:700;text-decoration:none;margin-bottom:1.2rem}
-        .visita-header{background:#fff;border-radius:14px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,.05);margin-bottom:1.2rem;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem}
-        .visita-data-grande{text-align:center;background:#f0ede8;border-radius:10px;padding:.8rem 1.2rem;min-width:70px}
-        .dia-num{font-size:2rem;font-weight:900;color:#162a1e;line-height:1}
-        .mes-txt{font-size:.72rem;font-weight:700;color:#aaa;text-transform:uppercase}
-        .visita-titulo{flex:1}
-        .cliente-nome{font-size:1.2rem;font-weight:700;color:#162a1e}
-        .cliente-fazenda{color:#E67E22;font-size:.85rem;font-weight:700;margin:.2rem 0}
-        .cliente-loc{color:#aaa;font-size:.78rem}
-        .status-atual{display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;font-weight:700;padding:.35rem 1rem;border-radius:20px;color:#fff;margin-top:.5rem}
-        .acoes{display:flex;gap:.6rem;flex-wrap:wrap}
-        .btn-acao{padding:.55rem 1rem;border-radius:8px;border:none;font-family:'Comfortaa',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .2s}
-        .secao{background:#fff;border-radius:12px;padding:1.2rem 1.5rem;box-shadow:0 2px 6px rgba(0,0,0,.04);margin-bottom:1rem}
-        .secao-label{font-size:.68rem;font-weight:700;color:#E67E22;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.6rem}
-        .secao-texto{font-size:.88rem;color:#444;line-height:1.8}
-        .status-btns{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem}
-        .status-btn{padding:.45rem 1rem;border-radius:20px;border:1.5px solid;font-family:'Comfortaa',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer;transition:all .2s;background:transparent}
-        .info-row{display:flex;gap:.5rem;align-items:center;font-size:.85rem;color:#444;margin-bottom:.4rem}
-        .info-row span{font-weight:700;color:#162a1e}
-        .link-cliente{display:inline-flex;align-items:center;gap:.4rem;color:#E67E22;font-size:.82rem;font-weight:700;text-decoration:none;margin-top:.5rem}
-
-        /* Info chips */
-        .info-chips{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.4rem}
-        .chip{display:inline-flex;align-items:center;gap:.35rem;background:#f0ede8;border-radius:20px;padding:.3rem .8rem;font-size:.78rem;font-weight:700;color:#162a1e}
-
-        /* Observação */
-        .obs-vazia{font-size:.82rem;color:#aaa;font-style:italic}
-        .obs-texto{font-size:.88rem;color:#444;line-height:1.8;background:#f7f5f0;border-radius:8px;padding:.8rem 1rem}
-        .obs-acoes{display:flex;gap:.5rem;margin-top:.8rem}
-        .btn-obs{padding:.4rem .9rem;border-radius:8px;border:none;font-family:'Comfortaa',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer;transition:all .2s}
-        .btn-obs-edit{background:#f0ede8;color:#162a1e}
-        .btn-obs-edit:hover{background:#e0dbd2}
-        .btn-obs-salvar{background:#162a1e;color:#fff}
-        .btn-obs-salvar:hover{background:#0d1f14}
-        .btn-obs-salvar:disabled{opacity:.6;cursor:not-allowed}
-        .btn-obs-cancelar{background:transparent;color:#aaa;border:1px solid #eae5de}
-        .obs-textarea{width:100%;padding:.7rem 1rem;border:1.5px solid #E67E22;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;background:#fff;resize:vertical;min-height:90px;outline:none;box-sizing:border-box}
-
-        /* Modal overlay */
-        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem}
-        .modal-box{background:#fff;border-radius:16px;padding:2rem;max-width:480px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.15)}
-        .modal-titulo{font-size:1rem;font-weight:700;color:#162a1e;margin-bottom:.4rem}
-        .modal-sub{font-size:.82rem;color:#888;margin-bottom:1.2rem}
-        .modal-textarea{width:100%;padding:.8rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;background:#fafaf8;resize:vertical;min-height:100px;outline:none;box-sizing:border-box;transition:border-color .2s}
-        .modal-textarea:focus{border-color:#27ae60;background:#fff}
-        .modal-btns{display:flex;gap:.6rem;margin-top:1rem;justify-content:flex-end}
-        .btn-modal-confirmar{background:#27ae60;color:#fff;border:none;padding:.7rem 1.4rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer;transition:background .2s}
-        .btn-modal-confirmar:hover{background:#219150}
-        .btn-modal-confirmar:disabled{opacity:.6;cursor:not-allowed}
-        .btn-modal-cancelar{background:transparent;color:#888;border:1.5px solid #eae5de;padding:.7rem 1.2rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer}
+        .page-title{font-size:1.3rem;font-weight:700;color:#162a1e;margin-bottom:1.5rem}
+        .form-card{background:#fff;border-radius:12px;padding:1.8rem;box-shadow:0 2px 8px rgba(0,0,0,.05);max-width:720px;margin:0 auto}
+        .form-section{font-size:.7rem;font-weight:700;color:#E67E22;letter-spacing:.08em;text-transform:uppercase;margin:1.2rem 0 .8rem;padding-bottom:.4rem;border-bottom:1px solid #f0ede8}
+        .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+        .form-full{grid-column:1/-1}
+        .campo label{display:block;font-size:.72rem;font-weight:700;color:#555;letter-spacing:.04em;margin-bottom:.35rem}
+        .campo input,.campo select,.campo textarea{width:100%;padding:.7rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;outline:none;transition:border-color .2s;background:#fafaf8;box-sizing:border-box}
+        .campo input:focus,.campo select:focus,.campo textarea:focus{border-color:#E67E22;background:#fff}
+        .campo textarea{resize:vertical;min-height:100px}
+        .status-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
+        .status-opt{border:1.5px solid #eae5de;border-radius:8px;padding:.6rem;text-align:center;cursor:pointer;font-size:.78rem;font-weight:700;color:#888;transition:all .2s;background:#fafaf8}
+        .status-opt.sel-agendada{border-color:#E67E22;background:#fff8f3;color:#E67E22}
+        .status-opt.sel-realizada{border-color:#27ae60;background:#f0fdf4;color:#27ae60}
+        .status-opt.sel-cancelada{border-color:#e74c3c;background:#fef2f2;color:#e74c3c}
+        .motivo-select{width:100%;padding:.7rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;outline:none;transition:border-color .2s;background:#fafaf8;cursor:pointer;box-sizing:border-box}
+        .motivo-select:focus{border-color:#E67E22;background:#fff}
+        .motivo-outro-box{margin-top:.6rem;animation:fadeIn .2s ease}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+        .err{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:.6rem 1rem;border-radius:8px;font-size:.8rem;margin-bottom:1rem}
+        .form-actions{display:flex;gap:.8rem;margin-top:1.5rem}
+        .btn-salvar{background:#E67E22;color:#fff;border:none;padding:.8rem 1.8rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;transition:background .2s}
+        .btn-salvar:hover{background:#d35400}
+        .btn-salvar:disabled{opacity:.6;cursor:not-allowed}
+        .btn-cancelar{background:transparent;color:#888;border:1.5px solid #eae5de;padding:.8rem 1.8rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer}
+        @media(max-width:600px){.form-grid{grid-template-columns:1fr}}
       `}</style>
 
-      {/* MODAL de finalização */}
-      {modalAberto && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setModalAberto(false) }}>
-          <div className="modal-box">
-            <div className="modal-titulo">✅ Finalizar visita</div>
-            <div className="modal-sub">Adicione uma observação sobre como foi a visita (opcional)</div>
-            <textarea
-              className="modal-textarea"
-              placeholder="Ex: Produtor demonstrou interesse nos produtos... Solo com deficiência de potássio identificada..."
-              value={observacaoModal}
-              onChange={e => setObservacaoModal(e.target.value)}
-              autoFocus
-            />
-            <div className="modal-btns">
-              <button className="btn-modal-cancelar" onClick={() => setModalAberto(false)}>Cancelar</button>
-              <button
-                className="btn-modal-confirmar"
-                onClick={confirmarFinalizacao}
-                disabled={salvandoObs}
-              >
-                {salvandoObs ? 'Salvando...' : '✓ Confirmar Finalização'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <Link href="/dashboard/visitas" className="voltar">← Voltar</Link>
+      <h1 className="page-title">Nova Visita</h1>
 
-      <div className="visita-header">
-        <div style={{display:'flex',gap:'1rem',alignItems:'flex-start',flex:1}}>
-          <div className="visita-data-grande">
-            <div className="dia-num">{String(data.getDate()).padStart(2,'0')}</div>
-            <div className="mes-txt">{data.toLocaleDateString('pt-BR',{month:'short'})}</div>
-            <div className="mes-txt">{data.getFullYear()}</div>
+      <div className="form-card">
+        <form onSubmit={salvar}>
+
+          {/* CLIENTE */}
+          <div className="form-section">Cliente</div>
+          <div className="campo">
+            <label>SELECIONAR CLIENTE *</label>
+            <select value={form.cliente_id} onChange={e => atualizar('cliente_id', e.target.value)} required>
+              <option value="">Selecione o cliente...</option>
+              {clientes.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}{c.nome_fazenda ? ` — ${c.nome_fazenda}` : ''}
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="visita-titulo">
-            <div className="cliente-nome">{visita.cliente?.nome}</div>
-            {visita.cliente?.nome_fazenda && <div className="cliente-fazenda">🌾 {visita.cliente.nome_fazenda}</div>}
-            <div className="cliente-loc">📍 {visita.cliente?.cidade}/{visita.cliente?.estado}</div>
-            {/* Chips de motivo e KM */}
-            <div className="info-chips">
-              {motivoExibido && <span className="chip">🎯 {motivoExibido}</span>}
-              {visita.km_rodado != null && <span className="chip">🛣️ {visita.km_rodado} km</span>}
+
+          {/* DATA E HORÁRIO */}
+          <div className="form-section">Data e Horário</div>
+          <div className="form-grid">
+            <div className="campo">
+              <label>DATA DA VISITA *</label>
+              <input type="date" value={form.data_visita} onChange={e => atualizar('data_visita', e.target.value)} required/>
             </div>
-            <div className="status-atual" style={{background: statusCor[visita.status]}}>
-              {visita.status === 'agendada' ? '📅' : visita.status === 'realizada' ? '✅' : '❌'} {visita.status}
+            <div className="campo">
+              <label>HORA</label>
+              <input type="time" value={form.hora_visita} onChange={e => atualizar('hora_visita', e.target.value)}/>
             </div>
           </div>
-        </div>
-        <div className="acoes">
-          <button className="btn-acao" style={{background:'#fef2f2',color:'#e74c3c'}} onClick={deletar}>🗑️ Excluir</button>
-        </div>
-      </div>
 
-      {/* Alterar Status */}
-      <div className="secao">
-        <div className="secao-label">Alterar Status</div>
-        <div className="status-btns">
-          {['agendada','realizada','cancelada'].map(s => (
-            <button
-              key={s}
-              className="status-btn"
-              style={{
-                borderColor: statusCor[s],
-                color: visita.status === s ? '#fff' : statusCor[s],
-                background: visita.status === s ? statusCor[s] : 'transparent',
-                opacity: atualizando ? 0.6 : 1
-              }}
-              onClick={() => mudarStatus(s)}
-              disabled={atualizando || visita.status === s}
-            >
-              {s === 'agendada' ? '📅' : s === 'realizada' ? '✅' : '❌'} {s.charAt(0).toUpperCase() + s.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Motivo e KM */}
-      {(motivoExibido || visita.km_rodado != null) && (
-        <div className="secao">
-          <div className="secao-label">Deslocamento e Motivo</div>
-          {motivoExibido && <div className="info-row">🎯 <span>{motivoExibido}</span></div>}
-          {visita.km_rodado != null && <div className="info-row">🛣️ <span>{visita.km_rodado} km rodados</span></div>}
-        </div>
-      )}
-
-      {/* Observação de finalização */}
-      {visita.status === 'realizada' && (
-        <div className="secao">
-          <div className="secao-label">Observação de Finalização</div>
-          {editandoObs ? (
-            <>
-              <textarea
-                className="obs-textarea"
-                value={obsEditada}
-                onChange={e => setObsEditada(e.target.value)}
-                placeholder="Escreva uma observação sobre esta visita..."
-                autoFocus
+          {/* MOTIVO E KM — NOVO */}
+          <div className="form-section">Motivo e Deslocamento</div>
+          <div className="form-grid">
+            <div className="campo form-full">
+              <label>MOTIVO DA VISITA</label>
+              <select
+                className="motivo-select"
+                value={form.motivo_visita}
+                onChange={e => atualizar('motivo_visita', e.target.value)}
+              >
+                <option value="">Selecione o motivo...</option>
+                {MOTIVOS.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              {form.motivo_visita === 'Outros' && (
+                <div className="motivo-outro-box">
+                  <input
+                    type="text"
+                    placeholder="Descreva o motivo..."
+                    value={form.motivo_outro}
+                    onChange={e => atualizar('motivo_outro', e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="campo">
+              <label>KM RODADO</label>
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder="Ex: 142.5"
+                value={form.km_rodado}
+                onChange={e => atualizar('km_rodado', e.target.value)}
               />
-              <div className="obs-acoes">
-                <button className="btn-obs btn-obs-salvar" onClick={salvarEdicaoObs} disabled={salvandoObs}>
-                  {salvandoObs ? 'Salvando...' : '✓ Salvar'}
-                </button>
-                <button className="btn-obs btn-obs-cancelar" onClick={() => setEditandoObs(false)}>Cancelar</button>
+            </div>
+          </div>
+
+          {/* STATUS */}
+          <div className="form-section">Status</div>
+          <div className="status-grid">
+            {['agendada','realizada','cancelada'].map(s => (
+              <div
+                key={s}
+                className={`status-opt ${form.status === s ? `sel-${s}` : ''}`}
+                onClick={() => atualizar('status', s)}
+              >
+                {s === 'agendada' ? '📅' : s === 'realizada' ? '✅' : '❌'} {s.charAt(0).toUpperCase() + s.slice(1)}
               </div>
-            </>
-          ) : (
-            <>
-              {visita.observacao_finalizacao
-                ? <div className="obs-texto">{visita.observacao_finalizacao}</div>
-                : <div className="obs-vazia">Nenhuma observação registrada.</div>
-              }
-              <div className="obs-acoes">
-                <button
-                  className="btn-obs btn-obs-edit"
-                  onClick={() => { setObsEditada(visita.observacao_finalizacao || ''); setEditandoObs(true) }}
-                >
-                  ✏️ {visita.observacao_finalizacao ? 'Editar observação' : 'Adicionar observação'}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
+            ))}
+          </div>
 
-      {visita.hora_visita && (
-        <div className="secao">
-          <div className="secao-label">Horário</div>
-          <div className="info-row">⏰ <span>{visita.hora_visita.slice(0,5)}</span></div>
-        </div>
-      )}
+          {/* DETALHES */}
+          <div className="form-section">Detalhes</div>
+          <div className="campo">
+            <label>DESCRIÇÃO DA VISITA</label>
+            <textarea value={form.descricao} onChange={e => atualizar('descricao', e.target.value)} placeholder="O que foi feito na visita..."/>
+          </div>
+          <div className="campo">
+            <label>RECOMENDAÇÕES</label>
+            <textarea value={form.recomendacoes} onChange={e => atualizar('recomendacoes', e.target.value)} placeholder="Recomendações para o produtor..." style={{minHeight:'80px'}}/>
+          </div>
+          <div className="campo">
+            <label>PRÓXIMO CONTATO</label>
+            <input type="date" value={form.proximo_contato} onChange={e => atualizar('proximo_contato', e.target.value)}/>
+          </div>
 
-      {visita.descricao && (
-        <div className="secao">
-          <div className="secao-label">Descrição da Visita</div>
-          <div className="secao-texto">{visita.descricao}</div>
-        </div>
-      )}
+          {erro && <div className="err">{erro}</div>}
 
-      {visita.recomendacoes && (
-        <div className="secao">
-          <div className="secao-label">Recomendações</div>
-          <div className="secao-texto">{visita.recomendacoes}</div>
-        </div>
-      )}
-
-      {visita.proximo_contato && (
-        <div className="secao">
-          <div className="secao-label">Próximo Contato</div>
-          <div className="info-row">📅 <span>{new Date(visita.proximo_contato + 'T12:00:00').toLocaleDateString('pt-BR')}</span></div>
-        </div>
-      )}
-
-      <div className="secao">
-        <div className="secao-label">Cliente</div>
-        <div className="info-row">👤 <span>{visita.cliente?.nome}</span></div>
-        {visita.cliente?.nome_fazenda && <div className="info-row">🌾 <span>{visita.cliente.nome_fazenda}</span></div>}
-        <Link href={`/dashboard/clientes/${visita.cliente?.id}`} className="link-cliente">
-          Ver perfil completo do cliente →
-        </Link>
+          <div className="form-actions">
+            <button type="submit" className="btn-salvar" disabled={carregando}>
+              {carregando ? 'Salvando...' : '✓ Salvar Visita'}
+            </button>
+            <button type="button" className="btn-cancelar" onClick={() => router.back()}>Cancelar</button>
+          </div>
+        </form>
       </div>
     </>
+  )
+}
+
+export default function NovaVisitaPage() {
+  return (
+    <Suspense fallback={<div style={{textAlign:'center',padding:'3rem',color:'#aaa'}}>Carregando...</div>}>
+      <NovaVisitaForm />
+    </Suspense>
   )
 }
