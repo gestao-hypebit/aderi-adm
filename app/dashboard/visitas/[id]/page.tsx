@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -21,6 +21,18 @@ type Visita = {
   funcionario: { nome_completo: string }
 }
 
+type FotoPreview = {
+  file: File
+  preview: string
+  legenda: string
+}
+
+type FotoSalva = {
+  id: string
+  url: string
+  legenda: string | null
+}
+
 export default function VisitaDetalhe() {
   const { id } = useParams()
   const router = useRouter()
@@ -32,11 +44,17 @@ export default function VisitaDetalhe() {
   // Modal de finalização
   const [modalAberto, setModalAberto] = useState(false)
   const [observacaoModal, setObservacaoModal] = useState('')
+  const [fotosModal, setFotosModal] = useState<FotoPreview[]>([])
   const [salvandoObs, setSalvandoObs] = useState(false)
+  const inputFotoRef = useRef<HTMLInputElement>(null)
 
   // Modo edição da observação
   const [editandoObs, setEditandoObs] = useState(false)
   const [obsEditada, setObsEditada] = useState('')
+
+  // Fotos salvas da visita
+  const [fotos, setFotos] = useState<FotoSalva[]>([])
+  const [carregandoFotos, setCarregandoFotos] = useState(false)
 
   useEffect(() => {
     async function carregar() {
@@ -47,14 +65,45 @@ export default function VisitaDetalhe() {
         .single()
       setVisita(data)
       setCarregando(false)
+      if (data?.status === 'realizada') carregarFotos()
     }
     carregar()
   }, [id])
 
-  // Ao clicar em "Realizada", abre o modal em vez de salvar direto
+  async function carregarFotos() {
+    setCarregandoFotos(true)
+    const { data } = await supabase
+      .from('visita_fotos')
+      .select('id, url, legenda')
+      .eq('visita_id', id)
+      .order('created_at')
+    setFotos(data || [])
+    setCarregandoFotos(false)
+  }
+
+  function adicionarFotos(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || [])
+    const novas: FotoPreview[] = files.map(file => ({
+      file,
+      preview: URL.createObjectURL(file),
+      legenda: ''
+    }))
+    setFotosModal(prev => [...prev, ...novas])
+    if (inputFotoRef.current) inputFotoRef.current.value = ''
+  }
+
+  function removerFotoModal(index: number) {
+    setFotosModal(prev => prev.filter((_, i) => i !== index))
+  }
+
+  function atualizarLegenda(index: number, legenda: string) {
+    setFotosModal(prev => prev.map((f, i) => i === index ? { ...f, legenda } : f))
+  }
+
   async function mudarStatus(novoStatus: string) {
     if (novoStatus === 'realizada' && visita?.status !== 'realizada') {
       setObservacaoModal(visita?.observacao_finalizacao || '')
+      setFotosModal([])
       setModalAberto(true)
       return
     }
@@ -64,25 +113,53 @@ export default function VisitaDetalhe() {
     setAtualizando(false)
   }
 
-  // Confirmar finalização com observação
   async function confirmarFinalizacao() {
     setSalvandoObs(true)
+
+    // Salvar observação
     await supabase.from('visitas').update({
       status: 'realizada',
       observacao_finalizacao: observacaoModal || null,
     }).eq('id', id)
     setVisita(v => v ? { ...v, status: 'realizada', observacao_finalizacao: observacaoModal || null } : v)
+
+    // Upload das fotos
+    for (const foto of fotosModal) {
+      const ext = foto.file.name.split('.').pop()
+      const path = `${id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const { data: uploadData, error } = await supabase.storage
+        .from('visita-fotos')
+        .upload(path, foto.file, { contentType: foto.file.type })
+
+      if (!error && uploadData) {
+        const { data: urlData } = supabase.storage.from('visita-fotos').getPublicUrl(path)
+        await supabase.from('visita_fotos').insert({
+          visita_id: id,
+          url: urlData.publicUrl,
+          legenda: foto.legenda || null,
+        })
+      }
+    }
+
     setSalvandoObs(false)
     setModalAberto(false)
+    carregarFotos()
   }
 
-  // Salvar edição da observação depois
   async function salvarEdicaoObs() {
     setSalvandoObs(true)
     await supabase.from('visitas').update({ observacao_finalizacao: obsEditada || null }).eq('id', id)
     setVisita(v => v ? { ...v, observacao_finalizacao: obsEditada || null } : v)
     setSalvandoObs(false)
     setEditandoObs(false)
+  }
+
+  async function deletarFoto(fotoId: string, url: string) {
+    if (!confirm('Excluir esta foto?')) return
+    const path = url.split('/visita-fotos/')[1]
+    await supabase.storage.from('visita-fotos').remove([path])
+    await supabase.from('visita_fotos').delete().eq('id', fotoId)
+    setFotos(prev => prev.filter(f => f.id !== fotoId))
   }
 
   async function deletar() {
@@ -129,12 +206,8 @@ export default function VisitaDetalhe() {
         .info-row{display:flex;gap:.5rem;align-items:center;font-size:.85rem;color:#444;margin-bottom:.4rem}
         .info-row span{font-weight:700;color:#162a1e}
         .link-cliente{display:inline-flex;align-items:center;gap:.4rem;color:#E67E22;font-size:.82rem;font-weight:700;text-decoration:none;margin-top:.5rem}
-
-        /* Info chips */
         .info-chips{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.4rem}
         .chip{display:inline-flex;align-items:center;gap:.35rem;background:#f0ede8;border-radius:20px;padding:.3rem .8rem;font-size:.78rem;font-weight:700;color:#162a1e}
-
-        /* Observação */
         .obs-vazia{font-size:.82rem;color:#aaa;font-style:italic}
         .obs-texto{font-size:.88rem;color:#444;line-height:1.8;background:#f7f5f0;border-radius:8px;padding:.8rem 1rem}
         .obs-acoes{display:flex;gap:.5rem;margin-top:.8rem}
@@ -147,26 +220,49 @@ export default function VisitaDetalhe() {
         .btn-obs-cancelar{background:transparent;color:#aaa;border:1px solid #eae5de}
         .obs-textarea{width:100%;padding:.7rem 1rem;border:1.5px solid #E67E22;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;background:#fff;resize:vertical;min-height:90px;outline:none;box-sizing:border-box}
 
-        /* Modal overlay */
-        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem}
-        .modal-box{background:#fff;border-radius:16px;padding:2rem;max-width:480px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+        /* Fotos salvas */
+        .fotos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1rem;margin-top:.8rem}
+        .foto-item{position:relative;border-radius:10px;overflow:hidden;border:1px solid #eae5de}
+        .foto-img{width:100%;height:140px;object-fit:cover;display:block}
+        .foto-legenda{padding:.5rem .7rem;font-size:.72rem;color:#555;background:#fafaf8;border-top:1px solid #f0ede8;font-style:italic}
+        .foto-del{position:absolute;top:5px;right:5px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:.75rem;display:flex;align-items:center;justify-content:center}
+        .btn-add-foto{display:inline-flex;align-items:center;gap:.4rem;background:#f0ede8;color:#162a1e;border:none;padding:.5rem 1rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;transition:background .2s;margin-top:.8rem}
+        .btn-add-foto:hover{background:#e0dbd2}
+
+        /* Modal */
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem;overflow-y:auto}
+        .modal-box{background:#fff;border-radius:16px;padding:2rem;max-width:560px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.15);max-height:90vh;overflow-y:auto}
         .modal-titulo{font-size:1rem;font-weight:700;color:#162a1e;margin-bottom:.4rem}
         .modal-sub{font-size:.82rem;color:#888;margin-bottom:1.2rem}
-        .modal-textarea{width:100%;padding:.8rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;background:#fafaf8;resize:vertical;min-height:100px;outline:none;box-sizing:border-box;transition:border-color .2s}
+        .modal-textarea{width:100%;padding:.8rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;background:#fafaf8;resize:vertical;min-height:90px;outline:none;box-sizing:border-box;transition:border-color .2s}
         .modal-textarea:focus{border-color:#27ae60;background:#fff}
-        .modal-btns{display:flex;gap:.6rem;margin-top:1rem;justify-content:flex-end}
+        .modal-divider{border:none;border-top:1px solid #f0ede8;margin:1.2rem 0}
+        .modal-secao-label{font-size:.7rem;font-weight:700;color:#E67E22;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.8rem}
+
+        /* Fotos no modal */
+        .fotos-preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.8rem;margin-bottom:.8rem}
+        .foto-preview-item{border-radius:10px;overflow:hidden;border:1.5px solid #eae5de;position:relative}
+        .foto-preview-img{width:100%;height:120px;object-fit:cover;display:block}
+        .foto-preview-legenda{width:100%;padding:.4rem .5rem;border:none;border-top:1px solid #f0ede8;font-family:'Comfortaa',sans-serif;font-size:.72rem;color:#162a1e;background:#fafaf8;outline:none;box-sizing:border-box}
+        .foto-preview-legenda::placeholder{color:#bbb}
+        .foto-preview-del{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:.72rem;display:flex;align-items:center;justify-content:center}
+        .btn-upload-foto{display:inline-flex;align-items:center;gap:.5rem;background:#f0ede8;color:#162a1e;border:1.5px dashed #ccc;padding:.7rem 1.2rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;transition:all .2s;width:100%;justify-content:center}
+        .btn-upload-foto:hover{background:#e0dbd2;border-color:#E67E22}
+
+        .modal-btns{display:flex;gap:.6rem;margin-top:1rem;justify-content:flex-end;flex-wrap:wrap}
         .btn-modal-confirmar{background:#27ae60;color:#fff;border:none;padding:.7rem 1.4rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer;transition:background .2s}
         .btn-modal-confirmar:hover{background:#219150}
         .btn-modal-confirmar:disabled{opacity:.6;cursor:not-allowed}
         .btn-modal-cancelar{background:transparent;color:#888;border:1.5px solid #eae5de;padding:.7rem 1.2rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer}
       `}</style>
 
-      {/* MODAL de finalização */}
+      {/* MODAL de finalização com fotos */}
       {modalAberto && (
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setModalAberto(false) }}>
           <div className="modal-box">
             <div className="modal-titulo">✅ Finalizar visita</div>
-            <div className="modal-sub">Adicione uma observação sobre como foi a visita (opcional)</div>
+            <div className="modal-sub">Adicione uma observação e fotos da visita (opcional)</div>
+
             <textarea
               className="modal-textarea"
               placeholder="Ex: Produtor demonstrou interesse nos produtos... Solo com deficiência de potássio identificada..."
@@ -174,6 +270,39 @@ export default function VisitaDetalhe() {
               onChange={e => setObservacaoModal(e.target.value)}
               autoFocus
             />
+
+            <hr className="modal-divider"/>
+            <div className="modal-secao-label">📷 Fotos da visita</div>
+
+            {fotosModal.length > 0 && (
+              <div className="fotos-preview-grid">
+                {fotosModal.map((foto, i) => (
+                  <div key={i} className="foto-preview-item">
+                    <img src={foto.preview} alt="" className="foto-preview-img"/>
+                    <button className="foto-preview-del" onClick={() => removerFotoModal(i)}>✕</button>
+                    <input
+                      className="foto-preview-legenda"
+                      placeholder="Legenda da foto..."
+                      value={foto.legenda}
+                      onChange={e => atualizarLegenda(i, e.target.value)}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <input
+              ref={inputFotoRef}
+              type="file"
+              accept="image/*"
+              multiple
+              style={{display:'none'}}
+              onChange={adicionarFotos}
+            />
+            <button className="btn-upload-foto" onClick={() => inputFotoRef.current?.click()}>
+              📷 {fotosModal.length > 0 ? 'Adicionar mais fotos' : 'Selecionar fotos'}
+            </button>
+
             <div className="modal-btns">
               <button className="btn-modal-cancelar" onClick={() => setModalAberto(false)}>Cancelar</button>
               <button
@@ -201,7 +330,6 @@ export default function VisitaDetalhe() {
             <div className="cliente-nome">{visita.cliente?.nome}</div>
             {visita.cliente?.nome_fazenda && <div className="cliente-fazenda">🌾 {visita.cliente.nome_fazenda}</div>}
             <div className="cliente-loc">📍 {visita.cliente?.cidade}/{visita.cliente?.estado}</div>
-            {/* Chips de motivo e KM */}
             <div className="info-chips">
               {motivoExibido && <span className="chip">🎯 {motivoExibido}</span>}
               {visita.km_rodado != null && <span className="chip">🛣️ {visita.km_rodado} km</span>}
@@ -287,10 +415,25 @@ export default function VisitaDetalhe() {
         </div>
       )}
 
-      {visita.hora_visita && (
+      {/* Fotos da visita */}
+      {visita.status === 'realizada' && (
         <div className="secao">
-          <div className="secao-label">Horário</div>
-          <div className="info-row">⏰ <span>{visita.hora_visita.slice(0,5)}</span></div>
+          <div className="secao-label">Fotos da Visita</div>
+          {carregandoFotos ? (
+            <div style={{color:'#aaa',fontSize:'.82rem'}}>Carregando fotos...</div>
+          ) : fotos.length === 0 ? (
+            <div className="obs-vazia">Nenhuma foto adicionada.</div>
+          ) : (
+            <div className="fotos-grid">
+              {fotos.map(foto => (
+                <div key={foto.id} className="foto-item">
+                  <img src={foto.url} alt={foto.legenda || ''} className="foto-img"/>
+                  <button className="foto-del" onClick={() => deletarFoto(foto.id, foto.url)}>✕</button>
+                  {foto.legenda && <div className="foto-legenda">{foto.legenda}</div>}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
