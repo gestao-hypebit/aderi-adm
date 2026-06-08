@@ -146,44 +146,12 @@ function NovaVisitaForm() {
             </select>
           </div>
 
-          {/* DATA E HORÁRIO */}
-          <div className="form-section">Data e Horário</div>
+          {/* DATA E KM */}
+          <div className="form-section">Data e Deslocamento</div>
           <div className="form-grid">
             <div className="campo">
               <label>DATA DA VISITA *</label>
               <input type="date" value={form.data_visita} onChange={e => atualizar('data_visita', e.target.value)} required/>
-            </div>
-            <div className="campo">
-              <label>HORA</label>
-              <input type="time" value={form.hora_visita} onChange={e => atualizar('hora_visita', e.target.value)}/>
-            </div>
-          </div>
-
-          {/* MOTIVO E KM */}
-          <div className="form-section">Motivo e Deslocamento</div>
-          <div className="form-grid">
-            <div className="campo form-full">
-              <label>MOTIVO DA VISITA</label>
-              <select
-                className="motivo-select"
-                value={form.motivo_visita}
-                onChange={e => atualizar('motivo_visita', e.target.value)}
-              >
-                <option value="">Selecione o motivo...</option>
-                {MOTIVOS.map(m => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-              {form.motivo_visita === 'Outros' && (
-                <div className="motivo-outro-box">
-                  <input
-                    type="text"
-                    placeholder="Descreva o motivo..."
-                    value={form.motivo_outro}
-                    onChange={e => atualizar('motivo_outro', e.target.value)}
-                  />
-                </div>
-              )}
             </div>
             <div className="campo">
               <label>KM RODADO</label>
@@ -196,6 +164,32 @@ function NovaVisitaForm() {
                 onChange={e => atualizar('km_rodado', e.target.value)}
               />
             </div>
+          </div>
+
+          {/* MOTIVO */}
+          <div className="form-section">Motivo da Visita</div>
+          <div className="campo">
+            <label>MOTIVO DA VISITA</label>
+            <select
+              className="motivo-select"
+              value={form.motivo_visita}
+              onChange={e => atualizar('motivo_visita', e.target.value)}
+            >
+              <option value="">Selecione o motivo...</option>
+              {MOTIVOS.map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            {form.motivo_visita === 'Outros' && (
+              <div className="motivo-outro-box">
+                <input
+                  type="text"
+                  placeholder="Descreva o motivo..."
+                  value={form.motivo_outro}
+                  onChange={e => atualizar('motivo_outro', e.target.value)}
+                />
+              </div>
+            )}
           </div>
 
           {/* STATUS */}
