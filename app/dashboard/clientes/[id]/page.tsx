@@ -101,7 +101,7 @@ export default function ClientePerfilPage() {
           </div>
         </div>
         <div className="perfil-acoes">
-          <Link href={`/dashboard/visitas/nova?cliente=${cliente.id}`} className="btn-visita">
+          <Link href={`/dashboard/visitas/novo?cliente=${cliente.id}`} className="btn-visita">
             + Nova Visita
           </Link>
           <Link href={`/dashboard/clientes/${cliente.id}/editar`} className="btn-editar">
@@ -137,7 +137,7 @@ export default function ClientePerfilPage() {
       {visitas.length === 0 ? (
         <div className="vazio-visitas">
           Nenhuma visita registrada ainda.<br/>
-          <Link href={`/dashboard/visitas/nova?cliente=${cliente.id}`} className="btn-visita" style={{marginTop:'1rem',display:'inline-flex'}}>
+          <Link href={`/dashboard/visitas/novo?cliente=${cliente.id}`} className="btn-visita" style={{marginTop:'1rem',display:'inline-flex'}}>
             + Registrar primeira visita
           </Link>
         </div>

@@ -170,7 +170,7 @@ export default function AgendamentoPage() {
           <div className="page-title">📅 Agenda de Visitas</div>
           <div className="page-sub">Clique em um dia para ver e agendar visitas</div>
         </div>
-        <Link href={`/dashboard/visitas/nova?data=${dataParaNovaVisita}`} className="btn-nova">
+        <Link href={`/dashboard/visitas/novo?data=${dataParaNovaVisita}`} className="btn-nova">
           + Nova Visita
         </Link>
       </div>
@@ -234,7 +234,7 @@ export default function AgendamentoPage() {
                 }
               </div>
             </div>
-            <Link href={`/dashboard/visitas/nova?data=${dataParaNovaVisita}`} className="btn-agendar">
+            <Link href={`/dashboard/visitas/novo?data=${dataParaNovaVisita}`} className="btn-agendar">
               + Agendar neste dia
             </Link>
           </div>

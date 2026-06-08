@@ -173,7 +173,7 @@ export default async function DashboardHome() {
 
       {/* Ações rápidas */}
       <div className="acoes-rapidas">
-        <Link href="/dashboard/visitas/nova" className="btn-acao-home" style={{background:'#E67E22',color:'#fff'}}>📋 Nova Visita</Link>
+        <Link href="/dashboard/visitas/novo" className="btn-acao-home" style={{background:'#E67E22',color:'#fff'}}>📋 Nova Visita</Link>
         <Link href="/dashboard/clientes/novo" className="btn-acao-home" style={{background:'#162a1e',color:'#fff'}}>👤 Novo Cliente</Link>
         <Link href="/dashboard/relatorios" className="btn-acao-home" style={{background:'#fff',color:'#162a1e',border:'1.5px solid #eae5de'}}>📊 Relatórios</Link>
       </div>

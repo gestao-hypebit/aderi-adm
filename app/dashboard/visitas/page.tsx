@@ -84,7 +84,7 @@ export default function VisitasPage() {
 
       <div className="page-header">
         <div className="page-title">📋 Visitas</div>
-        <Link href="/dashboard/visitas/nova" className="btn-nova">+ Nova Visita</Link>
+        <Link href="/dashboard/visitas/novo" className="btn-nova">+ Nova Visita</Link>
       </div>
 
       <div className="filtros">
