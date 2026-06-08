@@ -43,6 +43,8 @@ function NovaVisitaForm() {
       setClientes(data || [])
       const clienteParam = searchParams.get('cliente')
       if (clienteParam) setForm(f => ({ ...f, cliente_id: clienteParam }))
+      const dataParam = searchParams.get('data')
+      if (dataParam) setForm(f => ({ ...f, data_visita: dataParam }))
     }
     carregar()
   }, [])

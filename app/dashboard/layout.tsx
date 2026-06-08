@@ -12,8 +12,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard', label: 'Início', icon: '🏠' },
     { href: '/dashboard/clientes', label: 'Clientes', icon: '👥' },
     { href: '/dashboard/visitas', label: 'Visitas', icon: '📋' },
+    { href: '/dashboard/agendamento', label: 'Agenda', icon: '📅' },
     { href: '/dashboard/relatorios', label: 'Relatórios', icon: '📊' },
   ]
+
+  // Verifica se o link está ativo (exato ou começa com o href para subrotas)
+  function isAtivo(href: string) {
+    if (href === '/dashboard') return pathname === '/dashboard'
+    return pathname.startsWith(href)
+  }
 
   return (
     <>
@@ -60,10 +67,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       `}</style>
 
       <div className="layout">
-        {/* Overlay mobile */}
         {menuAberto && <div className="overlay" onClick={() => setMenuAberto(false)}/>}
 
-        {/* Sidebar */}
         <aside className={`sidebar ${menuAberto ? 'aberto' : ''}`}>
           <div className="sidebar-logo">
             <img src="/logo-aderi.png" alt="Aderi"/>
@@ -76,7 +81,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Link
                 key={link.href}
                 href={link.href}
-                className={`nav-link ${pathname === link.href ? 'ativo' : ''}`}
+                className={`nav-link ${isAtivo(link.href) ? 'ativo' : ''}`}
                 onClick={() => setMenuAberto(false)}
               >
                 <span className="icon">{link.icon}</span>
@@ -94,12 +99,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </aside>
 
-        {/* Main */}
         <div className="main">
           <header className="topbar">
             <button className="menu-toggle" onClick={() => setMenuAberto(!menuAberto)}>☰</button>
             <span className="topbar-titulo">
-              {links.find(l => l.href === pathname)?.label || 'Dashboard'}
+              {links.find(l => isAtivo(l.href))?.label || 'Dashboard'}
             </span>
             <div className="topbar-user">
               <div className="user-avatar">J</div>
