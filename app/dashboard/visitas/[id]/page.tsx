@@ -41,18 +41,15 @@ export default function VisitaDetalhe() {
   const [atualizando, setAtualizando] = useState(false)
   const supabase = createClient()
 
-  // Modal de finalização
   const [modalAberto, setModalAberto] = useState(false)
   const [observacaoModal, setObservacaoModal] = useState('')
   const [fotosModal, setFotosModal] = useState<FotoPreview[]>([])
   const [salvandoObs, setSalvandoObs] = useState(false)
-  const inputFotoRef = useRef<HTMLInputElement>(null)
+  const inputFotoModalRef = useRef<HTMLInputElement>(null)
 
-  // Modo edição da observação
   const [editandoObs, setEditandoObs] = useState(false)
   const [obsEditada, setObsEditada] = useState('')
 
-  // Fotos salvas da visita
   const [fotos, setFotos] = useState<FotoSalva[]>([])
   const [carregandoFotos, setCarregandoFotos] = useState(false)
   const [uploadandoFoto, setUploadandoFoto] = useState(false)
@@ -83,7 +80,33 @@ export default function VisitaDetalhe() {
     setCarregandoFotos(false)
   }
 
-  function adicionarFotos(e: React.ChangeEvent<HTMLInputElement>) {
+  // Upload avulso (botão na seção de fotos)
+  async function uploadFotoAvulsa(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || [])
+    if (!files.length) return
+    setUploadandoFoto(true)
+    for (const file of files) {
+      const ext = file.name.split('.').pop()
+      const path = `${id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const { data: uploadData, error } = await supabase.storage
+        .from('visita-fotos')
+        .upload(path, file, { contentType: file.type })
+      if (!error && uploadData) {
+        const { data: urlData } = supabase.storage.from('visita-fotos').getPublicUrl(path)
+        await supabase.from('visita_fotos').insert({
+          visita_id: id,
+          url: urlData.publicUrl,
+          legenda: null,
+        })
+      }
+    }
+    setUploadandoFoto(false)
+    if (inputFotoAvulsaRef.current) inputFotoAvulsaRef.current.value = ''
+    carregarFotos()
+  }
+
+  // Fotos no modal
+  function adicionarFotosModal(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || [])
     const novas: FotoPreview[] = files.map(file => ({
       file,
@@ -91,7 +114,7 @@ export default function VisitaDetalhe() {
       legenda: ''
     }))
     setFotosModal(prev => [...prev, ...novas])
-    if (inputFotoRef.current) inputFotoRef.current.value = ''
+    if (inputFotoModalRef.current) inputFotoModalRef.current.value = ''
   }
 
   function removerFotoModal(index: number) {
@@ -117,22 +140,18 @@ export default function VisitaDetalhe() {
 
   async function confirmarFinalizacao() {
     setSalvandoObs(true)
-
-    // Salvar observação
     await supabase.from('visitas').update({
       status: 'realizada',
       observacao_finalizacao: observacaoModal || null,
     }).eq('id', id)
     setVisita(v => v ? { ...v, status: 'realizada', observacao_finalizacao: observacaoModal || null } : v)
 
-    // Upload das fotos
     for (const foto of fotosModal) {
       const ext = foto.file.name.split('.').pop()
       const path = `${id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
       const { data: uploadData, error } = await supabase.storage
         .from('visita-fotos')
         .upload(path, foto.file, { contentType: foto.file.type })
-
       if (!error && uploadData) {
         const { data: urlData } = supabase.storage.from('visita-fotos').getPublicUrl(path)
         await supabase.from('visita_fotos').insert({
@@ -221,8 +240,6 @@ export default function VisitaDetalhe() {
         .btn-obs-salvar:disabled{opacity:.6;cursor:not-allowed}
         .btn-obs-cancelar{background:transparent;color:#aaa;border:1px solid #eae5de}
         .obs-textarea{width:100%;padding:.7rem 1rem;border:1.5px solid #E67E22;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;background:#fff;resize:vertical;min-height:90px;outline:none;box-sizing:border-box}
-
-        /* Fotos salvas */
         .fotos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1rem;margin-top:.8rem}
         .foto-item{position:relative;border-radius:10px;overflow:hidden;border:1px solid #eae5de}
         .foto-img{width:100%;height:140px;object-fit:cover;display:block}
@@ -230,8 +247,7 @@ export default function VisitaDetalhe() {
         .foto-del{position:absolute;top:5px;right:5px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:.75rem;display:flex;align-items:center;justify-content:center}
         .btn-add-foto{display:inline-flex;align-items:center;gap:.4rem;background:#f0ede8;color:#162a1e;border:none;padding:.5rem 1rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;transition:background .2s;margin-top:.8rem}
         .btn-add-foto:hover{background:#e0dbd2}
-
-        /* Modal */
+        .btn-add-foto:disabled{opacity:.6;cursor:not-allowed}
         .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem;overflow-y:auto}
         .modal-box{background:#fff;border-radius:16px;padding:2rem;max-width:560px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.15);max-height:90vh;overflow-y:auto}
         .modal-titulo{font-size:1rem;font-weight:700;color:#162a1e;margin-bottom:.4rem}
@@ -240,17 +256,14 @@ export default function VisitaDetalhe() {
         .modal-textarea:focus{border-color:#27ae60;background:#fff}
         .modal-divider{border:none;border-top:1px solid #f0ede8;margin:1.2rem 0}
         .modal-secao-label{font-size:.7rem;font-weight:700;color:#E67E22;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.8rem}
-
-        /* Fotos no modal */
         .fotos-preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.8rem;margin-bottom:.8rem}
         .foto-preview-item{border-radius:10px;overflow:hidden;border:1.5px solid #eae5de;position:relative}
         .foto-preview-img{width:100%;height:120px;object-fit:cover;display:block}
         .foto-preview-legenda{width:100%;padding:.4rem .5rem;border:none;border-top:1px solid #f0ede8;font-family:'Comfortaa',sans-serif;font-size:.72rem;color:#162a1e;background:#fafaf8;outline:none;box-sizing:border-box}
         .foto-preview-legenda::placeholder{color:#bbb}
         .foto-preview-del{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:.72rem;display:flex;align-items:center;justify-content:center}
-        .btn-upload-foto{display:inline-flex;align-items:center;gap:.5rem;background:#f0ede8;color:#162a1e;border:1.5px dashed #ccc;padding:.7rem 1.2rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;transition:all .2s;width:100%;justify-content:center}
+        .btn-upload-foto{display:inline-flex;align-items:center;gap:.5rem;background:#f0ede8;color:#162a1e;border:1.5px dashed #ccc;padding:.7rem 1.2rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;transition:all .2s;width:100%;justify-content:center;box-sizing:border-box}
         .btn-upload-foto:hover{background:#e0dbd2;border-color:#E67E22}
-
         .modal-btns{display:flex;gap:.6rem;margin-top:1rem;justify-content:flex-end;flex-wrap:wrap}
         .btn-modal-confirmar{background:#27ae60;color:#fff;border:none;padding:.7rem 1.4rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer;transition:background .2s}
         .btn-modal-confirmar:hover{background:#219150}
@@ -264,18 +277,15 @@ export default function VisitaDetalhe() {
           <div className="modal-box">
             <div className="modal-titulo">✅ Finalizar visita</div>
             <div className="modal-sub">Adicione uma observação e fotos da visita (opcional)</div>
-
             <textarea
               className="modal-textarea"
-              placeholder="Ex: Produtor demonstrou interesse nos produtos... Solo com deficiência de potássio identificada..."
+              placeholder="Ex: Produtor demonstrou interesse nos produtos..."
               value={observacaoModal}
               onChange={e => setObservacaoModal(e.target.value)}
               autoFocus
             />
-
             <hr className="modal-divider"/>
             <div className="modal-secao-label">📷 Fotos da visita</div>
-
             {fotosModal.length > 0 && (
               <div className="fotos-preview-grid">
                 {fotosModal.map((foto, i) => (
@@ -292,26 +302,20 @@ export default function VisitaDetalhe() {
                 ))}
               </div>
             )}
-
             <input
-              ref={inputFotoRef}
+              ref={inputFotoModalRef}
               type="file"
               accept="image/*"
               multiple
               style={{display:'none'}}
-              onChange={adicionarFotos}
+              onChange={adicionarFotosModal}
             />
-            <button className="btn-upload-foto" onClick={() => inputFotoRef.current?.click()}>
+            <button className="btn-upload-foto" onClick={() => inputFotoModalRef.current?.click()}>
               📷 {fotosModal.length > 0 ? 'Adicionar mais fotos' : 'Selecionar fotos'}
             </button>
-
             <div className="modal-btns">
               <button className="btn-modal-cancelar" onClick={() => setModalAberto(false)}>Cancelar</button>
-              <button
-                className="btn-modal-confirmar"
-                onClick={confirmarFinalizacao}
-                disabled={salvandoObs}
-              >
+              <button className="btn-modal-confirmar" onClick={confirmarFinalizacao} disabled={salvandoObs}>
                 {salvandoObs ? 'Salvando...' : '✓ Confirmar Finalização'}
               </button>
             </div>
@@ -346,14 +350,11 @@ export default function VisitaDetalhe() {
         </div>
       </div>
 
-      {/* Alterar Status */}
       <div className="secao">
         <div className="secao-label">Alterar Status</div>
         <div className="status-btns">
           {['agendada','realizada','cancelada'].map(s => (
-            <button
-              key={s}
-              className="status-btn"
+            <button key={s} className="status-btn"
               style={{
                 borderColor: statusCor[s],
                 color: visita.status === s ? '#fff' : statusCor[s],
@@ -369,7 +370,6 @@ export default function VisitaDetalhe() {
         </div>
       </div>
 
-      {/* Motivo e KM */}
       {(motivoExibido || visita.km_rodado != null) && (
         <div className="secao">
           <div className="secao-label">Deslocamento e Motivo</div>
@@ -378,19 +378,14 @@ export default function VisitaDetalhe() {
         </div>
       )}
 
-      {/* Observação de finalização */}
       {visita.status === 'realizada' && (
         <div className="secao">
           <div className="secao-label">Observação de Finalização</div>
           {editandoObs ? (
             <>
-              <textarea
-                className="obs-textarea"
-                value={obsEditada}
+              <textarea className="obs-textarea" value={obsEditada}
                 onChange={e => setObsEditada(e.target.value)}
-                placeholder="Escreva uma observação sobre esta visita..."
-                autoFocus
-              />
+                placeholder="Escreva uma observação..." autoFocus/>
               <div className="obs-acoes">
                 <button className="btn-obs btn-obs-salvar" onClick={salvarEdicaoObs} disabled={salvandoObs}>
                   {salvandoObs ? 'Salvando...' : '✓ Salvar'}
@@ -405,10 +400,8 @@ export default function VisitaDetalhe() {
                 : <div className="obs-vazia">Nenhuma observação registrada.</div>
               }
               <div className="obs-acoes">
-                <button
-                  className="btn-obs btn-obs-edit"
-                  onClick={() => { setObsEditada(visita.observacao_finalizacao || ''); setEditandoObs(true) }}
-                >
+                <button className="btn-obs btn-obs-edit"
+                  onClick={() => { setObsEditada(visita.observacao_finalizacao || ''); setEditandoObs(true) }}>
                   ✏️ {visita.observacao_finalizacao ? 'Editar observação' : 'Adicionar observação'}
                 </button>
               </div>
@@ -417,18 +410,11 @@ export default function VisitaDetalhe() {
         </div>
       )}
 
-      {/* Fotos da visita */}
       {visita.status === 'realizada' && (
         <div className="secao">
           <div className="secao-label">Fotos da Visita</div>
-          <input
-            ref={inputFotoAvulsaRef}
-            type="file"
-            accept="image/*"
-            multiple
-            style={{display:'none'}}
-            onChange={uploadFotoAvulsa}
-          />
+          <input ref={inputFotoAvulsaRef} type="file" accept="image/*" multiple
+            style={{display:'none'}} onChange={uploadFotoAvulsa}/>
           {carregandoFotos ? (
             <div style={{color:'#aaa',fontSize:'.82rem'}}>Carregando fotos...</div>
           ) : fotos.length === 0 ? (
@@ -444,11 +430,7 @@ export default function VisitaDetalhe() {
               ))}
             </div>
           )}
-          <button
-            className="btn-add-foto"
-            onClick={() => inputFotoAvulsaRef.current?.click()}
-            disabled={uploadandoFoto}
-          >
+          <button className="btn-add-foto" onClick={() => inputFotoAvulsaRef.current?.click()} disabled={uploadandoFoto}>
             {uploadandoFoto ? '⏳ Enviando...' : '📷 Adicionar fotos'}
           </button>
         </div>
