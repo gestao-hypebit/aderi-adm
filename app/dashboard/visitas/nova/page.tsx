@@ -7,6 +7,16 @@ import Link from 'next/link'
 
 type Cliente = { id: string; nome: string; nome_fazenda: string }
 
+const MOTIVOS = [
+  'Visita de rotina',
+  'Entrega de produtos',
+  'Negociação',
+  'Amostra de solo',
+  'Amostra de folha',
+  'Acompanhamento de entrega de produto',
+  'Outros',
+]
+
 function NovaVisitaForm() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [form, setForm] = useState({
@@ -16,7 +26,10 @@ function NovaVisitaForm() {
     status: 'agendada',
     descricao: '',
     recomendacoes: '',
-    proximo_contato: ''
+    proximo_contato: '',
+    km_rodado: '',
+    motivo_visita: '',
+    motivo_outro: '',
   })
   const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState('')
@@ -46,11 +59,21 @@ function NovaVisitaForm() {
 
     const { data: { user } } = await supabase.auth.getUser()
 
+    const motivoFinal = form.motivo_visita === 'Outros' ? 'Outros' : form.motivo_visita
+    const motivoOutroFinal = form.motivo_visita === 'Outros' ? form.motivo_outro : null
+
     const { error } = await supabase.from('visitas').insert({
-      ...form,
-      funcionario_id: user?.id,
+      cliente_id: form.cliente_id,
+      data_visita: form.data_visita,
       hora_visita: form.hora_visita || null,
-      proximo_contato: form.proximo_contato || null
+      status: form.status,
+      descricao: form.descricao,
+      recomendacoes: form.recomendacoes,
+      proximo_contato: form.proximo_contato || null,
+      funcionario_id: user?.id,
+      km_rodado: form.km_rodado ? parseFloat(form.km_rodado) : null,
+      motivo_visita: motivoFinal || null,
+      motivo_outro: motivoOutroFinal,
     })
 
     if (error) { setErro('Erro ao salvar. Tente novamente.'); setCarregando(false); return }
@@ -67,7 +90,7 @@ function NovaVisitaForm() {
         .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
         .form-full{grid-column:1/-1}
         .campo label{display:block;font-size:.72rem;font-weight:700;color:#555;letter-spacing:.04em;margin-bottom:.35rem}
-        .campo input,.campo select,.campo textarea{width:100%;padding:.7rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;outline:none;transition:border-color .2s;background:#fafaf8}
+        .campo input,.campo select,.campo textarea{width:100%;padding:.7rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;outline:none;transition:border-color .2s;background:#fafaf8;box-sizing:border-box}
         .campo input:focus,.campo select:focus,.campo textarea:focus{border-color:#E67E22;background:#fff}
         .campo textarea{resize:vertical;min-height:100px}
         .status-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
@@ -75,6 +98,10 @@ function NovaVisitaForm() {
         .status-opt.sel-agendada{border-color:#E67E22;background:#fff8f3;color:#E67E22}
         .status-opt.sel-realizada{border-color:#27ae60;background:#f0fdf4;color:#27ae60}
         .status-opt.sel-cancelada{border-color:#e74c3c;background:#fef2f2;color:#e74c3c}
+        .motivo-select{width:100%;padding:.7rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;outline:none;transition:border-color .2s;background:#fafaf8;cursor:pointer;box-sizing:border-box}
+        .motivo-select:focus{border-color:#E67E22;background:#fff}
+        .motivo-outro-box{margin-top:.6rem;animation:fadeIn .2s ease}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
         .err{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:.6rem 1rem;border-radius:8px;font-size:.8rem;margin-bottom:1rem}
         .form-actions{display:flex;gap:.8rem;margin-top:1.5rem}
         .btn-salvar{background:#E67E22;color:#fff;border:none;padding:.8rem 1.8rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;transition:background .2s}
@@ -89,6 +116,8 @@ function NovaVisitaForm() {
 
       <div className="form-card">
         <form onSubmit={salvar}>
+
+          {/* CLIENTE */}
           <div className="form-section">Cliente</div>
           <div className="campo">
             <label>SELECIONAR CLIENTE *</label>
@@ -102,6 +131,7 @@ function NovaVisitaForm() {
             </select>
           </div>
 
+          {/* DATA E HORÁRIO */}
           <div className="form-section">Data e Horário</div>
           <div className="form-grid">
             <div className="campo">
@@ -114,6 +144,46 @@ function NovaVisitaForm() {
             </div>
           </div>
 
+          {/* MOTIVO E KM — NOVO */}
+          <div className="form-section">Motivo e Deslocamento</div>
+          <div className="form-grid">
+            <div className="campo form-full">
+              <label>MOTIVO DA VISITA</label>
+              <select
+                className="motivo-select"
+                value={form.motivo_visita}
+                onChange={e => atualizar('motivo_visita', e.target.value)}
+              >
+                <option value="">Selecione o motivo...</option>
+                {MOTIVOS.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              {form.motivo_visita === 'Outros' && (
+                <div className="motivo-outro-box">
+                  <input
+                    type="text"
+                    placeholder="Descreva o motivo..."
+                    value={form.motivo_outro}
+                    onChange={e => atualizar('motivo_outro', e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="campo">
+              <label>KM RODADO</label>
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder="Ex: 142.5"
+                value={form.km_rodado}
+                onChange={e => atualizar('km_rodado', e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* STATUS */}
           <div className="form-section">Status</div>
           <div className="status-grid">
             {['agendada','realizada','cancelada'].map(s => (
@@ -127,6 +197,7 @@ function NovaVisitaForm() {
             ))}
           </div>
 
+          {/* DETALHES */}
           <div className="form-section">Detalhes</div>
           <div className="campo">
             <label>DESCRIÇÃO DA VISITA</label>

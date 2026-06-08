@@ -13,6 +13,10 @@ type Visita = {
   descricao: string
   recomendacoes: string
   proximo_contato: string
+  km_rodado: number | null
+  motivo_visita: string | null
+  motivo_outro: string | null
+  observacao_finalizacao: string | null
   cliente: { id: string; nome: string; nome_fazenda: string; cidade: string; estado: string }
   funcionario: { nome_completo: string }
 }
@@ -24,6 +28,15 @@ export default function VisitaDetalhe() {
   const [carregando, setCarregando] = useState(true)
   const [atualizando, setAtualizando] = useState(false)
   const supabase = createClient()
+
+  // Modal de finalização
+  const [modalAberto, setModalAberto] = useState(false)
+  const [observacaoModal, setObservacaoModal] = useState('')
+  const [salvandoObs, setSalvandoObs] = useState(false)
+
+  // Modo edição da observação
+  const [editandoObs, setEditandoObs] = useState(false)
+  const [obsEditada, setObsEditada] = useState('')
 
   useEffect(() => {
     async function carregar() {
@@ -38,11 +51,38 @@ export default function VisitaDetalhe() {
     carregar()
   }, [id])
 
+  // Ao clicar em "Realizada", abre o modal em vez de salvar direto
   async function mudarStatus(novoStatus: string) {
+    if (novoStatus === 'realizada' && visita?.status !== 'realizada') {
+      setObservacaoModal(visita?.observacao_finalizacao || '')
+      setModalAberto(true)
+      return
+    }
     setAtualizando(true)
     await supabase.from('visitas').update({ status: novoStatus }).eq('id', id)
     setVisita(v => v ? { ...v, status: novoStatus } : v)
     setAtualizando(false)
+  }
+
+  // Confirmar finalização com observação
+  async function confirmarFinalizacao() {
+    setSalvandoObs(true)
+    await supabase.from('visitas').update({
+      status: 'realizada',
+      observacao_finalizacao: observacaoModal || null,
+    }).eq('id', id)
+    setVisita(v => v ? { ...v, status: 'realizada', observacao_finalizacao: observacaoModal || null } : v)
+    setSalvandoObs(false)
+    setModalAberto(false)
+  }
+
+  // Salvar edição da observação depois
+  async function salvarEdicaoObs() {
+    setSalvandoObs(true)
+    await supabase.from('visitas').update({ observacao_finalizacao: obsEditada || null }).eq('id', id)
+    setVisita(v => v ? { ...v, observacao_finalizacao: obsEditada || null } : v)
+    setSalvandoObs(false)
+    setEditandoObs(false)
   }
 
   async function deletar() {
@@ -56,6 +96,10 @@ export default function VisitaDetalhe() {
     realizada: '#27ae60',
     cancelada: '#e74c3c'
   }
+
+  const motivoExibido = visita?.motivo_visita === 'Outros'
+    ? `Outros — ${visita.motivo_outro || ''}`
+    : visita?.motivo_visita
 
   if (carregando) return <div style={{textAlign:'center',padding:'3rem',color:'#aaa'}}>Carregando...</div>
   if (!visita) return <div style={{textAlign:'center',padding:'3rem',color:'#aaa'}}>Visita não encontrada.</div>
@@ -85,7 +129,64 @@ export default function VisitaDetalhe() {
         .info-row{display:flex;gap:.5rem;align-items:center;font-size:.85rem;color:#444;margin-bottom:.4rem}
         .info-row span{font-weight:700;color:#162a1e}
         .link-cliente{display:inline-flex;align-items:center;gap:.4rem;color:#E67E22;font-size:.82rem;font-weight:700;text-decoration:none;margin-top:.5rem}
+
+        /* Info chips */
+        .info-chips{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.4rem}
+        .chip{display:inline-flex;align-items:center;gap:.35rem;background:#f0ede8;border-radius:20px;padding:.3rem .8rem;font-size:.78rem;font-weight:700;color:#162a1e}
+
+        /* Observação */
+        .obs-vazia{font-size:.82rem;color:#aaa;font-style:italic}
+        .obs-texto{font-size:.88rem;color:#444;line-height:1.8;background:#f7f5f0;border-radius:8px;padding:.8rem 1rem}
+        .obs-acoes{display:flex;gap:.5rem;margin-top:.8rem}
+        .btn-obs{padding:.4rem .9rem;border-radius:8px;border:none;font-family:'Comfortaa',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer;transition:all .2s}
+        .btn-obs-edit{background:#f0ede8;color:#162a1e}
+        .btn-obs-edit:hover{background:#e0dbd2}
+        .btn-obs-salvar{background:#162a1e;color:#fff}
+        .btn-obs-salvar:hover{background:#0d1f14}
+        .btn-obs-salvar:disabled{opacity:.6;cursor:not-allowed}
+        .btn-obs-cancelar{background:transparent;color:#aaa;border:1px solid #eae5de}
+        .obs-textarea{width:100%;padding:.7rem 1rem;border:1.5px solid #E67E22;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;background:#fff;resize:vertical;min-height:90px;outline:none;box-sizing:border-box}
+
+        /* Modal overlay */
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem}
+        .modal-box{background:#fff;border-radius:16px;padding:2rem;max-width:480px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+        .modal-titulo{font-size:1rem;font-weight:700;color:#162a1e;margin-bottom:.4rem}
+        .modal-sub{font-size:.82rem;color:#888;margin-bottom:1.2rem}
+        .modal-textarea{width:100%;padding:.8rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;background:#fafaf8;resize:vertical;min-height:100px;outline:none;box-sizing:border-box;transition:border-color .2s}
+        .modal-textarea:focus{border-color:#27ae60;background:#fff}
+        .modal-btns{display:flex;gap:.6rem;margin-top:1rem;justify-content:flex-end}
+        .btn-modal-confirmar{background:#27ae60;color:#fff;border:none;padding:.7rem 1.4rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer;transition:background .2s}
+        .btn-modal-confirmar:hover{background:#219150}
+        .btn-modal-confirmar:disabled{opacity:.6;cursor:not-allowed}
+        .btn-modal-cancelar{background:transparent;color:#888;border:1.5px solid #eae5de;padding:.7rem 1.2rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer}
       `}</style>
+
+      {/* MODAL de finalização */}
+      {modalAberto && (
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setModalAberto(false) }}>
+          <div className="modal-box">
+            <div className="modal-titulo">✅ Finalizar visita</div>
+            <div className="modal-sub">Adicione uma observação sobre como foi a visita (opcional)</div>
+            <textarea
+              className="modal-textarea"
+              placeholder="Ex: Produtor demonstrou interesse nos produtos... Solo com deficiência de potássio identificada..."
+              value={observacaoModal}
+              onChange={e => setObservacaoModal(e.target.value)}
+              autoFocus
+            />
+            <div className="modal-btns">
+              <button className="btn-modal-cancelar" onClick={() => setModalAberto(false)}>Cancelar</button>
+              <button
+                className="btn-modal-confirmar"
+                onClick={confirmarFinalizacao}
+                disabled={salvandoObs}
+              >
+                {salvandoObs ? 'Salvando...' : '✓ Confirmar Finalização'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Link href="/dashboard/visitas" className="voltar">← Voltar</Link>
 
@@ -100,6 +201,11 @@ export default function VisitaDetalhe() {
             <div className="cliente-nome">{visita.cliente?.nome}</div>
             {visita.cliente?.nome_fazenda && <div className="cliente-fazenda">🌾 {visita.cliente.nome_fazenda}</div>}
             <div className="cliente-loc">📍 {visita.cliente?.cidade}/{visita.cliente?.estado}</div>
+            {/* Chips de motivo e KM */}
+            <div className="info-chips">
+              {motivoExibido && <span className="chip">🎯 {motivoExibido}</span>}
+              {visita.km_rodado != null && <span className="chip">🛣️ {visita.km_rodado} km</span>}
+            </div>
             <div className="status-atual" style={{background: statusCor[visita.status]}}>
               {visita.status === 'agendada' ? '📅' : visita.status === 'realizada' ? '✅' : '❌'} {visita.status}
             </div>
@@ -110,6 +216,7 @@ export default function VisitaDetalhe() {
         </div>
       </div>
 
+      {/* Alterar Status */}
       <div className="secao">
         <div className="secao-label">Alterar Status</div>
         <div className="status-btns">
@@ -131,6 +238,54 @@ export default function VisitaDetalhe() {
           ))}
         </div>
       </div>
+
+      {/* Motivo e KM */}
+      {(motivoExibido || visita.km_rodado != null) && (
+        <div className="secao">
+          <div className="secao-label">Deslocamento e Motivo</div>
+          {motivoExibido && <div className="info-row">🎯 <span>{motivoExibido}</span></div>}
+          {visita.km_rodado != null && <div className="info-row">🛣️ <span>{visita.km_rodado} km rodados</span></div>}
+        </div>
+      )}
+
+      {/* Observação de finalização */}
+      {visita.status === 'realizada' && (
+        <div className="secao">
+          <div className="secao-label">Observação de Finalização</div>
+          {editandoObs ? (
+            <>
+              <textarea
+                className="obs-textarea"
+                value={obsEditada}
+                onChange={e => setObsEditada(e.target.value)}
+                placeholder="Escreva uma observação sobre esta visita..."
+                autoFocus
+              />
+              <div className="obs-acoes">
+                <button className="btn-obs btn-obs-salvar" onClick={salvarEdicaoObs} disabled={salvandoObs}>
+                  {salvandoObs ? 'Salvando...' : '✓ Salvar'}
+                </button>
+                <button className="btn-obs btn-obs-cancelar" onClick={() => setEditandoObs(false)}>Cancelar</button>
+              </div>
+            </>
+          ) : (
+            <>
+              {visita.observacao_finalizacao
+                ? <div className="obs-texto">{visita.observacao_finalizacao}</div>
+                : <div className="obs-vazia">Nenhuma observação registrada.</div>
+              }
+              <div className="obs-acoes">
+                <button
+                  className="btn-obs btn-obs-edit"
+                  onClick={() => { setObsEditada(visita.observacao_finalizacao || ''); setEditandoObs(true) }}
+                >
+                  ✏️ {visita.observacao_finalizacao ? 'Editar observação' : 'Adicionar observação'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {visita.hora_visita && (
         <div className="secao">

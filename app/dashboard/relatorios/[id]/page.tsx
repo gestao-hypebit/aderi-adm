@@ -14,6 +14,10 @@ type Visita = {
   recomendacoes: string
   proximo_contato: string
   created_at: string
+  km_rodado: number | null
+  motivo_visita: string | null
+  motivo_outro: string | null
+  observacao_finalizacao: string | null
   cliente: {
     nome: string
     cpf_cnpj: string
@@ -54,6 +58,26 @@ export default function RelatorioVisitaPage() {
   const dataVisita = new Date(visita.data_visita + 'T12:00:00')
   const dataGeracao = new Date()
 
+  const statusCores: Record<string, string> = {
+    agendada: '#E67E22',
+    realizada: '#27ae60',
+    cancelada: '#e74c3c',
+  }
+  const statusEmoji: Record<string, string> = {
+    agendada: '📅',
+    realizada: '✅',
+    cancelada: '❌',
+  }
+  const statusLabel: Record<string, string> = {
+    agendada: 'Visita Agendada',
+    realizada: 'Visita Realizada',
+    cancelada: 'Visita Cancelada',
+  }
+
+  const motivoExibido = visita.motivo_visita === 'Outros'
+    ? `Outros — ${visita.motivo_outro || ''}`
+    : visita.motivo_visita
+
   return (
     <>
       <style>{`
@@ -67,7 +91,7 @@ export default function RelatorioVisitaPage() {
 
         /* RELATÓRIO */
         .relatorio{background:#fff;border-radius:16px;padding:2.5rem;box-shadow:0 4px 20px rgba(0,0,0,.08);max-width:800px;margin:0 auto;font-family:'Comfortaa',sans-serif}
-        
+
         /* CABEÇALHO */
         .rel-header{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:1.5rem;border-bottom:2px solid #162a1e;margin-bottom:1.5rem}
         .rel-logo-area{display:flex;align-items:center;gap:.7rem}
@@ -88,9 +112,9 @@ export default function RelatorioVisitaPage() {
         .rel-campo-valor{font-size:.82rem;font-weight:700;color:#162a1e}
         .rel-campo-full{grid-column:1/-1}
         .rel-texto{background:#f7f5f0;border-radius:8px;padding:.8rem 1rem;font-size:.82rem;color:#444;line-height:1.8}
-        
-        /* DESTAQUE STATUS */
-        .rel-status{display:inline-flex;align-items:center;gap:.4rem;background:#27ae60;color:#fff;font-size:.75rem;font-weight:700;padding:.3rem .8rem;border-radius:20px}
+
+        /* STATUS */
+        .rel-status{display:inline-flex;align-items:center;gap:.4rem;color:#fff;font-size:.75rem;font-weight:700;padding:.3rem .8rem;border-radius:20px}
 
         /* RODAPÉ */
         .rel-footer{margin-top:2rem;padding-top:1rem;border-top:1px solid #eae5de;display:flex;align-items:center;justify-content:space-between;font-size:.68rem;color:#aaa}
@@ -138,7 +162,12 @@ export default function RelatorioVisitaPage() {
 
         {/* Status */}
         <div style={{marginBottom:'1.2rem'}}>
-          <span className="rel-status">✅ Visita Realizada</span>
+          <span
+            className="rel-status"
+            style={{background: statusCores[visita.status] || '#888'}}
+          >
+            {statusEmoji[visita.status]} {statusLabel[visita.status] || visita.status}
+          </span>
         </div>
 
         {/* Dados do Cliente */}
@@ -201,7 +230,7 @@ export default function RelatorioVisitaPage() {
           </div>
         </div>
 
-        {/* Dados da Visita */}
+        {/* Dados da Visita — inclui KM e Motivo */}
         <div className="rel-secao">
           <div className="rel-secao-titulo">Dados da Visita</div>
           <div className="rel-grid">
@@ -213,6 +242,18 @@ export default function RelatorioVisitaPage() {
               <div className="rel-campo">
                 <div className="rel-campo-label">Horário</div>
                 <div className="rel-campo-valor">{visita.hora_visita.slice(0,5)}</div>
+              </div>
+            )}
+            {motivoExibido && (
+              <div className="rel-campo rel-campo-full">
+                <div className="rel-campo-label">Motivo da visita</div>
+                <div className="rel-campo-valor">🎯 {motivoExibido}</div>
+              </div>
+            )}
+            {visita.km_rodado != null && (
+              <div className="rel-campo">
+                <div className="rel-campo-label">KM rodado</div>
+                <div className="rel-campo-valor">🛣️ {visita.km_rodado} km</div>
               </div>
             )}
             {visita.funcionario?.nome_completo && (
@@ -243,6 +284,14 @@ export default function RelatorioVisitaPage() {
           <div className="rel-secao">
             <div className="rel-secao-titulo">Recomendações Técnicas</div>
             <div className="rel-texto">{visita.recomendacoes}</div>
+          </div>
+        )}
+
+        {/* Observação de finalização */}
+        {visita.observacao_finalizacao && (
+          <div className="rel-secao">
+            <div className="rel-secao-titulo">Observações de Finalização</div>
+            <div className="rel-texto">{visita.observacao_finalizacao}</div>
           </div>
         )}
 
