@@ -55,6 +55,8 @@ export default function VisitaDetalhe() {
   // Fotos salvas da visita
   const [fotos, setFotos] = useState<FotoSalva[]>([])
   const [carregandoFotos, setCarregandoFotos] = useState(false)
+  const [uploadandoFoto, setUploadandoFoto] = useState(false)
+  const inputFotoAvulsaRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     async function carregar() {
@@ -419,6 +421,14 @@ export default function VisitaDetalhe() {
       {visita.status === 'realizada' && (
         <div className="secao">
           <div className="secao-label">Fotos da Visita</div>
+          <input
+            ref={inputFotoAvulsaRef}
+            type="file"
+            accept="image/*"
+            multiple
+            style={{display:'none'}}
+            onChange={uploadFotoAvulsa}
+          />
           {carregandoFotos ? (
             <div style={{color:'#aaa',fontSize:'.82rem'}}>Carregando fotos...</div>
           ) : fotos.length === 0 ? (
@@ -434,6 +444,13 @@ export default function VisitaDetalhe() {
               ))}
             </div>
           )}
+          <button
+            className="btn-add-foto"
+            onClick={() => inputFotoAvulsaRef.current?.click()}
+            disabled={uploadandoFoto}
+          >
+            {uploadandoFoto ? '⏳ Enviando...' : '📷 Adicionar fotos'}
+          </button>
         </div>
       )}
 
