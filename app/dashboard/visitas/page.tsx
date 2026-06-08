@@ -1,257 +1,153 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
-type Cliente = { id: string; nome: string; nome_fazenda: string }
+type Visita = {
+  id: string
+  data_visita: string
+  hora_visita: string | null
+  status: string
+  motivo_visita: string | null
+  cliente: { id: string; nome: string; nome_fazenda: string; cidade: string; estado: string }
+}
 
-const MOTIVOS = [
-  'Visita de rotina',
-  'Entrega de produtos',
-  'Negociação',
-  'Amostra de solo',
-  'Amostra de folha',
-  'Acompanhamento de entrega de produto',
-  'Outros',
-]
+const statusCor: Record<string, string> = {
+  agendada: '#E67E22',
+  realizada: '#27ae60',
+  cancelada: '#e74c3c',
+}
+const statusEmoji: Record<string, string> = {
+  agendada: '📅',
+  realizada: '✅',
+  cancelada: '❌',
+}
 
-function NovaVisitaForm() {
-  const [clientes, setClientes] = useState<Cliente[]>([])
-  const [form, setForm] = useState({
-    cliente_id: '',
-    data_visita: new Date().toISOString().split('T')[0],
-    hora_visita: '',
-    status: 'agendada',
-    descricao: '',
-    recomendacoes: '',
-    proximo_contato: '',
-    km_rodado: '',
-    motivo_visita: '',
-    motivo_outro: '',
-  })
-  const [carregando, setCarregando] = useState(false)
-  const [salvo, setSalvo] = useState(false)
-  const [erro, setErro] = useState('')
-  const router = useRouter()
-  const searchParams = useSearchParams()
+export default function VisitasPage() {
   const supabase = createClient()
+  const [visitas, setVisitas] = useState<Visita[]>([])
+  const [carregando, setCarregando] = useState(true)
+  const [filtroStatus, setFiltroStatus] = useState('todos')
+  const [busca, setBusca] = useState('')
 
   useEffect(() => {
     async function carregar() {
-      const { data } = await supabase.from('clientes').select('id, nome, nome_fazenda').order('nome')
-      setClientes(data || [])
-      const clienteParam = searchParams.get('cliente')
-      if (clienteParam) setForm(f => ({ ...f, cliente_id: clienteParam }))
-      const dataParam = searchParams.get('data')
-      if (dataParam) setForm(f => ({ ...f, data_visita: dataParam }))
+      const { data } = await supabase
+        .from('visitas')
+        .select('id, data_visita, hora_visita, status, motivo_visita, cliente:clientes(id, nome, nome_fazenda, cidade, estado)')
+        .order('data_visita', { ascending: false })
+      setVisitas((data as unknown as Visita[]) || [])
+      setCarregando(false)
     }
     carregar()
   }, [])
 
-  function atualizar(campo: string, valor: string) {
-    setForm(f => ({ ...f, [campo]: valor }))
-  }
-
-  async function salvar(e: React.FormEvent) {
-    e.preventDefault()
-    if (!form.cliente_id) { setErro('Selecione um cliente.'); return }
-    setCarregando(true)
-    setErro('')
-
-    const { data: { user } } = await supabase.auth.getUser()
-
-    const motivoFinal = form.motivo_visita === 'Outros' ? 'Outros' : form.motivo_visita
-    const motivoOutroFinal = form.motivo_visita === 'Outros' ? form.motivo_outro : null
-
-    const { error } = await supabase.from('visitas').insert({
-      cliente_id: form.cliente_id,
-      data_visita: form.data_visita,
-      hora_visita: form.hora_visita || null,
-      status: form.status,
-      descricao: form.descricao,
-      recomendacoes: form.recomendacoes,
-      proximo_contato: form.proximo_contato || null,
-      funcionario_id: user?.id,
-      km_rodado: form.km_rodado ? parseFloat(form.km_rodado) : null,
-      motivo_visita: motivoFinal || null,
-      motivo_outro: motivoOutroFinal,
-    })
-
-    if (error) {
-      setErro('Erro ao salvar. Tente novamente.')
-      setCarregando(false)
-      return
-    }
-
-    // Mostrar sucesso e redirecionar após 1.5s
-    setSalvo(true)
-    setCarregando(false)
-    setTimeout(() => {
-      router.push('/dashboard/visitas')
-    }, 1500)
-  }
+  const visitasFiltradas = visitas.filter(v => {
+    const matchStatus = filtroStatus === 'todos' || v.status === filtroStatus
+    const matchBusca = busca === '' ||
+      v.cliente?.nome?.toLowerCase().includes(busca.toLowerCase()) ||
+      v.cliente?.nome_fazenda?.toLowerCase().includes(busca.toLowerCase())
+    return matchStatus && matchBusca
+  })
 
   return (
     <>
       <style>{`
-        .voltar{display:inline-flex;align-items:center;gap:.4rem;color:#E67E22;font-size:.82rem;font-weight:700;text-decoration:none;margin-bottom:1.2rem}
-        .page-title{font-size:1.3rem;font-weight:700;color:#162a1e;margin-bottom:1.5rem}
-        .form-card{background:#fff;border-radius:12px;padding:1.8rem;box-shadow:0 2px 8px rgba(0,0,0,.05);max-width:720px;margin:0 auto}
-        .form-section{font-size:.7rem;font-weight:700;color:#E67E22;letter-spacing:.08em;text-transform:uppercase;margin:1.2rem 0 .8rem;padding-bottom:.4rem;border-bottom:1px solid #f0ede8}
-        .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
-        .form-full{grid-column:1/-1}
-        .campo label{display:block;font-size:.72rem;font-weight:700;color:#555;letter-spacing:.04em;margin-bottom:.35rem}
-        .campo input,.campo select,.campo textarea{width:100%;padding:.7rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;outline:none;transition:border-color .2s;background:#fafaf8;box-sizing:border-box}
-        .campo input:focus,.campo select:focus,.campo textarea:focus{border-color:#E67E22;background:#fff}
-        .campo textarea{resize:vertical;min-height:100px}
-        .status-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
-        .status-opt{border:1.5px solid #eae5de;border-radius:8px;padding:.6rem;text-align:center;cursor:pointer;font-size:.78rem;font-weight:700;color:#888;transition:all .2s;background:#fafaf8}
-        .status-opt.sel-agendada{border-color:#E67E22;background:#fff8f3;color:#E67E22}
-        .status-opt.sel-realizada{border-color:#27ae60;background:#f0fdf4;color:#27ae60}
-        .status-opt.sel-cancelada{border-color:#e74c3c;background:#fef2f2;color:#e74c3c}
-        .motivo-select{width:100%;padding:.7rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;outline:none;transition:border-color .2s;background:#fafaf8;cursor:pointer;box-sizing:border-box}
-        .motivo-select:focus{border-color:#E67E22;background:#fff}
-        .motivo-outro-box{margin-top:.6rem;animation:fadeIn .2s ease}
-        @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
-        .err{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:.6rem 1rem;border-radius:8px;font-size:.8rem;margin-bottom:1rem}
-        .sucesso{background:#f0fdf4;border:1px solid #86efac;color:#166534;padding:.8rem 1rem;border-radius:8px;font-size:.85rem;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem;animation:fadeIn .3s ease}
-        .form-actions{display:flex;gap:.8rem;margin-top:1.5rem}
-        .btn-salvar{background:#E67E22;color:#fff;border:none;padding:.8rem 1.8rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:.5rem}
-        .btn-salvar:hover{background:#d35400}
-        .btn-salvar:disabled{opacity:.6;cursor:not-allowed}
-        .btn-salvar.salvo{background:#27ae60}
-        .btn-cancelar{background:transparent;color:#888;border:1.5px solid #eae5de;padding:.8rem 1.8rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer}
-        @media(max-width:600px){.form-grid{grid-template-columns:1fr}}
+        .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;flex-wrap:wrap;gap:1rem}
+        .page-title{font-size:1.3rem;font-weight:700;color:#162a1e}
+        .btn-nova{display:inline-flex;align-items:center;gap:.5rem;background:#E67E22;color:#fff;padding:.7rem 1.4rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;font-weight:700;text-decoration:none;transition:background .2s}
+        .btn-nova:hover{background:#d35400}
+        .filtros{display:flex;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center}
+        .busca{flex:1;min-width:180px;padding:.6rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;background:#fff;outline:none;transition:border-color .2s}
+        .busca:focus{border-color:#E67E22}
+        .filtro-btn{padding:.5rem 1rem;border-radius:20px;border:1.5px solid #eae5de;font-family:'Comfortaa',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer;background:#fff;color:#888;transition:all .2s}
+        .filtro-btn.ativo{color:#fff}
+        .visitas-lista{display:flex;flex-direction:column;gap:.7rem}
+        .visita-card{background:#fff;border-radius:12px;padding:1rem 1.2rem;box-shadow:0 2px 6px rgba(0,0,0,.04);display:flex;align-items:center;gap:1rem;text-decoration:none;transition:box-shadow .2s;border-left:4px solid}
+        .visita-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.1)}
+        .visita-data-box{text-align:center;background:#f0ede8;border-radius:8px;padding:.4rem .7rem;min-width:44px;flex-shrink:0}
+        .dia{font-size:1.2rem;font-weight:900;color:#162a1e;line-height:1}
+        .mes{font-size:.62rem;font-weight:700;color:#aaa;text-transform:uppercase}
+        .visita-info{flex:1;min-width:0}
+        .visita-cliente{font-size:.92rem;font-weight:700;color:#162a1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .visita-fazenda{font-size:.75rem;color:#E67E22;font-weight:700;margin:.1rem 0}
+        .visita-loc{font-size:.72rem;color:#aaa}
+        .visita-motivo{font-size:.72rem;color:#888;margin-top:.2rem}
+        .status-badge{display:inline-flex;align-items:center;gap:.3rem;font-size:.72rem;font-weight:700;padding:.25rem .7rem;border-radius:20px;color:#fff;white-space:nowrap;flex-shrink:0}
+        .vazio{text-align:center;padding:3rem 1rem;color:#aaa}
+        .vazio-icon{font-size:2.5rem;margin-bottom:.8rem}
+        .vazio-txt{font-size:.9rem}
+        .contador{font-size:.78rem;color:#aaa;margin-bottom:.8rem}
+        @media(max-width:600px){.visita-card{flex-wrap:wrap}}
       `}</style>
 
-      <Link href="/dashboard/visitas" className="voltar">← Voltar</Link>
-      <h1 className="page-title">Nova Visita</h1>
-
-      <div className="form-card">
-        <form onSubmit={salvar}>
-
-          {/* CLIENTE */}
-          <div className="form-section">Cliente</div>
-          <div className="campo">
-            <label>SELECIONAR CLIENTE *</label>
-            <select value={form.cliente_id} onChange={e => atualizar('cliente_id', e.target.value)} required>
-              <option value="">Selecione o cliente...</option>
-              {clientes.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}{c.nome_fazenda ? ` — ${c.nome_fazenda}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* DATA E HORÁRIO */}
-          <div className="form-section">Data e Horário</div>
-          <div className="form-grid">
-            <div className="campo">
-              <label>DATA DA VISITA *</label>
-              <input type="date" value={form.data_visita} onChange={e => atualizar('data_visita', e.target.value)} required/>
-            </div>
-            <div className="campo">
-              <label>HORA</label>
-              <input type="time" value={form.hora_visita} onChange={e => atualizar('hora_visita', e.target.value)}/>
-            </div>
-          </div>
-
-          {/* MOTIVO E KM */}
-          <div className="form-section">Motivo e Deslocamento</div>
-          <div className="form-grid">
-            <div className="campo form-full">
-              <label>MOTIVO DA VISITA</label>
-              <select
-                className="motivo-select"
-                value={form.motivo_visita}
-                onChange={e => atualizar('motivo_visita', e.target.value)}
-              >
-                <option value="">Selecione o motivo...</option>
-                {MOTIVOS.map(m => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-              {form.motivo_visita === 'Outros' && (
-                <div className="motivo-outro-box">
-                  <input
-                    type="text"
-                    placeholder="Descreva o motivo..."
-                    value={form.motivo_outro}
-                    onChange={e => atualizar('motivo_outro', e.target.value)}
-                  />
-                </div>
-              )}
-            </div>
-            <div className="campo">
-              <label>KM RODADO</label>
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                placeholder="Ex: 142.5"
-                value={form.km_rodado}
-                onChange={e => atualizar('km_rodado', e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* STATUS */}
-          <div className="form-section">Status</div>
-          <div className="status-grid">
-            {['agendada','realizada','cancelada'].map(s => (
-              <div
-                key={s}
-                className={`status-opt ${form.status === s ? `sel-${s}` : ''}`}
-                onClick={() => atualizar('status', s)}
-              >
-                {s === 'agendada' ? '📅' : s === 'realizada' ? '✅' : '❌'} {s.charAt(0).toUpperCase() + s.slice(1)}
-              </div>
-            ))}
-          </div>
-
-          {/* DETALHES */}
-          <div className="form-section">Detalhes</div>
-          <div className="campo">
-            <label>DESCRIÇÃO DA VISITA</label>
-            <textarea value={form.descricao} onChange={e => atualizar('descricao', e.target.value)} placeholder="O que foi feito na visita..."/>
-          </div>
-          <div className="campo">
-            <label>RECOMENDAÇÕES</label>
-            <textarea value={form.recomendacoes} onChange={e => atualizar('recomendacoes', e.target.value)} placeholder="Recomendações para o produtor..." style={{minHeight:'80px'}}/>
-          </div>
-          <div className="campo">
-            <label>PRÓXIMO CONTATO</label>
-            <input type="date" value={form.proximo_contato} onChange={e => atualizar('proximo_contato', e.target.value)}/>
-          </div>
-
-          {erro && <div className="err">❌ {erro}</div>}
-          {salvo && <div className="sucesso">✅ Visita salva com sucesso! Redirecionando...</div>}
-
-          <div className="form-actions">
-            <button
-              type="submit"
-              className={`btn-salvar${salvo ? ' salvo' : ''}`}
-              disabled={carregando || salvo}
-            >
-              {carregando ? '⏳ Salvando...' : salvo ? '✅ Salvo!' : '✓ Salvar Visita'}
-            </button>
-            <button type="button" className="btn-cancelar" onClick={() => router.back()} disabled={carregando || salvo}>
-              Cancelar
-            </button>
-          </div>
-        </form>
+      <div className="page-header">
+        <div className="page-title">📋 Visitas</div>
+        <Link href="/dashboard/visitas/nova" className="btn-nova">+ Nova Visita</Link>
       </div>
-    </>
-  )
-}
 
-export default function NovaVisitaPage() {
-  return (
-    <Suspense fallback={<div style={{textAlign:'center',padding:'3rem',color:'#aaa'}}>Carregando...</div>}>
-      <NovaVisitaForm />
-    </Suspense>
+      <div className="filtros">
+        <input
+          className="busca"
+          placeholder="🔍 Buscar por cliente ou fazenda..."
+          value={busca}
+          onChange={e => setBusca(e.target.value)}
+        />
+        {['todos','agendada','realizada','cancelada'].map(s => (
+          <button
+            key={s}
+            className={`filtro-btn ${filtroStatus === s ? 'ativo' : ''}`}
+            style={filtroStatus === s ? { background: s === 'todos' ? '#162a1e' : statusCor[s], borderColor: s === 'todos' ? '#162a1e' : statusCor[s] } : {}}
+            onClick={() => setFiltroStatus(s)}
+          >
+            {s === 'todos' ? 'Todas' : `${statusEmoji[s]} ${s.charAt(0).toUpperCase() + s.slice(1)}`}
+          </button>
+        ))}
+      </div>
+
+      {!carregando && (
+        <div className="contador">
+          {visitasFiltradas.length} visita{visitasFiltradas.length !== 1 ? 's' : ''} encontrada{visitasFiltradas.length !== 1 ? 's' : ''}
+        </div>
+      )}
+
+      {carregando ? (
+        <div className="vazio"><div className="vazio-icon">⏳</div><div className="vazio-txt">Carregando...</div></div>
+      ) : visitasFiltradas.length === 0 ? (
+        <div className="vazio">
+          <div className="vazio-icon">📋</div>
+          <div className="vazio-txt">Nenhuma visita encontrada.</div>
+        </div>
+      ) : (
+        <div className="visitas-lista">
+          {visitasFiltradas.map(v => {
+            const d = new Date(v.data_visita + 'T12:00:00')
+            return (
+              <Link
+                key={v.id}
+                href={`/dashboard/visitas/${v.id}`}
+                className="visita-card"
+                style={{ borderLeftColor: statusCor[v.status] || '#ccc' }}
+              >
+                <div className="visita-data-box">
+                  <div className="dia">{String(d.getDate()).padStart(2,'0')}</div>
+                  <div className="mes">{d.toLocaleDateString('pt-BR',{month:'short'})}</div>
+                </div>
+                <div className="visita-info">
+                  <div className="visita-cliente">{v.cliente?.nome}</div>
+                  {v.cliente?.nome_fazenda && <div className="visita-fazenda">🌾 {v.cliente.nome_fazenda}</div>}
+                  {v.cliente?.cidade && <div className="visita-loc">📍 {v.cliente.cidade}/{v.cliente.estado}</div>}
+                  {v.motivo_visita && <div className="visita-motivo">🎯 {v.motivo_visita}</div>}
+                </div>
+                <div className="status-badge" style={{ background: statusCor[v.status] || '#aaa' }}>
+                  {statusEmoji[v.status]} {v.status.charAt(0).toUpperCase() + v.status.slice(1)}
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </>
   )
 }
