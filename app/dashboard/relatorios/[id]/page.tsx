@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
 
 type Visita = {
   id: string
@@ -32,10 +31,17 @@ type Visita = {
   funcionario: { nome_completo: string }
 }
 
+type Foto = {
+  id: string
+  url: string
+  legenda: string | null
+}
+
 export default function RelatorioVisitaPage() {
   const { id } = useParams()
   const router = useRouter()
   const [visita, setVisita] = useState<Visita | null>(null)
+  const [fotos, setFotos] = useState<Foto[]>([])
   const [carregando, setCarregando] = useState(true)
   const supabase = createClient()
 
@@ -47,6 +53,14 @@ export default function RelatorioVisitaPage() {
         .eq('id', id)
         .single()
       setVisita(data)
+
+      const { data: fotosData } = await supabase
+        .from('visita_fotos')
+        .select('id, url, legenda')
+        .eq('visita_id', id)
+        .order('created_at')
+      setFotos(fotosData || [])
+
       setCarregando(false)
     }
     carregar()
@@ -59,19 +73,13 @@ export default function RelatorioVisitaPage() {
   const dataGeracao = new Date()
 
   const statusCores: Record<string, string> = {
-    agendada: '#E67E22',
-    realizada: '#27ae60',
-    cancelada: '#e74c3c',
+    agendada: '#E67E22', realizada: '#27ae60', cancelada: '#e74c3c',
   }
   const statusEmoji: Record<string, string> = {
-    agendada: '📅',
-    realizada: '✅',
-    cancelada: '❌',
+    agendada: '📅', realizada: '✅', cancelada: '❌',
   }
   const statusLabel: Record<string, string> = {
-    agendada: 'Visita Agendada',
-    realizada: 'Visita Realizada',
-    cancelada: 'Visita Cancelada',
+    agendada: 'Visita Agendada', realizada: 'Visita Realizada', cancelada: 'Visita Cancelada',
   }
 
   const motivoExibido = visita.motivo_visita === 'Outros'
@@ -83,16 +91,13 @@ export default function RelatorioVisitaPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700;900&display=swap');
 
-        /* TELA */
         .acoes-tela{display:flex;gap:.7rem;margin-bottom:1.5rem;flex-wrap:wrap}
         .btn-voltar{display:inline-flex;align-items:center;gap:.4rem;color:#E67E22;font-size:.82rem;font-weight:700;text-decoration:none;background:none;border:none;cursor:pointer;font-family:'Comfortaa',sans-serif}
         .btn-imprimir{display:inline-flex;align-items:center;gap:.5rem;background:#162a1e;color:#fff;padding:.7rem 1.4rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;font-weight:700;border:none;cursor:pointer;transition:background .2s}
         .btn-imprimir:hover{background:#0d1f14}
 
-        /* RELATÓRIO */
         .relatorio{background:#fff;border-radius:16px;padding:2.5rem;box-shadow:0 4px 20px rgba(0,0,0,.08);max-width:800px;margin:0 auto;font-family:'Comfortaa',sans-serif}
 
-        /* CABEÇALHO */
         .rel-header{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:1.5rem;border-bottom:2px solid #162a1e;margin-bottom:1.5rem}
         .rel-logo-area{display:flex;align-items:center;gap:.7rem}
         .rel-logo-img{width:40px;height:40px;object-fit:contain}
@@ -103,7 +108,6 @@ export default function RelatorioVisitaPage() {
         .rel-titulo-doc p{font-size:.72rem;color:#aaa}
         .rel-num{background:#162a1e;color:#fff;font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:4px;display:inline-block;margin-top:.3rem}
 
-        /* SEÇÕES */
         .rel-secao{margin-bottom:1.5rem}
         .rel-secao-titulo{font-size:.7rem;font-weight:700;color:#E67E22;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.8rem;padding-bottom:.4rem;border-bottom:1px solid #f0ede8}
         .rel-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
@@ -112,15 +116,17 @@ export default function RelatorioVisitaPage() {
         .rel-campo-valor{font-size:.82rem;font-weight:700;color:#162a1e}
         .rel-campo-full{grid-column:1/-1}
         .rel-texto{background:#f7f5f0;border-radius:8px;padding:.8rem 1rem;font-size:.82rem;color:#444;line-height:1.8}
-
-        /* STATUS */
         .rel-status{display:inline-flex;align-items:center;gap:.4rem;color:#fff;font-size:.75rem;font-weight:700;padding:.3rem .8rem;border-radius:20px}
 
-        /* RODAPÉ */
+        /* FOTOS */
+        .rel-fotos-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:.4rem}
+        .rel-foto-item{border-radius:8px;overflow:hidden;border:1px solid #eae5de;break-inside:avoid}
+        .rel-foto-img{width:100%;height:200px;object-fit:cover;display:block}
+        .rel-foto-legenda{padding:.5rem .7rem;font-size:.72rem;color:#555;background:#f7f5f0;border-top:1px solid #eae5de;text-align:center;font-style:italic;line-height:1.4}
+
         .rel-footer{margin-top:2rem;padding-top:1rem;border-top:1px solid #eae5de;display:flex;align-items:center;justify-content:space-between;font-size:.68rem;color:#aaa}
         .rel-assinatura{border-top:1px solid #162a1e;padding-top:.3rem;min-width:200px;text-align:center;font-size:.7rem;color:#555;margin-top:2rem}
 
-        /* IMPRESSÃO */
         @media print {
             .acoes-tela { display: none !important; }
             .sidebar { display: none !important; }
@@ -130,10 +136,11 @@ export default function RelatorioVisitaPage() {
             .content > *:not(.relatorio) { display: none !important; }
             .relatorio { box-shadow: none !important; border-radius: 0 !important; padding: 1.5rem !important; max-width: 100% !important; }
             body { background: #fff !important; }
+            .rel-foto-item { break-inside: avoid; }
+            .rel-fotos-grid { break-inside: avoid; }
         }
       `}</style>
 
-      {/* Botões visíveis só na tela */}
       <div className="acoes-tela">
         <button className="btn-voltar" onClick={() => router.back()}>← Voltar</button>
         <button className="btn-imprimir" onClick={() => window.print()}>
@@ -141,7 +148,6 @@ export default function RelatorioVisitaPage() {
         </button>
       </div>
 
-      {/* RELATÓRIO */}
       <div className="relatorio">
 
         {/* Cabeçalho */}
@@ -162,10 +168,7 @@ export default function RelatorioVisitaPage() {
 
         {/* Status */}
         <div style={{marginBottom:'1.2rem'}}>
-          <span
-            className="rel-status"
-            style={{background: statusCores[visita.status] || '#888'}}
-          >
+          <span className="rel-status" style={{background: statusCores[visita.status] || '#888'}}>
             {statusEmoji[visita.status]} {statusLabel[visita.status] || visita.status}
           </span>
         </div>
@@ -230,7 +233,7 @@ export default function RelatorioVisitaPage() {
           </div>
         </div>
 
-        {/* Dados da Visita — inclui KM e Motivo */}
+        {/* Dados da Visita */}
         <div className="rel-secao">
           <div className="rel-secao-titulo">Dados da Visita</div>
           <div className="rel-grid">
@@ -271,7 +274,6 @@ export default function RelatorioVisitaPage() {
           </div>
         </div>
 
-        {/* Descrição */}
         {visita.descricao && (
           <div className="rel-secao">
             <div className="rel-secao-titulo">Descrição da Visita</div>
@@ -279,7 +281,6 @@ export default function RelatorioVisitaPage() {
           </div>
         )}
 
-        {/* Recomendações */}
         {visita.recomendacoes && (
           <div className="rel-secao">
             <div className="rel-secao-titulo">Recomendações Técnicas</div>
@@ -287,11 +288,27 @@ export default function RelatorioVisitaPage() {
           </div>
         )}
 
-        {/* Observação de finalização */}
         {visita.observacao_finalizacao && (
           <div className="rel-secao">
             <div className="rel-secao-titulo">Observações de Finalização</div>
             <div className="rel-texto">{visita.observacao_finalizacao}</div>
+          </div>
+        )}
+
+        {/* FOTOS */}
+        {fotos.length > 0 && (
+          <div className="rel-secao">
+            <div className="rel-secao-titulo">Registro Fotográfico</div>
+            <div className="rel-fotos-grid">
+              {fotos.map(foto => (
+                <div key={foto.id} className="rel-foto-item">
+                  <img src={foto.url} alt={foto.legenda || ''} className="rel-foto-img"/>
+                  {foto.legenda && (
+                    <div className="rel-foto-legenda">{foto.legenda}</div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
