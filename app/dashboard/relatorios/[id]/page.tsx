@@ -128,8 +128,6 @@ export default function RelatorioVisitaPage() {
         .rel-assinatura{border-top:1px solid #162a1e;padding-top:.3rem;min-width:200px;text-align:center;font-size:.7rem;color:#555;margin-top:2rem}
 
         @media print {
-          *{overflow:visible !important;scrollbar-width:none !important}
-          ::-webkit-scrollbar{display:none !important}
           .acoes-tela{display:none !important}
           .sidebar{display:none !important}
           .topbar{display:none !important}
@@ -138,8 +136,9 @@ export default function RelatorioVisitaPage() {
           .content > *:not(.relatorio){display:none !important}
           .relatorio{box-shadow:none !important;border-radius:0 !important;padding:1.5rem !important;max-width:100% !important}
           body{background:#fff !important}
-          .rel-foto-item{break-inside:avoid;page-break-inside:avoid}
-          .rel-fotos-grid{break-inside:avoid;page-break-inside:avoid}
+          .rel-fotos-grid{display:block !important}
+          .rel-foto-item{display:block !important;width:100% !important;margin-bottom:1rem !important;break-inside:avoid !important;page-break-inside:avoid !important}
+          .rel-foto-img{height:220px !important}
           .rel-secao{break-inside:avoid;page-break-inside:avoid}
         }
       `}</style>
