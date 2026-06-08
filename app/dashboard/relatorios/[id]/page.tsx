@@ -120,8 +120,8 @@ export default function RelatorioVisitaPage() {
 
         /* FOTOS */
         .rel-fotos-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:.4rem}
-        .rel-foto-item{border-radius:8px;overflow:hidden;border:1px solid #eae5de;break-inside:avoid;page-break-inside:avoid}
-        .rel-foto-img{width:100%;height:160px;object-fit:cover;display:block}
+        .rel-foto-item{border-radius:8px;overflow:hidden;border:1px solid #eae5de}
+        .rel-foto-img{width:100%;height:200px;object-fit:cover;display:block}
         .rel-foto-legenda{padding:.5rem .7rem;font-size:.72rem;color:#555;background:#f7f5f0;border-top:1px solid #eae5de;text-align:center;font-style:italic;line-height:1.4}
 
         .rel-footer{margin-top:2rem;padding-top:1rem;border-top:1px solid #eae5de;display:flex;align-items:center;justify-content:space-between;font-size:.68rem;color:#aaa}
@@ -136,10 +136,6 @@ export default function RelatorioVisitaPage() {
           .content > *:not(.relatorio){display:none !important}
           .relatorio{box-shadow:none !important;border-radius:0 !important;padding:1.5rem !important;max-width:100% !important}
           body{background:#fff !important}
-          .rel-fotos-grid{display:block !important}
-          .rel-foto-item{display:block !important;width:100% !important;margin-bottom:1rem !important;break-inside:avoid !important;page-break-inside:avoid !important}
-          .rel-foto-img{height:220px !important}
-          .rel-secao{break-inside:avoid;page-break-inside:avoid}
         }
       `}</style>
 
