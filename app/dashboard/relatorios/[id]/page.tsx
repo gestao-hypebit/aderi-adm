@@ -120,27 +120,27 @@ export default function RelatorioVisitaPage() {
 
         /* FOTOS */
         .rel-fotos-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:.4rem}
-        .rel-foto-item{border-radius:8px;overflow:hidden;border:1px solid #eae5de;break-inside:avoid}
-        .rel-foto-img{width:100%;height:200px;object-fit:cover;display:block}
+        .rel-foto-item{border-radius:8px;overflow:hidden;border:1px solid #eae5de;break-inside:avoid;page-break-inside:avoid}
+        .rel-foto-img{width:100%;height:160px;object-fit:cover;display:block}
         .rel-foto-legenda{padding:.5rem .7rem;font-size:.72rem;color:#555;background:#f7f5f0;border-top:1px solid #eae5de;text-align:center;font-style:italic;line-height:1.4}
 
         .rel-footer{margin-top:2rem;padding-top:1rem;border-top:1px solid #eae5de;display:flex;align-items:center;justify-content:space-between;font-size:.68rem;color:#aaa}
         .rel-assinatura{border-top:1px solid #162a1e;padding-top:.3rem;min-width:200px;text-align:center;font-size:.7rem;color:#555;margin-top:2rem}
 
         @media print {
-          * { overflow: visible !important; scrollbar-width: none !important; }
-          ::-webkit-scrollbar { display: none !important; }
-          .acoes-tela { display: none !important; }
-          .sidebar { display: none !important; }
-          .topbar { display: none !important; }
-          .main { margin-left: 0 !important; width: 100% !important; }
-          .content { padding: 0 !important; }
-          .content > *:not(.relatorio) { display: none !important; }
-          .relatorio { box-shadow: none !important; border-radius: 0 !important; padding: 1.5rem !important; max-width: 100% !important; }
-          body { background: #fff !important; }
-          .rel-foto-item { break-inside: avoid; }
-          .rel-fotos-grid { break-inside: avoid; }
-}
+          *{overflow:visible !important;scrollbar-width:none !important}
+          ::-webkit-scrollbar{display:none !important}
+          .acoes-tela{display:none !important}
+          .sidebar{display:none !important}
+          .topbar{display:none !important}
+          .main{margin-left:0 !important;width:100% !important}
+          .content{padding:0 !important}
+          .content > *:not(.relatorio){display:none !important}
+          .relatorio{box-shadow:none !important;border-radius:0 !important;padding:1.5rem !important;max-width:100% !important}
+          body{background:#fff !important}
+          .rel-foto-item{break-inside:avoid;page-break-inside:avoid}
+          .rel-fotos-grid{break-inside:avoid;page-break-inside:avoid}
+          .rel-secao{break-inside:avoid;page-break-inside:avoid}
         }
       `}</style>
 
@@ -153,7 +153,6 @@ export default function RelatorioVisitaPage() {
 
       <div className="relatorio">
 
-        {/* Cabeçalho */}
         <div className="rel-header">
           <div className="rel-logo-area">
             <img src="/logo-aderi.png" alt="Aderi" className="rel-logo-img"/>
@@ -169,14 +168,12 @@ export default function RelatorioVisitaPage() {
           </div>
         </div>
 
-        {/* Status */}
         <div style={{marginBottom:'1.2rem'}}>
           <span className="rel-status" style={{background: statusCores[visita.status] || '#888'}}>
             {statusEmoji[visita.status]} {statusLabel[visita.status] || visita.status}
           </span>
         </div>
 
-        {/* Dados do Cliente */}
         <div className="rel-secao">
           <div className="rel-secao-titulo">Dados do Produtor</div>
           <div className="rel-grid">
@@ -205,7 +202,6 @@ export default function RelatorioVisitaPage() {
           </div>
         </div>
 
-        {/* Dados da Fazenda */}
         <div className="rel-secao">
           <div className="rel-secao-titulo">Dados da Propriedade</div>
           <div className="rel-grid">
@@ -236,7 +232,6 @@ export default function RelatorioVisitaPage() {
           </div>
         </div>
 
-        {/* Dados da Visita */}
         <div className="rel-secao">
           <div className="rel-secao-titulo">Dados da Visita</div>
           <div className="rel-grid">
@@ -298,7 +293,6 @@ export default function RelatorioVisitaPage() {
           </div>
         )}
 
-        {/* FOTOS */}
         {fotos.length > 0 && (
           <div className="rel-secao">
             <div className="rel-secao-titulo">Registro Fotográfico</div>
@@ -315,7 +309,6 @@ export default function RelatorioVisitaPage() {
           </div>
         )}
 
-        {/* Assinatura */}
         <div style={{display:'flex',justifyContent:'flex-end',marginTop:'2.5rem'}}>
           <div className="rel-assinatura">
             <div>{visita.funcionario?.nome_completo || 'Técnico Responsável'}</div>
@@ -323,7 +316,6 @@ export default function RelatorioVisitaPage() {
           </div>
         </div>
 
-        {/* Rodapé */}
         <div className="rel-footer">
           <span>Aderi Agronegócios — Piumhi, MG</span>
           <span>Gerado em {dataGeracao.toLocaleDateString('pt-BR')} às {dataGeracao.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</span>
