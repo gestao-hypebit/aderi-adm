@@ -29,6 +29,7 @@ export default async function DashboardHome() {
     { data: todasVisitas },
     { data: visitasRecentes },
     { data: todosClientes },
+    { data: kmDoMes },
   ] = await Promise.all([
     supabase.from('clientes').select('*', { count: 'exact', head: true }),
     supabase.from('visitas').select('*', { count: 'exact', head: true }).eq('data_visita', hoje),
@@ -41,6 +42,7 @@ export default async function DashboardHome() {
     supabase.from('visitas').select('data_visita, status').gte('data_visita', inicioHistorico),
     supabase.from('visitas').select('cliente_id, data_visita').gte('data_visita', dezDiasAtrasStr).eq('status', 'realizada'),
     supabase.from('clientes').select('id, nome, nome_fazenda'),
+    supabase.from('km_diario').select('km_inicial, km_final, data').gte('data', inicioMes).eq('funcionario_id', user.id),
   ])
 
   // Clientes sem visita nos últimos 10 dias
@@ -85,6 +87,16 @@ export default async function DashboardHome() {
     cancelada: '#e74c3c'
   }
 
+  // Resumo de KM do mês
+  const lancamentosCompletos = (kmDoMes || []).filter((k: any) => k.km_inicial !== null && k.km_final !== null)
+  const totalKmMes = lancamentosCompletos.reduce((acc: number, k: any) => acc + (k.km_final - k.km_inicial), 0)
+  const diasComPendencia = (kmDoMes || []).filter((k: any) => k.km_inicial !== null && k.km_final === null).length
+
+  const kmCor = diasComPendencia > 0 ? '#E67E22' : '#27ae60'
+  const kmLabel = diasComPendencia > 0
+    ? `${diasComPendencia} dia${diasComPendencia > 1 ? 's' : ''} pendente${diasComPendencia > 1 ? 's' : ''}`
+    : `${lancamentosCompletos.length} dia${lancamentosCompletos.length !== 1 ? 's' : ''} registrado${lancamentosCompletos.length !== 1 ? 's' : ''}`
+
   return (
     <>
       <style>{`
@@ -92,11 +104,13 @@ export default async function DashboardHome() {
         .home-saudacao h1{font-size:1.4rem;font-weight:700;color:#162a1e}
         .home-saudacao p{color:#aaa;font-size:.82rem;margin-top:.2rem}
         .cards-resumo{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1rem;margin-bottom:1.2rem}
-        .resumo-card{background:#fff;border-radius:12px;padding:1.2rem;box-shadow:0 2px 8px rgba(0,0,0,.05);border-top:3px solid;position:relative;overflow:hidden}
+        .resumo-card{background:#fff;border-radius:12px;padding:1.2rem;box-shadow:0 2px 8px rgba(0,0,0,.05);border-top:3px solid;position:relative;overflow:hidden;text-decoration:none;display:block;transition:transform .15s}
+        .resumo-card.clickable:hover{transform:translateY(-2px)}
         .resumo-num{font-size:2rem;font-weight:900;color:#162a1e;line-height:1}
         .resumo-label{font-size:.72rem;color:#aaa;font-weight:700;margin-top:.3rem}
-        .resumo-icon{font-size:1.3rem;margin-bottom:.4rem}
+        .resumo-icon{margin-bottom:.5rem;height:20px;display:flex;align-items:center}
         .resumo-sub{font-size:.7rem;color:#aaa;margin-top:.4rem}
+        .resumo-sub.destaque{font-weight:700}
         .acoes-rapidas{display:flex;gap:.7rem;margin-bottom:1.2rem;flex-wrap:wrap}
         .btn-acao-home{display:inline-flex;align-items:center;gap:.4rem;padding:.65rem 1.2rem;border-radius:8px;text-decoration:none;font-size:.82rem;font-weight:700;transition:background .2s}
         .alerta-section{margin-bottom:1.2rem}
@@ -133,62 +147,88 @@ export default async function DashboardHome() {
       `}</style>
 
       <div className="home-saudacao">
-        <h1>{saudacao}! 👋</h1>
+        <h1>{saudacao}</h1>
         <p>{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
       </div>
 
       {/* Cards de resumo */}
       <div className="cards-resumo">
         <div className="resumo-card" style={{borderTopColor:'#162a1e'}}>
-          <div className="resumo-icon">👥</div>
+          <div className="resumo-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#162a1e" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
           <div className="resumo-num">{totalClientes || 0}</div>
           <div className="resumo-label">Clientes</div>
           <div className="resumo-sub">cadastrados</div>
         </div>
+
         <div className="resumo-card" style={{borderTopColor:'#E67E22'}}>
-          <div className="resumo-icon">📅</div>
+          <div className="resumo-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E67E22" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
           <div className="resumo-num">{visitasHoje || 0}</div>
           <div className="resumo-label">Visitas hoje</div>
           <div className="resumo-sub">{new Date().toLocaleDateString('pt-BR',{day:'numeric',month:'short'})}</div>
         </div>
+
         <div className="resumo-card" style={{borderTopColor:'#27ae60'}}>
-          <div className="resumo-icon">✅</div>
+          <div className="resumo-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#27ae60" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
           <div className="resumo-num">{visitasMes || 0}</div>
           <div className="resumo-label">Visitas este mês</div>
           <div className="resumo-sub">{new Date().toLocaleDateString('pt-BR',{month:'long'})}</div>
         </div>
+
         <div className="resumo-card" style={{borderTopColor:'#9b59b6'}}>
-          <div className="resumo-icon">⏳</div>
+          <div className="resumo-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9b59b6" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
           <div className="resumo-num">{visitasAgendadas || 0}</div>
           <div className="resumo-label">Agendadas</div>
           <div className="resumo-sub">pendentes</div>
         </div>
+
         <div className="resumo-card" style={{borderTopColor:'#3498db'}}>
-          <div className="resumo-icon">📊</div>
+          <div className="resumo-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3498db" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          </div>
           <div className="resumo-num">{taxaConclusao}%</div>
           <div className="resumo-label">Taxa de conclusão</div>
           <div className="resumo-sub">das visitas</div>
         </div>
+
+        {/* Card Controle de KM */}
+        <Link href="/dashboard/km" className="resumo-card clickable" style={{borderTopColor: kmCor}}>
+          <div className="resumo-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={kmCor} strokeWidth="2"><path d="M5 17h14M5 17a2 2 0 0 1-2-2v-2a2 2 0 0 1 .5-1.32L5.5 9a2 2 0 0 1 1.5-.68h10a2 2 0 0 1 1.5.68l2 2.68A2 2 0 0 1 21 13v2a2 2 0 0 1-2 2"/><circle cx="7.5" cy="17" r="1.5"/><circle cx="16.5" cy="17" r="1.5"/></svg>
+          </div>
+          <div className="resumo-num" style={{fontSize: '1.6rem'}}>
+            {totalKmMes.toLocaleString('pt-BR')} km
+          </div>
+          <div className="resumo-label">KM rodado no mês</div>
+          <div className="resumo-sub destaque" style={{color: kmCor}}>{kmLabel}</div>
+        </Link>
       </div>
 
       {/* Ações rápidas */}
       <div className="acoes-rapidas">
-        <Link href="/dashboard/visitas/novo" className="btn-acao-home" style={{background:'#E67E22',color:'#fff'}}>📋 Nova Visita</Link>
-        <Link href="/dashboard/clientes/novo" className="btn-acao-home" style={{background:'#162a1e',color:'#fff'}}>👤 Novo Cliente</Link>
-        <Link href="/dashboard/relatorios" className="btn-acao-home" style={{background:'#fff',color:'#162a1e',border:'1.5px solid #eae5de'}}>📊 Relatórios</Link>
+        <Link href="/dashboard/visitas/novo" className="btn-acao-home" style={{background:'#E67E22',color:'#fff'}}>Nova Visita</Link>
+        <Link href="/dashboard/clientes/novo" className="btn-acao-home" style={{background:'#162a1e',color:'#fff'}}>Novo Cliente</Link>
+        <Link href="/dashboard/relatorios" className="btn-acao-home" style={{background:'#fff',color:'#162a1e',border:'1.5px solid #eae5de'}}>Relatórios</Link>
       </div>
 
       {/* Alerta clientes sem visita */}
       {alertaClientes.length > 0 && (
         <div className="alerta-section">
           <div className="alerta-titulo">
-            ⚠️ Clientes sem visita há mais de 10 dias ({alertaClientes.length})
+            Clientes sem visita há mais de 10 dias ({alertaClientes.length})
           </div>
           {alertaClientes.slice(0, 4).map((c: any) => (
             <Link key={c.id} href={`/dashboard/clientes/${c.id}`} className="alerta-item">
               <div>
                 <div className="alerta-nome">{c.nome}</div>
-                {c.nome_fazenda && <div className="alerta-fazenda">🌾 {c.nome_fazenda}</div>}
+                {c.nome_fazenda && <div className="alerta-fazenda">{c.nome_fazenda}</div>}
               </div>
               <span className="alerta-badge">+10 dias sem visita</span>
             </Link>
@@ -204,11 +244,11 @@ export default async function DashboardHome() {
       {/* Gráfico + Taxa */}
       <div className="grid-main">
         <div className="secao-card">
-          <div className="secao-titulo">📈 Visitas nos últimos 6 meses</div>
+          <div className="secao-titulo">Visitas nos últimos 6 meses</div>
           <DashboardCharts dados={dadosGrafico} />
         </div>
         <div className="secao-card">
-          <div className="secao-titulo">📊 Status geral</div>
+          <div className="secao-titulo">Status geral</div>
           <div className="taxa-wrap">
             <div className="taxa-num">{taxaConclusao}%</div>
             <div className="taxa-label">Taxa de conclusão</div>
@@ -239,11 +279,11 @@ export default async function DashboardHome() {
       <div className="grid-2">
         <div className="secao-card">
           <div className="secao-titulo">
-            📅 Próximas visitas
+            Próximas visitas
             <Link href="/dashboard/visitas">Ver todas →</Link>
           </div>
           {!proximasVisitas?.length ? (
-            <div className="vazio-mini">Nenhuma visita agendada 🎉</div>
+            <div className="vazio-mini">Nenhuma visita agendada</div>
           ) : proximasVisitas.map((v: any) => {
             const d = new Date(v.data_visita + 'T12:00:00')
             return (
@@ -263,7 +303,7 @@ export default async function DashboardHome() {
         </div>
         <div className="secao-card">
           <div className="secao-titulo">
-            🕐 Últimas atividades
+            Últimas atividades
             <Link href="/dashboard/visitas">Ver todas →</Link>
           </div>
           {!ultimasVisitas?.length ? (

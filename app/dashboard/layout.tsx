@@ -9,12 +9,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname()
 
   const links = [
-    { href: '/dashboard', label: 'Início', icon: '🏠' },
-    { href: '/dashboard/clientes', label: 'Clientes', icon: '👥' },
-    { href: '/dashboard/visitas', label: 'Visitas', icon: '📋' },
-    { href: '/dashboard/agendamento', label: 'Agenda', icon: '📅' },
-    { href: '/dashboard/relatorios', label: 'Relatórios', icon: '📊' },
-  ]
+  { href: '/dashboard', label: 'Início', icon: '🏠' },
+  { href: '/dashboard/clientes', label: 'Clientes', icon: '👥' },
+  { href: '/dashboard/visitas', label: 'Visitas', icon: '📋' },
+  { href: '/dashboard/agendamento', label: 'Agenda', icon: '📅' },
+  { href: '/dashboard/km', label: 'Controle de KM', icon: '⛽' },
+  { href: '/dashboard/relatorios', label: 'Relatórios', icon: '📊' },
+    ]
 
   // Verifica se o link está ativo (exato ou começa com o href para subrotas)
   function isAtivo(href: string) {

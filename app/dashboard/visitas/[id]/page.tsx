@@ -33,6 +33,50 @@ type FotoSalva = {
   legenda: string | null
 }
 
+// ===== Ícones =====
+function IconArrowLeft() {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+}
+function IconCalendar({ color = 'currentColor' }: { color?: string }) {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+}
+function IconCheck({ color = 'currentColor', size = 14 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+}
+function IconX({ color = 'currentColor', size = 14 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+}
+function IconTrash({ color = 'currentColor' }: { color?: string }) {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+}
+function IconSprout({ color = 'currentColor', size = 12 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M7 20h10"/><path d="M10 20c0-4 .5-8 2-10"/><path d="M14 20c0-4-.5-8-2-10"/><path d="M5 5c1.5 0 3 1 3.5 3C7 8 5 7.5 4 6c-.5-1 0-1 1-1z"/><path d="M19 8c-1.5 0-3 .5-4 2 1.5 1 3 1 4 0 1-.5 1-1.5 0-2z"/></svg>
+}
+function IconPin({ color = '#aaa', size = 12 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+}
+function IconTarget({ color = '#888', size = 12 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+}
+function IconRoute({ color = '#888', size = 12 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><circle cx="6" cy="19" r="3"/><circle cx="18" cy="5" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/></svg>
+}
+function IconCamera({ color = 'currentColor', size = 14 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+}
+function IconEdit({ color = 'currentColor' }: { color?: string }) {
+  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+}
+function IconUser({ color = 'currentColor', size = 14 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+}
+
+function statusIcon(status: string, color: string, size = 14) {
+  if (status === 'agendada') return <IconCalendar color={color} />
+  if (status === 'realizada') return <IconCheck color={color} size={size} />
+  return <IconX color={color} size={size} />
+}
+
 export default function VisitaDetalhe() {
   const { id } = useParams()
   const router = useRouter()
@@ -80,7 +124,6 @@ export default function VisitaDetalhe() {
     setCarregandoFotos(false)
   }
 
-  // Upload avulso (botão na seção de fotos)
   async function uploadFotoAvulsa(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || [])
     if (!files.length) return
@@ -105,7 +148,6 @@ export default function VisitaDetalhe() {
     carregarFotos()
   }
 
-  // Fotos no modal
   function adicionarFotosModal(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || [])
     const novas: FotoPreview[] = files.map(file => ({
@@ -214,25 +256,25 @@ export default function VisitaDetalhe() {
         .mes-txt{font-size:.72rem;font-weight:700;color:#aaa;text-transform:uppercase}
         .visita-titulo{flex:1}
         .cliente-nome{font-size:1.2rem;font-weight:700;color:#162a1e}
-        .cliente-fazenda{color:#E67E22;font-size:.85rem;font-weight:700;margin:.2rem 0}
-        .cliente-loc{color:#aaa;font-size:.78rem}
+        .cliente-fazenda{display:flex;align-items:center;gap:.35rem;color:#E67E22;font-size:.85rem;font-weight:700;margin:.3rem 0}
+        .cliente-loc{display:flex;align-items:center;gap:.35rem;color:#aaa;font-size:.78rem}
         .status-atual{display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;font-weight:700;padding:.35rem 1rem;border-radius:20px;color:#fff;margin-top:.5rem}
         .acoes{display:flex;gap:.6rem;flex-wrap:wrap}
-        .btn-acao{padding:.55rem 1rem;border-radius:8px;border:none;font-family:'Comfortaa',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .2s}
+        .btn-acao{display:inline-flex;align-items:center;gap:.4rem;padding:.55rem 1rem;border-radius:8px;border:none;font-family:'Comfortaa',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .2s}
         .secao{background:#fff;border-radius:12px;padding:1.2rem 1.5rem;box-shadow:0 2px 6px rgba(0,0,0,.04);margin-bottom:1rem}
         .secao-label{font-size:.68rem;font-weight:700;color:#E67E22;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.6rem}
         .secao-texto{font-size:.88rem;color:#444;line-height:1.8}
         .status-btns{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem}
-        .status-btn{padding:.45rem 1rem;border-radius:20px;border:1.5px solid;font-family:'Comfortaa',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer;transition:all .2s;background:transparent}
-        .info-row{display:flex;gap:.5rem;align-items:center;font-size:.85rem;color:#444;margin-bottom:.4rem}
+        .status-btn{display:inline-flex;align-items:center;gap:.4rem;padding:.45rem 1rem;border-radius:20px;border:1.5px solid;font-family:'Comfortaa',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer;transition:all .2s;background:transparent}
+        .info-row{display:flex;gap:.6rem;align-items:center;font-size:.85rem;color:#444;margin-bottom:.4rem}
         .info-row span{font-weight:700;color:#162a1e}
         .link-cliente{display:inline-flex;align-items:center;gap:.4rem;color:#E67E22;font-size:.82rem;font-weight:700;text-decoration:none;margin-top:.5rem}
-        .info-chips{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.4rem}
-        .chip{display:inline-flex;align-items:center;gap:.35rem;background:#f0ede8;border-radius:20px;padding:.3rem .8rem;font-size:.78rem;font-weight:700;color:#162a1e}
+        .info-chips{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.5rem}
+        .chip{display:inline-flex;align-items:center;gap:.4rem;background:#f0ede8;border-radius:20px;padding:.3rem .8rem;font-size:.78rem;font-weight:700;color:#162a1e}
         .obs-vazia{font-size:.82rem;color:#aaa;font-style:italic}
         .obs-texto{font-size:.88rem;color:#444;line-height:1.8;background:#f7f5f0;border-radius:8px;padding:.8rem 1rem}
         .obs-acoes{display:flex;gap:.5rem;margin-top:.8rem}
-        .btn-obs{padding:.4rem .9rem;border-radius:8px;border:none;font-family:'Comfortaa',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer;transition:all .2s}
+        .btn-obs{display:inline-flex;align-items:center;gap:.4rem;padding:.4rem .9rem;border-radius:8px;border:none;font-family:'Comfortaa',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer;transition:all .2s}
         .btn-obs-edit{background:#f0ede8;color:#162a1e}
         .btn-obs-edit:hover{background:#e0dbd2}
         .btn-obs-salvar{background:#162a1e;color:#fff}
@@ -244,28 +286,28 @@ export default function VisitaDetalhe() {
         .foto-item{position:relative;border-radius:10px;overflow:hidden;border:1px solid #eae5de}
         .foto-img{width:100%;height:140px;object-fit:cover;display:block}
         .foto-legenda{padding:.5rem .7rem;font-size:.72rem;color:#555;background:#fafaf8;border-top:1px solid #f0ede8;font-style:italic}
-        .foto-del{position:absolute;top:5px;right:5px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:.75rem;display:flex;align-items:center;justify-content:center}
+        .foto-del{position:absolute;top:5px;right:5px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;display:flex;align-items:center;justify-content:center}
         .btn-add-foto{display:inline-flex;align-items:center;gap:.4rem;background:#f0ede8;color:#162a1e;border:none;padding:.5rem 1rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;transition:background .2s;margin-top:.8rem}
         .btn-add-foto:hover{background:#e0dbd2}
         .btn-add-foto:disabled{opacity:.6;cursor:not-allowed}
         .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem;overflow-y:auto}
         .modal-box{background:#fff;border-radius:16px;padding:2rem;max-width:560px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.15);max-height:90vh;overflow-y:auto}
-        .modal-titulo{font-size:1rem;font-weight:700;color:#162a1e;margin-bottom:.4rem}
+        .modal-titulo{display:flex;align-items:center;gap:.5rem;font-size:1rem;font-weight:700;color:#162a1e;margin-bottom:.4rem}
         .modal-sub{font-size:.82rem;color:#888;margin-bottom:1.2rem}
         .modal-textarea{width:100%;padding:.8rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;background:#fafaf8;resize:vertical;min-height:90px;outline:none;box-sizing:border-box;transition:border-color .2s}
         .modal-textarea:focus{border-color:#27ae60;background:#fff}
         .modal-divider{border:none;border-top:1px solid #f0ede8;margin:1.2rem 0}
-        .modal-secao-label{font-size:.7rem;font-weight:700;color:#E67E22;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.8rem}
+        .modal-secao-label{display:flex;align-items:center;gap:.4rem;font-size:.7rem;font-weight:700;color:#E67E22;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.8rem}
         .fotos-preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.8rem;margin-bottom:.8rem}
         .foto-preview-item{border-radius:10px;overflow:hidden;border:1.5px solid #eae5de;position:relative}
         .foto-preview-img{width:100%;height:120px;object-fit:cover;display:block}
         .foto-preview-legenda{width:100%;padding:.4rem .5rem;border:none;border-top:1px solid #f0ede8;font-family:'Comfortaa',sans-serif;font-size:.72rem;color:#162a1e;background:#fafaf8;outline:none;box-sizing:border-box}
         .foto-preview-legenda::placeholder{color:#bbb}
-        .foto-preview-del{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:.72rem;display:flex;align-items:center;justify-content:center}
+        .foto-preview-del{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;display:flex;align-items:center;justify-content:center}
         .btn-upload-foto{display:inline-flex;align-items:center;gap:.5rem;background:#f0ede8;color:#162a1e;border:1.5px dashed #ccc;padding:.7rem 1.2rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;transition:all .2s;width:100%;justify-content:center;box-sizing:border-box}
         .btn-upload-foto:hover{background:#e0dbd2;border-color:#E67E22}
         .modal-btns{display:flex;gap:.6rem;margin-top:1rem;justify-content:flex-end;flex-wrap:wrap}
-        .btn-modal-confirmar{background:#27ae60;color:#fff;border:none;padding:.7rem 1.4rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer;transition:background .2s}
+        .btn-modal-confirmar{display:inline-flex;align-items:center;gap:.4rem;background:#27ae60;color:#fff;border:none;padding:.7rem 1.4rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer;transition:background .2s}
         .btn-modal-confirmar:hover{background:#219150}
         .btn-modal-confirmar:disabled{opacity:.6;cursor:not-allowed}
         .btn-modal-cancelar{background:transparent;color:#888;border:1.5px solid #eae5de;padding:.7rem 1.2rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer}
@@ -275,7 +317,7 @@ export default function VisitaDetalhe() {
       {modalAberto && (
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setModalAberto(false) }}>
           <div className="modal-box">
-            <div className="modal-titulo">✅ Finalizar visita</div>
+            <div className="modal-titulo"><IconCheck color="#27ae60" size={18} /> Finalizar visita</div>
             <div className="modal-sub">Adicione uma observação e fotos da visita (opcional)</div>
             <textarea
               className="modal-textarea"
@@ -285,13 +327,13 @@ export default function VisitaDetalhe() {
               autoFocus
             />
             <hr className="modal-divider"/>
-            <div className="modal-secao-label">📷 Fotos da visita</div>
+            <div className="modal-secao-label"><IconCamera /> Fotos da visita</div>
             {fotosModal.length > 0 && (
               <div className="fotos-preview-grid">
                 {fotosModal.map((foto, i) => (
                   <div key={i} className="foto-preview-item">
                     <img src={foto.preview} alt="" className="foto-preview-img"/>
-                    <button className="foto-preview-del" onClick={() => removerFotoModal(i)}>✕</button>
+                    <button className="foto-preview-del" onClick={() => removerFotoModal(i)}><IconX size={12} /></button>
                     <input
                       className="foto-preview-legenda"
                       placeholder="Legenda da foto..."
@@ -311,19 +353,19 @@ export default function VisitaDetalhe() {
               onChange={adicionarFotosModal}
             />
             <button className="btn-upload-foto" onClick={() => inputFotoModalRef.current?.click()}>
-              📷 {fotosModal.length > 0 ? 'Adicionar mais fotos' : 'Selecionar fotos'}
+              <IconCamera /> {fotosModal.length > 0 ? 'Adicionar mais fotos' : 'Selecionar fotos'}
             </button>
             <div className="modal-btns">
               <button className="btn-modal-cancelar" onClick={() => setModalAberto(false)}>Cancelar</button>
               <button className="btn-modal-confirmar" onClick={confirmarFinalizacao} disabled={salvandoObs}>
-                {salvandoObs ? 'Salvando...' : '✓ Confirmar Finalização'}
+                {salvandoObs ? 'Salvando...' : (<><IconCheck size={14} /> Confirmar Finalização</>)}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <Link href="/dashboard/visitas" className="voltar">← Voltar</Link>
+      <Link href="/dashboard/visitas" className="voltar"><IconArrowLeft /> Voltar</Link>
 
       <div className="visita-header">
         <div style={{display:'flex',gap:'1rem',alignItems:'flex-start',flex:1}}>
@@ -334,19 +376,19 @@ export default function VisitaDetalhe() {
           </div>
           <div className="visita-titulo">
             <div className="cliente-nome">{visita.cliente?.nome}</div>
-            {visita.cliente?.nome_fazenda && <div className="cliente-fazenda">🌾 {visita.cliente.nome_fazenda}</div>}
-            <div className="cliente-loc">📍 {visita.cliente?.cidade}/{visita.cliente?.estado}</div>
+            {visita.cliente?.nome_fazenda && <div className="cliente-fazenda"><IconSprout color="#E67E22" />{visita.cliente.nome_fazenda}</div>}
+            <div className="cliente-loc"><IconPin />{visita.cliente?.cidade}/{visita.cliente?.estado}</div>
             <div className="info-chips">
-              {motivoExibido && <span className="chip">🎯 {motivoExibido}</span>}
-              {visita.km_rodado != null && <span className="chip">🛣️ {visita.km_rodado} km</span>}
+              {motivoExibido && <span className="chip"><IconTarget />{motivoExibido}</span>}
+              {visita.km_rodado != null && <span className="chip"><IconRoute />{visita.km_rodado} km</span>}
             </div>
             <div className="status-atual" style={{background: statusCor[visita.status]}}>
-              {visita.status === 'agendada' ? '📅' : visita.status === 'realizada' ? '✅' : '❌'} {visita.status}
+              {statusIcon(visita.status, '#fff')} {visita.status}
             </div>
           </div>
         </div>
         <div className="acoes">
-          <button className="btn-acao" style={{background:'#fef2f2',color:'#e74c3c'}} onClick={deletar}>🗑️ Excluir</button>
+          <button className="btn-acao" style={{background:'#fef2f2',color:'#e74c3c'}} onClick={deletar}><IconTrash /> Excluir</button>
         </div>
       </div>
 
@@ -364,7 +406,7 @@ export default function VisitaDetalhe() {
               onClick={() => mudarStatus(s)}
               disabled={atualizando || visita.status === s}
             >
-              {s === 'agendada' ? '📅' : s === 'realizada' ? '✅' : '❌'} {s.charAt(0).toUpperCase() + s.slice(1)}
+              {statusIcon(s, visita.status === s ? '#fff' : statusCor[s])} {s.charAt(0).toUpperCase() + s.slice(1)}
             </button>
           ))}
         </div>
@@ -373,8 +415,8 @@ export default function VisitaDetalhe() {
       {(motivoExibido || visita.km_rodado != null) && (
         <div className="secao">
           <div className="secao-label">Deslocamento e Motivo</div>
-          {motivoExibido && <div className="info-row">🎯 <span>{motivoExibido}</span></div>}
-          {visita.km_rodado != null && <div className="info-row">🛣️ <span>{visita.km_rodado} km rodados</span></div>}
+          {motivoExibido && <div className="info-row"><IconTarget color="#888" size={16} /> <span>{motivoExibido}</span></div>}
+          {visita.km_rodado != null && <div className="info-row"><IconRoute color="#888" size={16} /> <span>{visita.km_rodado} km rodados</span></div>}
         </div>
       )}
 
@@ -388,7 +430,7 @@ export default function VisitaDetalhe() {
                 placeholder="Escreva uma observação..." autoFocus/>
               <div className="obs-acoes">
                 <button className="btn-obs btn-obs-salvar" onClick={salvarEdicaoObs} disabled={salvandoObs}>
-                  {salvandoObs ? 'Salvando...' : '✓ Salvar'}
+                  {salvandoObs ? 'Salvando...' : (<><IconCheck size={13} /> Salvar</>)}
                 </button>
                 <button className="btn-obs btn-obs-cancelar" onClick={() => setEditandoObs(false)}>Cancelar</button>
               </div>
@@ -402,7 +444,7 @@ export default function VisitaDetalhe() {
               <div className="obs-acoes">
                 <button className="btn-obs btn-obs-edit"
                   onClick={() => { setObsEditada(visita.observacao_finalizacao || ''); setEditandoObs(true) }}>
-                  ✏️ {visita.observacao_finalizacao ? 'Editar observação' : 'Adicionar observação'}
+                  <IconEdit /> {visita.observacao_finalizacao ? 'Editar observação' : 'Adicionar observação'}
                 </button>
               </div>
             </>
@@ -424,14 +466,14 @@ export default function VisitaDetalhe() {
               {fotos.map(foto => (
                 <div key={foto.id} className="foto-item">
                   <img src={foto.url} alt={foto.legenda || ''} className="foto-img"/>
-                  <button className="foto-del" onClick={() => deletarFoto(foto.id, foto.url)}>✕</button>
+                  <button className="foto-del" onClick={() => deletarFoto(foto.id, foto.url)}><IconX color="#fff" size={12} /></button>
                   {foto.legenda && <div className="foto-legenda">{foto.legenda}</div>}
                 </div>
               ))}
             </div>
           )}
           <button className="btn-add-foto" onClick={() => inputFotoAvulsaRef.current?.click()} disabled={uploadandoFoto}>
-            {uploadandoFoto ? '⏳ Enviando...' : '📷 Adicionar fotos'}
+            <IconCamera /> {uploadandoFoto ? 'Enviando...' : 'Adicionar fotos'}
           </button>
         </div>
       )}
@@ -453,14 +495,14 @@ export default function VisitaDetalhe() {
       {visita.proximo_contato && (
         <div className="secao">
           <div className="secao-label">Próximo Contato</div>
-          <div className="info-row">📅 <span>{new Date(visita.proximo_contato + 'T12:00:00').toLocaleDateString('pt-BR')}</span></div>
+          <div className="info-row"><IconCalendar color="#888" /> <span>{new Date(visita.proximo_contato + 'T12:00:00').toLocaleDateString('pt-BR')}</span></div>
         </div>
       )}
 
       <div className="secao">
         <div className="secao-label">Cliente</div>
-        <div className="info-row">👤 <span>{visita.cliente?.nome}</span></div>
-        {visita.cliente?.nome_fazenda && <div className="info-row">🌾 <span>{visita.cliente.nome_fazenda}</span></div>}
+        <div className="info-row"><IconUser color="#888" /> <span>{visita.cliente?.nome}</span></div>
+        {visita.cliente?.nome_fazenda && <div className="info-row"><IconSprout color="#888" size={14} /> <span>{visita.cliente.nome_fazenda}</span></div>}
         <Link href={`/dashboard/clientes/${visita.cliente?.id}`} className="link-cliente">
           Ver perfil completo do cliente →
         </Link>

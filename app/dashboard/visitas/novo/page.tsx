@@ -17,6 +17,28 @@ const MOTIVOS = [
   'Outros',
 ]
 
+function IconArrowLeft() {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+}
+function IconCalendar({ color = 'currentColor' }: { color?: string }) {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+}
+function IconCheck({ color = 'currentColor', size = 14 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+}
+function IconX({ color = 'currentColor', size = 14 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+}
+function IconAlert({ color = 'currentColor' }: { color?: string }) {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+}
+
+function statusIcon(status: string, color: string) {
+  if (status === 'agendada') return <IconCalendar color={color} />
+  if (status === 'realizada') return <IconCheck color={color} />
+  return <IconX color={color} />
+}
+
 function NovaVisitaForm() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [form, setForm] = useState({
@@ -85,7 +107,6 @@ function NovaVisitaForm() {
       return
     }
 
-    // Mostrar sucesso e redirecionar após 1.5s
     setSalvo(true)
     setCarregando(false)
     setTimeout(() => {
@@ -107,7 +128,7 @@ function NovaVisitaForm() {
         .campo input:focus,.campo select:focus,.campo textarea:focus{border-color:#E67E22;background:#fff}
         .campo textarea{resize:vertical;min-height:100px}
         .status-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
-        .status-opt{border:1.5px solid #eae5de;border-radius:8px;padding:.6rem;text-align:center;cursor:pointer;font-size:.78rem;font-weight:700;color:#888;transition:all .2s;background:#fafaf8}
+        .status-opt{display:flex;align-items:center;justify-content:center;gap:.4rem;border:1.5px solid #eae5de;border-radius:8px;padding:.6rem;text-align:center;cursor:pointer;font-size:.78rem;font-weight:700;color:#888;transition:all .2s;background:#fafaf8}
         .status-opt.sel-agendada{border-color:#E67E22;background:#fff8f3;color:#E67E22}
         .status-opt.sel-realizada{border-color:#27ae60;background:#f0fdf4;color:#27ae60}
         .status-opt.sel-cancelada{border-color:#e74c3c;background:#fef2f2;color:#e74c3c}
@@ -115,8 +136,8 @@ function NovaVisitaForm() {
         .motivo-select:focus{border-color:#E67E22;background:#fff}
         .motivo-outro-box{margin-top:.6rem;animation:fadeIn .2s ease}
         @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
-        .err{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:.6rem 1rem;border-radius:8px;font-size:.8rem;margin-bottom:1rem}
-        .sucesso{background:#f0fdf4;border:1px solid #86efac;color:#166534;padding:.8rem 1rem;border-radius:8px;font-size:.85rem;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem;animation:fadeIn .3s ease}
+        .err{display:flex;align-items:center;gap:.5rem;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:.6rem 1rem;border-radius:8px;font-size:.8rem;margin-bottom:1rem}
+        .sucesso{display:flex;align-items:center;gap:.5rem;background:#f0fdf4;border:1px solid #86efac;color:#166534;padding:.8rem 1rem;border-radius:8px;font-size:.85rem;font-weight:700;margin-bottom:1rem;animation:fadeIn .3s ease}
         .form-actions{display:flex;gap:.8rem;margin-top:1.5rem}
         .btn-salvar{background:#E67E22;color:#fff;border:none;padding:.8rem 1.8rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:.5rem}
         .btn-salvar:hover{background:#d35400}
@@ -126,7 +147,7 @@ function NovaVisitaForm() {
         @media(max-width:600px){.form-grid{grid-template-columns:1fr}}
       `}</style>
 
-      <Link href="/dashboard/visitas" className="voltar">← Voltar</Link>
+      <Link href="/dashboard/visitas" className="voltar"><IconArrowLeft /> Voltar</Link>
       <h1 className="page-title">Nova Visita</h1>
 
       <div className="form-card">
@@ -195,15 +216,18 @@ function NovaVisitaForm() {
           {/* STATUS */}
           <div className="form-section">Status</div>
           <div className="status-grid">
-            {['agendada','realizada','cancelada'].map(s => (
-              <div
-                key={s}
-                className={`status-opt ${form.status === s ? `sel-${s}` : ''}`}
-                onClick={() => atualizar('status', s)}
-              >
-                {s === 'agendada' ? '📅' : s === 'realizada' ? '✅' : '❌'} {s.charAt(0).toUpperCase() + s.slice(1)}
-              </div>
-            ))}
+            {['agendada','realizada','cancelada'].map(s => {
+              const cores: Record<string,string> = { agendada:'#E67E22', realizada:'#27ae60', cancelada:'#e74c3c' }
+              return (
+                <div
+                  key={s}
+                  className={`status-opt ${form.status === s ? `sel-${s}` : ''}`}
+                  onClick={() => atualizar('status', s)}
+                >
+                  {statusIcon(s, form.status === s ? cores[s] : '#888')} {s.charAt(0).toUpperCase() + s.slice(1)}
+                </div>
+              )
+            })}
           </div>
 
           {/* DETALHES */}
@@ -221,8 +245,8 @@ function NovaVisitaForm() {
             <input type="date" value={form.proximo_contato} onChange={e => atualizar('proximo_contato', e.target.value)}/>
           </div>
 
-          {erro && <div className="err">❌ {erro}</div>}
-          {salvo && <div className="sucesso">✅ Visita salva com sucesso! Redirecionando...</div>}
+          {erro && <div className="err"><IconAlert /> {erro}</div>}
+          {salvo && <div className="sucesso"><IconCheck color="#166534" /> Visita salva com sucesso! Redirecionando...</div>}
 
           <div className="form-actions">
             <button
@@ -230,7 +254,7 @@ function NovaVisitaForm() {
               className={`btn-salvar${salvo ? ' salvo' : ''}`}
               disabled={carregando || salvo}
             >
-              {carregando ? '⏳ Salvando...' : salvo ? '✅ Salvo!' : '✓ Salvar Visita'}
+              {carregando ? 'Salvando...' : salvo ? (<><IconCheck /> Salvo!</>) : 'Salvar Visita'}
             </button>
             <button type="button" className="btn-cancelar" onClick={() => router.back()} disabled={carregando || salvo}>
               Cancelar

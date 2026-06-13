@@ -37,6 +37,50 @@ type Foto = {
   legenda: string | null
 }
 
+// ===== Ícones =====
+function IconArrowLeft() {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+}
+function IconPrinter() {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+}
+function IconCalendar({ color = 'currentColor', size = 13 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+}
+function IconCheck({ color = 'currentColor', size = 13 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+}
+function IconX({ color = 'currentColor', size = 13 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+}
+function IconSprout({ color = 'currentColor', size = 13 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M7 20h10"/><path d="M10 20c0-4 .5-8 2-10"/><path d="M14 20c0-4-.5-8-2-10"/><path d="M5 5c1.5 0 3 1 3.5 3C7 8 5 7.5 4 6c-.5-1 0-1 1-1z"/><path d="M19 8c-1.5 0-3 .5-4 2 1.5 1 3 1 4 0 1-.5 1-1.5 0-2z"/></svg>
+}
+function IconPin({ color = 'currentColor', size = 13 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+}
+function IconLeaf({ color = 'currentColor', size = 13 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+}
+function IconRuler({ color = 'currentColor', size = 13 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.4 2.4 0 0 1 0-3.4l2.6-2.6a2.4 2.4 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/></svg>
+}
+function IconRoute({ color = 'currentColor', size = 13 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><circle cx="6" cy="19" r="3"/><circle cx="18" cy="5" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/></svg>
+}
+function IconTarget({ color = 'currentColor', size = 13 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+}
+function IconUser({ color = 'currentColor', size = 13 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+}
+
+function statusIcon(status: string, color: string, size = 13) {
+  if (status === 'agendada') return <IconCalendar color={color} size={size} />
+  if (status === 'realizada') return <IconCheck color={color} size={size} />
+  return <IconX color={color} size={size} />
+}
+
 export default function RelatorioVisitaPage() {
   const { id } = useParams()
   const router = useRouter()
@@ -75,9 +119,6 @@ export default function RelatorioVisitaPage() {
   const statusCores: Record<string, string> = {
     agendada: '#E67E22', realizada: '#27ae60', cancelada: '#e74c3c',
   }
-  const statusEmoji: Record<string, string> = {
-    agendada: '📅', realizada: '✅', cancelada: '❌',
-  }
   const statusLabel: Record<string, string> = {
     agendada: 'Visita Agendada', realizada: 'Visita Realizada', cancelada: 'Visita Cancelada',
   }
@@ -113,7 +154,7 @@ export default function RelatorioVisitaPage() {
         .rel-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
         .rel-campo{background:#f7f5f0;border-radius:8px;padding:.6rem .8rem}
         .rel-campo-label{font-size:.62rem;font-weight:700;color:#aaa;letter-spacing:.06em;text-transform:uppercase;margin-bottom:.2rem}
-        .rel-campo-valor{font-size:.82rem;font-weight:700;color:#162a1e}
+        .rel-campo-valor{display:flex;align-items:center;gap:.4rem;font-size:.82rem;font-weight:700;color:#162a1e}
         .rel-campo-full{grid-column:1/-1}
         .rel-texto{background:#f7f5f0;border-radius:8px;padding:.8rem 1rem;font-size:.82rem;color:#444;line-height:1.8}
         .rel-status{display:inline-flex;align-items:center;gap:.4rem;color:#fff;font-size:.75rem;font-weight:700;padding:.3rem .8rem;border-radius:20px}
@@ -140,9 +181,9 @@ export default function RelatorioVisitaPage() {
       `}</style>
 
       <div className="acoes-tela">
-        <button className="btn-voltar" onClick={() => router.back()}>← Voltar</button>
+        <button className="btn-voltar" onClick={() => router.back()}><IconArrowLeft /> Voltar</button>
         <button className="btn-imprimir" onClick={() => window.print()}>
-          🖨️ Imprimir / Salvar PDF
+          <IconPrinter /> Imprimir / Salvar PDF
         </button>
       </div>
 
@@ -165,7 +206,7 @@ export default function RelatorioVisitaPage() {
 
         <div style={{marginBottom:'1.2rem'}}>
           <span className="rel-status" style={{background: statusCores[visita.status] || '#888'}}>
-            {statusEmoji[visita.status]} {statusLabel[visita.status] || visita.status}
+            {statusIcon(visita.status, '#fff')} {statusLabel[visita.status] || visita.status}
           </span>
         </div>
 
@@ -203,25 +244,25 @@ export default function RelatorioVisitaPage() {
             {visita.cliente?.nome_fazenda && (
               <div className="rel-campo">
                 <div className="rel-campo-label">Nome da fazenda</div>
-                <div className="rel-campo-valor">🌾 {visita.cliente.nome_fazenda}</div>
+                <div className="rel-campo-valor"><IconSprout color="#162a1e" />{visita.cliente.nome_fazenda}</div>
               </div>
             )}
             {visita.cliente?.cidade && (
               <div className="rel-campo">
                 <div className="rel-campo-label">Localização</div>
-                <div className="rel-campo-valor">📍 {visita.cliente.cidade}/{visita.cliente.estado}</div>
+                <div className="rel-campo-valor"><IconPin color="#162a1e" />{visita.cliente.cidade}/{visita.cliente.estado}</div>
               </div>
             )}
             {visita.cliente?.cultura_principal && (
               <div className="rel-campo">
                 <div className="rel-campo-label">Cultura principal</div>
-                <div className="rel-campo-valor">🌱 {visita.cliente.cultura_principal}</div>
+                <div className="rel-campo-valor"><IconLeaf color="#162a1e" />{visita.cliente.cultura_principal}</div>
               </div>
             )}
             {visita.cliente?.hectares && (
               <div className="rel-campo">
                 <div className="rel-campo-label">Área total</div>
-                <div className="rel-campo-valor">📐 {visita.cliente.hectares} hectares</div>
+                <div className="rel-campo-valor"><IconRuler color="#162a1e" />{visita.cliente.hectares} hectares</div>
               </div>
             )}
           </div>
@@ -243,25 +284,25 @@ export default function RelatorioVisitaPage() {
             {motivoExibido && (
               <div className="rel-campo rel-campo-full">
                 <div className="rel-campo-label">Motivo da visita</div>
-                <div className="rel-campo-valor">🎯 {motivoExibido}</div>
+                <div className="rel-campo-valor"><IconTarget color="#162a1e" />{motivoExibido}</div>
               </div>
             )}
             {visita.km_rodado != null && (
               <div className="rel-campo">
                 <div className="rel-campo-label">KM rodado</div>
-                <div className="rel-campo-valor">🛣️ {visita.km_rodado} km</div>
+                <div className="rel-campo-valor"><IconRoute color="#162a1e" />{visita.km_rodado} km</div>
               </div>
             )}
             {visita.funcionario?.nome_completo && (
               <div className="rel-campo rel-campo-full">
                 <div className="rel-campo-label">Técnico responsável</div>
-                <div className="rel-campo-valor">👤 {visita.funcionario.nome_completo}</div>
+                <div className="rel-campo-valor"><IconUser color="#162a1e" />{visita.funcionario.nome_completo}</div>
               </div>
             )}
             {visita.proximo_contato && (
               <div className="rel-campo rel-campo-full">
                 <div className="rel-campo-label">Próximo contato previsto</div>
-                <div className="rel-campo-valor">📅 {new Date(visita.proximo_contato + 'T12:00:00').toLocaleDateString('pt-BR')}</div>
+                <div className="rel-campo-valor"><IconCalendar color="#162a1e" />{new Date(visita.proximo_contato + 'T12:00:00').toLocaleDateString('pt-BR')}</div>
               </div>
             )}
           </div>

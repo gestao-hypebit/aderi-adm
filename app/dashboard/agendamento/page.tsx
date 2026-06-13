@@ -35,10 +35,30 @@ const statusCor: Record<string, string> = {
   realizada: '#27ae60',
   cancelada: '#e74c3c',
 }
-const statusEmoji: Record<string, string> = {
-  agendada: '📅',
-  realizada: '✅',
-  cancelada: '❌',
+
+function IconCalendar({ color = 'currentColor' }: { color?: string }) {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+}
+function IconCheck({ color = 'currentColor', size = 12 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+}
+function IconX({ color = 'currentColor', size = 12 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+}
+function IconSprout({ color = 'currentColor', size = 12 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M7 20h10"/><path d="M10 20c0-4 .5-8 2-10"/><path d="M14 20c0-4-.5-8-2-10"/><path d="M5 5c1.5 0 3 1 3.5 3C7 8 5 7.5 4 6c-.5-1 0-1 1-1z"/><path d="M19 8c-1.5 0-3 .5-4 2 1.5 1 3 1 4 0 1-.5 1-1.5 0-2z"/></svg>
+}
+function IconTarget({ color = '#888', size = 12 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+}
+function IconCalendarEmpty({ color = '#ccc' }: { color?: string }) {
+  return <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+}
+
+function statusIcon(status: string, color: string, size = 12) {
+  if (status === 'agendada') return <IconCalendar color={color} />
+  if (status === 'realizada') return <IconCheck color={color} size={size} />
+  return <IconX color={color} size={size} />
 }
 
 function normalizar(raw: VisitaRaw): Visita {
@@ -154,11 +174,11 @@ export default function AgendamentoPage() {
         .visita-status-bar{width:3px;border-radius:2px;align-self:stretch;flex-shrink:0}
         .visita-info{flex:1;min-width:0}
         .visita-cliente{font-size:.88rem;font-weight:700;color:#162a1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .visita-fazenda{font-size:.75rem;color:#E67E22;font-weight:700;margin:.1rem 0}
-        .visita-motivo{font-size:.72rem;color:#888}
+        .visita-fazenda{display:flex;align-items:center;gap:.35rem;font-size:.75rem;color:#E67E22;font-weight:700;margin:.15rem 0}
+        .visita-motivo{display:flex;align-items:center;gap:.35rem;font-size:.72rem;color:#888}
         .visita-badge{display:inline-flex;align-items:center;gap:.3rem;font-size:.68rem;font-weight:700;padding:.2rem .5rem;border-radius:10px;color:#fff;margin-top:.3rem}
         .dia-vazio{text-align:center;padding:2.5rem 1rem;color:#bbb}
-        .dia-vazio-icon{font-size:2rem;margin-bottom:.5rem}
+        .dia-vazio-icon{display:flex;justify-content:center;margin-bottom:.5rem}
         .dia-vazio-txt{font-size:.85rem}
         .resumo-bar{display:flex;gap:.8rem;margin-bottom:1rem;flex-wrap:wrap}
         .resumo-chip{display:inline-flex;align-items:center;gap:.4rem;background:#f0ede8;border-radius:20px;padding:.3rem .8rem;font-size:.75rem;font-weight:700;color:#162a1e}
@@ -167,7 +187,7 @@ export default function AgendamentoPage() {
 
       <div className="page-header">
         <div>
-          <div className="page-title">📅 Agenda de Visitas</div>
+          <div className="page-title">Agenda de Visitas</div>
           <div className="page-sub">Clique em um dia para ver e agendar visitas</div>
         </div>
         <Link href={`/dashboard/visitas/novo?data=${dataParaNovaVisita}`} className="btn-nova">
@@ -257,7 +277,7 @@ export default function AgendamentoPage() {
 
           {visitasDoDia.length === 0 ? (
             <div className="dia-vazio">
-              <div className="dia-vazio-icon">🗓️</div>
+              <div className="dia-vazio-icon"><IconCalendarEmpty /></div>
               <div className="dia-vazio-txt">Nenhuma visita agendada para este dia.</div>
             </div>
           ) : (
@@ -271,11 +291,11 @@ export default function AgendamentoPage() {
                   <div className="visita-info">
                     <div className="visita-cliente">{v.cliente?.nome}</div>
                     {v.cliente?.nome_fazenda && (
-                      <div className="visita-fazenda">🌾 {v.cliente.nome_fazenda}</div>
+                      <div className="visita-fazenda"><IconSprout color="#E67E22" />{v.cliente.nome_fazenda}</div>
                     )}
-                    {motivo && <div className="visita-motivo">🎯 {motivo}</div>}
+                    {motivo && <div className="visita-motivo"><IconTarget />{motivo}</div>}
                     <div className="visita-badge" style={{background: statusCor[v.status]}}>
-                      {statusEmoji[v.status]} {v.status.charAt(0).toUpperCase() + v.status.slice(1)}
+                      {statusIcon(v.status, '#fff')} {v.status.charAt(0).toUpperCase() + v.status.slice(1)}
                     </div>
                   </div>
                 </Link>
