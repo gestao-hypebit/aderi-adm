@@ -26,7 +26,7 @@ export default function CadastroPage() {
       password: senha,
       options: { data: { nome_completo: nome } }
     })
-    if (error) { setErro('Erro ao criar conta. Tente novamente.'); setCarregando(false); return }
+    if (error) { console.log('>>> ERRO SIGNUP:', error); setErro('Erro ao criar conta. Tente novamente.'); setCarregando(false); return }
     setOk(true)
     setCarregando(false)
   }
