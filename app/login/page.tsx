@@ -19,9 +19,21 @@ export default function LoginPage() {
     e.preventDefault()
     setCarregando(true)
     setErro('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password: senha })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha })
     if (error) { setErro('Email ou senha incorretos.'); setCarregando(false); return }
-    router.push('/dashboard')
+
+    // Verifica o role do usuário para direcionar ao lugar certo
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', data.user.id)
+      .single()
+
+    if (profile?.role === 'admin') {
+      router.push('/admin')
+    } else {
+      router.push('/dashboard')
+    }
   }
 
   async function handleEsqueci(e: React.FormEvent) {
@@ -62,7 +74,7 @@ export default function LoginPage() {
         .campo input{width:100%;padding:.75rem 1rem;border:1.5px solid #eae5de;border-radius:8px;background:#fafaf8;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#1a1a1a;outline:none;transition:border-color .2s,box-shadow .2s}
         .campo input:focus{border-color:#E67E22;box-shadow:0 0 0 3px rgba(230,126,34,.1);background:#fff}
         .campo input::placeholder{color:#c5bdb4}
-        .esqueci{display:block;text-align:right;font-size:.72rem;color:#E67E22;font-weight:700;cursor:pointer;text-decoration:none;margin-top:.4rem}
+        .esqueci{display:block;text-align:right;font-size:.72rem;color:#E67E22;font-weight:700;cursor:pointer;text-decoration:none;margin-top:.4rem;background:none;border:none;font-family:'Comfortaa',sans-serif;width:100%}
         .err{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:.65rem 1rem;border-radius:8px;font-size:.8rem;margin-bottom:.8rem}
         .ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;padding:1rem;border-radius:8px;font-size:.85rem;line-height:1.6;margin-bottom:1rem;text-align:center}
         .btn{width:100%;padding:.85rem;background:#E67E22;color:#fff;border:none;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;transition:background .2s,transform .1s;margin-top:.5rem}
@@ -90,7 +102,7 @@ export default function LoginPage() {
                 aderi <span>agronegócios</span>
               </div>
               <div>
-                <div className="badge">🔒 Área restrita</div>
+                <div className="badge">Área restrita</div>
                 <h2 className="left-h">Sua lavoura,<br/>mais rentabilidade<br/>para você.</h2>
                 <p className="left-p">Acesse o sistema interno da Aderi Agro</p>
               </div>
@@ -157,7 +169,7 @@ export default function LoginPage() {
                   <h1 className="ft">Email enviado!</h1>
                   <p className="fs">Verifique sua caixa de entrada</p>
                   <div className="ok">
-                    📬 Enviamos um link de recuperação para <strong>{email}</strong>.<br/>
+                    Enviamos um link de recuperação para <strong>{email}</strong>.<br/>
                     Clique no link do email para criar uma nova senha.
                   </div>
                   <button className="btn" onClick={() => { setModo('login'); setEmail('') }}>
