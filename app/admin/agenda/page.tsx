@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
@@ -28,10 +29,7 @@ type Visita = {
 
 type Colaborador = { id: string; nome_completo: string }
 
-const MESES = [
-  'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
-  'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
-]
+const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 const DIAS_SEMANA = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 
 const statusCor: Record<string, string> = {
@@ -60,55 +58,45 @@ function normalizar(raw: VisitaRaw): Visita {
 
 export default function AdminAgendaPage() {
   const supabase = createClient()
+  const searchParams = useSearchParams()
 
   const hoje = new Date()
   const [mes, setMes] = useState(hoje.getMonth())
   const [ano, setAno] = useState(hoje.getFullYear())
   const [visitas, setVisitas] = useState<Visita[]>([])
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([])
-  const [filtro, setFiltro] = useState<string>('todos') // 'todos' ou id do colaborador
   const [diaSelecionado, setDiaSelecionado] = useState<number | null>(hoje.getDate())
+  const [funcionarioId, setFuncionarioId] = useState(() => searchParams.get('func') ?? '')
 
-  // Carrega colaboradores uma vez
   useEffect(() => {
-    async function carregarColabs() {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, nome_completo')
-        .eq('role', 'colaborador')
-        .order('nome_completo')
-      setColaboradores(data || [])
-    }
-    carregarColabs()
+    supabase.from('profiles').select('id, nome_completo').eq('role', 'colaborador').order('nome_completo')
+      .then(({ data }) => setColaboradores(data || []))
   }, [])
 
-  // Carrega visitas do mês
+  // Carrega visitas ao mudar mês/ano ou funcionário
   useEffect(() => {
     async function carregar() {
       const inicio = `${ano}-${String(mes + 1).padStart(2, '0')}-01`
       const ultimoDia = new Date(ano, mes + 1, 0).getDate()
       const fim = `${ano}-${String(mes + 1).padStart(2, '0')}-${ultimoDia}`
 
-      const { data } = await supabase
+      let query = supabase
         .from('visitas')
         .select('id, data_visita, status, motivo_visita, motivo_outro, funcionario_id, cliente:clientes(id, nome, nome_fazenda), funcionario:profiles(nome_completo)')
         .gte('data_visita', inicio)
         .lte('data_visita', fim)
         .order('data_visita')
 
-      const normalized = (data || []).map(v => normalizar(v as unknown as VisitaRaw))
-      setVisitas(normalized)
+      if (funcionarioId) query = query.eq('funcionario_id', funcionarioId)
+
+      const { data } = await query
+      setVisitas((data || []).map(v => normalizar(v as unknown as VisitaRaw)))
     }
     carregar()
-  }, [mes, ano])
-
-  // Aplica o filtro de colaborador
-  const visitasFiltradas = filtro === 'todos'
-    ? visitas
-    : visitas.filter(v => v.funcionario_id === filtro)
+  }, [mes, ano, funcionarioId])
 
   const visitasPorDia: Record<number, Visita[]> = {}
-  visitasFiltradas.forEach(v => {
+  visitas.forEach(v => {
     const dia = parseInt(v.data_visita.split('-')[2])
     if (!visitasPorDia[dia]) visitasPorDia[dia] = []
     visitasPorDia[dia].push(v)
@@ -134,14 +122,10 @@ export default function AdminAgendaPage() {
   }
 
   const visitasDoDia = diaSelecionado ? (visitasPorDia[diaSelecionado] || []) : []
-
   const dataParaNovaVisita = diaSelecionado
     ? `${ano}-${String(mes + 1).padStart(2, '0')}-${String(diaSelecionado).padStart(2, '0')}`
     : new Date().toISOString().split('T')[0]
-
-  // Se há filtro de colaborador, passa pra nova visita já selecionado
-  const colabParam = filtro !== 'todos' ? `&funcionario=${filtro}` : ''
-
+  const colabParam = funcionarioId ? `&funcionario=${funcionarioId}` : ''
   const isHoje = (dia: number) =>
     dia === hoje.getDate() && mes === hoje.getMonth() && ano === hoje.getFullYear()
 
@@ -153,10 +137,6 @@ export default function AdminAgendaPage() {
         .page-sub{font-size:.8rem;color:#aaa;margin-top:.2rem}
         .btn-nova{display:inline-flex;align-items:center;gap:.5rem;background:#E67E22;color:#fff;padding:.7rem 1.4rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;font-weight:700;border:none;cursor:pointer;transition:background .2s;text-decoration:none}
         .btn-nova:hover{background:#d35400}
-        .filtro-bar{display:flex;gap:.5rem;margin-bottom:1.2rem;flex-wrap:wrap}
-        .filtro-btn{background:#fff;border:1.5px solid #eae5de;border-radius:20px;padding:.5rem 1.1rem;font-family:'Comfortaa',sans-serif;font-size:.78rem;font-weight:700;color:#888;cursor:pointer;transition:all .2s}
-        .filtro-btn:hover{border-color:#E67E22;color:#E67E22}
-        .filtro-btn.ativo{background:#162a1e;border-color:#162a1e;color:#fff}
         .cal-card{background:#fff;border-radius:16px;padding:1.5rem;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:1.2rem}
         .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem}
         .cal-mes-ano{font-size:1.05rem;font-weight:700;color:#162a1e}
@@ -207,23 +187,17 @@ export default function AdminAgendaPage() {
         </Link>
       </div>
 
-      {/* FILTRO POR COLABORADOR */}
-      <div className="filtro-bar">
-        <button
-          className={`filtro-btn ${filtro === 'todos' ? 'ativo' : ''}`}
-          onClick={() => setFiltro('todos')}
+      <div style={{background:'#fff',borderRadius:12,padding:'.85rem 1.2rem',boxShadow:'0 2px 8px rgba(0,0,0,.04)',marginBottom:'1.2rem',display:'flex',alignItems:'center',gap:'.65rem'}}>
+        <select
+          value={funcionarioId}
+          onChange={e => setFuncionarioId(e.target.value)}
+          style={{padding:'.3rem .6rem',border:'1.5px solid #eae5de',borderRadius:7,fontFamily:"'Comfortaa',sans-serif",fontSize:'.76rem',color:'#162a1e',background:'#fff',outline:'none',cursor:'pointer'}}
         >
-          Todos
-        </button>
-        {colaboradores.map(c => (
-          <button
-            key={c.id}
-            className={`filtro-btn ${filtro === c.id ? 'ativo' : ''}`}
-            onClick={() => setFiltro(c.id)}
-          >
-            {c.nome_completo}
-          </button>
-        ))}
+          <option value="">Todos os consultores</option>
+          {colaboradores.map(f => (
+            <option key={f.id} value={f.id}>{f.nome_completo}</option>
+          ))}
+        </select>
       </div>
 
       <div className="cal-card">
@@ -297,9 +271,7 @@ export default function AdminAgendaPage() {
             </div>
           ) : (
             visitasDoDia.map(v => {
-              const motivo = v.motivo_visita === 'Outros'
-                ? `Outros — ${v.motivo_outro || ''}`
-                : v.motivo_visita
+              const motivo = v.motivo_visita === 'Outros' ? `Outros — ${v.motivo_outro || ''}` : v.motivo_visita
               return (
                 <Link key={v.id} href={`/admin/visitas/${v.id}`} className="visita-item">
                   <div className="visita-status-bar" style={{background: statusCor[v.status]}}/>
@@ -309,6 +281,7 @@ export default function AdminAgendaPage() {
                       <div className="visita-fazenda"><IconSprout color="#E67E22" />{v.cliente.nome_fazenda}</div>
                     )}
                     <div className="visita-colab"><IconUser />{v.funcionario?.nome_completo}</div>
+                    {motivo && <div style={{fontSize:'.72rem',color:'#888',marginTop:'.2rem'}}>{motivo}</div>}
                     <div className="visita-badge" style={{background: statusCor[v.status]}}>
                       {v.status.charAt(0).toUpperCase() + v.status.slice(1)}
                     </div>

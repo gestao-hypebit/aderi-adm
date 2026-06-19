@@ -24,10 +24,8 @@ type Visita = {
   funcionario: { nome_completo: string }
 }
 
-const MESES = [
-  'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
-  'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
-]
+
+const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 const DIAS_SEMANA = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 
 const statusCor: Record<string, string> = {
@@ -93,8 +91,7 @@ export default function AgendamentoPage() {
         .lte('data_visita', fim)
         .order('data_visita')
 
-      const normalized = (data || []).map(v => normalizar(v as unknown as VisitaRaw))
-      setVisitas(normalized)
+      setVisitas((data || []).map(v => normalizar(v as unknown as VisitaRaw)))
       setCarregando(false)
     }
     carregar()
@@ -127,7 +124,6 @@ export default function AgendamentoPage() {
   }
 
   const visitasDoDia = diaSelecionado ? (visitasPorDia[diaSelecionado] || []) : []
-
   const dataParaNovaVisita = diaSelecionado
     ? `${ano}-${String(mes + 1).padStart(2, '0')}-${String(diaSelecionado).padStart(2, '0')}`
     : new Date().toISOString().split('T')[0]
@@ -150,7 +146,7 @@ export default function AgendamentoPage() {
         .cal-btn:hover{background:#e0dbd2}
         .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
         .cal-header-dia{text-align:center;font-size:.65rem;font-weight:700;color:#aaa;letter-spacing:.04em;padding:.3rem 0;text-transform:uppercase}
-        .cal-cel{min-height:52px;border-radius:10px;padding:4px;cursor:pointer;transition:all .15s;position:relative;display:flex;flex-direction:column;align-items:center}
+        .cal-cel{min-height:52px;border-radius:10px;padding:4px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center}
         .cal-cel:hover{background:#f0ede8}
         .cal-cel.vazia{cursor:default;pointer-events:none}
         .cal-cel.hoje .cal-num{background:#162a1e;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center}

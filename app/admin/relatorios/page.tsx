@@ -15,29 +15,29 @@ function IconArrow() {
 
 const relatorios = [
   {
-    href: '/dashboard/relatorios/visitas',
+    href: '/admin/relatorios/visitas',
     titulo: 'Relatório de Visitas',
     desc: 'Gere PDFs detalhados das visitas técnicas realizadas, com dados do produtor, da propriedade, recomendações e fotos.',
     Icon: IconClipboard,
     cor: '#27ae60',
   },
   {
-    href: '/dashboard/relatorios/clientes',
+    href: '/admin/relatorios/clientes',
     titulo: 'Relatório de Clientes',
     desc: 'Ficha completa de produtores: dados cadastrais, resumo de visitas e últimos atendimentos.',
     Icon: IconUsers,
     cor: '#162a1e',
   },
   {
-    href: '/dashboard/relatorios/km',
+    href: '/admin/relatorios/km',
     titulo: 'Relatório de KM / Combustível',
-    desc: 'Resumo de quilometragem rodada e abastecimentos por período, com detalhamento dia a dia antes de exportar.',
+    desc: 'Resumo de quilometragem rodada e abastecimentos por período, com detalhamento dia a dia.',
     Icon: IconCar,
     cor: '#E67E22',
   },
 ]
 
-export default function RelatoriosHub() {
+export default function AdminRelatoriosHub() {
   return (
     <>
       <style>{`

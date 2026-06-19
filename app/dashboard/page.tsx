@@ -1,15 +1,28 @@
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import DashboardCharts from './DashboardCharts'
+import DashboardPeriodoBar from './DashboardPeriodoBar'
 
-export default async function DashboardHome() {
+type SearchParams = Promise<{ inicio?: string; fim?: string }>
+
+export default async function DashboardHome({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const hoje = new Date().toISOString().split('T')[0]
-  const inicioMes = hoje.slice(0,7) + '-01'
+
+  // Período filtrado (padrão: mês atual)
+  const hojeDate = new Date()
+  const inicioMesPadrao = new Date(hojeDate.getFullYear(), hojeDate.getMonth(), 1).toISOString().slice(0, 10)
+  const fimMesPadrao = new Date(hojeDate.getFullYear(), hojeDate.getMonth() + 1, 0).toISOString().slice(0, 10)
+  const inicio = params.inicio ?? inicioMesPadrao
+  const fim = params.fim ?? fimMesPadrao
+
+  // Períodos fixos (não dependem do filtro)
   const seteMesesAtras = new Date()
   seteMesesAtras.setMonth(seteMesesAtras.getMonth() - 6)
   const inicioHistorico = seteMesesAtras.toISOString().split('T')[0]
@@ -20,7 +33,7 @@ export default async function DashboardHome() {
   const [
     { count: totalClientes },
     { count: visitasHoje },
-    { count: visitasMes },
+    { count: visitasPeriodo },
     { count: visitasRealizadas },
     { count: visitasAgendadas },
     { count: visitasCanceladas },
@@ -29,27 +42,27 @@ export default async function DashboardHome() {
     { data: todasVisitas },
     { data: visitasRecentes },
     { data: todosClientes },
-    { data: kmDoMes },
+    { data: kmDoPeriodo },
   ] = await Promise.all([
     supabase.from('clientes').select('*', { count: 'exact', head: true }),
     supabase.from('visitas').select('*', { count: 'exact', head: true }).eq('data_visita', hoje),
-    supabase.from('visitas').select('*', { count: 'exact', head: true }).gte('data_visita', inicioMes),
-    supabase.from('visitas').select('*', { count: 'exact', head: true }).eq('status', 'realizada'),
-    supabase.from('visitas').select('*', { count: 'exact', head: true }).eq('status', 'agendada'),
-    supabase.from('visitas').select('*', { count: 'exact', head: true }).eq('status', 'cancelada'),
+    supabase.from('visitas').select('*', { count: 'exact', head: true }).gte('data_visita', inicio).lte('data_visita', fim),
+    supabase.from('visitas').select('*', { count: 'exact', head: true }).eq('status', 'realizada').gte('data_visita', inicio).lte('data_visita', fim),
+    supabase.from('visitas').select('*', { count: 'exact', head: true }).eq('status', 'agendada').gte('data_visita', inicio).lte('data_visita', fim),
+    supabase.from('visitas').select('*', { count: 'exact', head: true }).eq('status', 'cancelada').gte('data_visita', inicio).lte('data_visita', fim),
     supabase.from('visitas').select('*, cliente:clientes(nome, nome_fazenda)').eq('status', 'agendada').gte('data_visita', hoje).order('data_visita').limit(5),
     supabase.from('visitas').select('*, cliente:clientes(nome, nome_fazenda)').order('created_at', { ascending: false }).limit(5),
     supabase.from('visitas').select('data_visita, status').gte('data_visita', inicioHistorico),
     supabase.from('visitas').select('cliente_id, data_visita').gte('data_visita', dezDiasAtrasStr).eq('status', 'realizada'),
     supabase.from('clientes').select('id, nome, nome_fazenda'),
-    supabase.from('km_diario').select('km_inicial, km_final, data').gte('data', inicioMes).eq('funcionario_id', user.id),
+    supabase.from('km_diario').select('km_inicial, km_final, data').gte('data', inicio).lte('data', fim).eq('funcionario_id', user.id),
   ])
 
   // Clientes sem visita nos últimos 10 dias
   const clientesComVisitaRecente = new Set(visitasRecentes?.map((v: any) => v.cliente_id) || [])
   const alertaClientes = (todosClientes || []).filter((c: any) => !clientesComVisitaRecente.has(c.id))
 
-  // Monta dados por mês para o gráfico
+  // Dados do gráfico — sempre últimos 6 meses (fixo, independente do filtro)
   const mesesMap: Record<string, { realizadas: number; agendadas: number }> = {}
   const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 
@@ -87,20 +100,27 @@ export default async function DashboardHome() {
     cancelada: '#e74c3c'
   }
 
-  // Resumo de KM do mês
-  const lancamentosCompletos = (kmDoMes || []).filter((k: any) => k.km_inicial !== null && k.km_final !== null)
-  const totalKmMes = lancamentosCompletos.reduce((acc: number, k: any) => acc + (k.km_final - k.km_inicial), 0)
-  const diasComPendencia = (kmDoMes || []).filter((k: any) => k.km_inicial !== null && k.km_final === null).length
+  // Resumo de KM do período
+  const lancamentosCompletos = (kmDoPeriodo || []).filter((k: any) => k.km_inicial !== null && k.km_final !== null)
+  const totalKmPeriodo = lancamentosCompletos.reduce((acc: number, k: any) => acc + (k.km_final - k.km_inicial), 0)
+  const diasComPendencia = (kmDoPeriodo || []).filter((k: any) => k.km_inicial !== null && k.km_final === null).length
 
   const kmCor = diasComPendencia > 0 ? '#E67E22' : '#27ae60'
   const kmLabel = diasComPendencia > 0
     ? `${diasComPendencia} dia${diasComPendencia > 1 ? 's' : ''} pendente${diasComPendencia > 1 ? 's' : ''}`
     : `${lancamentosCompletos.length} dia${lancamentosCompletos.length !== 1 ? 's' : ''} registrado${lancamentosCompletos.length !== 1 ? 's' : ''}`
 
+  // Label do período para os cards
+  const periodoLabel = inicio === fim
+    ? new Date(inicio + 'T12:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })
+    : inicio.slice(0, 7) === fim.slice(0, 7)
+    ? new Date(inicio + 'T12:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+    : `${new Date(inicio + 'T12:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} – ${new Date(fim + 'T12:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`
+
   return (
     <>
       <style>{`
-        .home-saudacao{margin-bottom:1.5rem}
+        .home-saudacao{margin-bottom:1rem}
         .home-saudacao h1{font-size:1.4rem;font-weight:700;color:#162a1e}
         .home-saudacao p{color:#aaa;font-size:.82rem;margin-top:.2rem}
         .cards-resumo{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1rem;margin-bottom:1.2rem}
@@ -151,6 +171,10 @@ export default async function DashboardHome() {
         <p>{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
       </div>
 
+      <Suspense fallback={null}>
+        <DashboardPeriodoBar inicio={inicio} fim={fim} />
+      </Suspense>
+
       {/* Cards de resumo */}
       <div className="cards-resumo">
         <div className="resumo-card" style={{borderTopColor:'#162a1e'}}>
@@ -175,9 +199,9 @@ export default async function DashboardHome() {
           <div className="resumo-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#27ae60" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
           </div>
-          <div className="resumo-num">{visitasMes || 0}</div>
-          <div className="resumo-label">Visitas este mês</div>
-          <div className="resumo-sub">{new Date().toLocaleDateString('pt-BR',{month:'long'})}</div>
+          <div className="resumo-num">{visitasPeriodo || 0}</div>
+          <div className="resumo-label">Visitas no período</div>
+          <div className="resumo-sub">{periodoLabel}</div>
         </div>
 
         <div className="resumo-card" style={{borderTopColor:'#9b59b6'}}>
@@ -186,7 +210,7 @@ export default async function DashboardHome() {
           </div>
           <div className="resumo-num">{visitasAgendadas || 0}</div>
           <div className="resumo-label">Agendadas</div>
-          <div className="resumo-sub">pendentes</div>
+          <div className="resumo-sub">{periodoLabel}</div>
         </div>
 
         <div className="resumo-card" style={{borderTopColor:'#3498db'}}>
@@ -195,18 +219,17 @@ export default async function DashboardHome() {
           </div>
           <div className="resumo-num">{taxaConclusao}%</div>
           <div className="resumo-label">Taxa de conclusão</div>
-          <div className="resumo-sub">das visitas</div>
+          <div className="resumo-sub">{periodoLabel}</div>
         </div>
 
-        {/* Card Controle de KM */}
         <Link href="/dashboard/km" className="resumo-card clickable" style={{borderTopColor: kmCor}}>
           <div className="resumo-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={kmCor} strokeWidth="2"><path d="M5 17h14M5 17a2 2 0 0 1-2-2v-2a2 2 0 0 1 .5-1.32L5.5 9a2 2 0 0 1 1.5-.68h10a2 2 0 0 1 1.5.68l2 2.68A2 2 0 0 1 21 13v2a2 2 0 0 1-2 2"/><circle cx="7.5" cy="17" r="1.5"/><circle cx="16.5" cy="17" r="1.5"/></svg>
           </div>
           <div className="resumo-num" style={{fontSize: '1.6rem'}}>
-            {totalKmMes.toLocaleString('pt-BR')} km
+            {totalKmPeriodo.toLocaleString('pt-BR')} km
           </div>
-          <div className="resumo-label">KM rodado no mês</div>
+          <div className="resumo-label">KM no período</div>
           <div className="resumo-sub destaque" style={{color: kmCor}}>{kmLabel}</div>
         </Link>
       </div>
@@ -240,40 +263,6 @@ export default async function DashboardHome() {
           )}
         </div>
       )}
-
-      {/* Gráfico + Taxa */}
-      <div className="grid-main">
-        <div className="secao-card">
-          <div className="secao-titulo">Visitas nos últimos 6 meses</div>
-          <DashboardCharts dados={dadosGrafico} />
-        </div>
-        <div className="secao-card">
-          <div className="secao-titulo">Status geral</div>
-          <div className="taxa-wrap">
-            <div className="taxa-num">{taxaConclusao}%</div>
-            <div className="taxa-label">Taxa de conclusão</div>
-          </div>
-          <div className="barra-status">
-            {[
-              { label: 'Realizadas', val: visitasRealizadas || 0, cor: '#27ae60' },
-              { label: 'Agendadas', val: visitasAgendadas || 0, cor: '#E67E22' },
-              { label: 'Canceladas', val: visitasCanceladas || 0, cor: '#e74c3c' },
-            ].map(item => {
-              const total = (visitasRealizadas||0)+(visitasAgendadas||0)+(visitasCanceladas||0)
-              const pct = total > 0 ? Math.round((item.val/total)*100) : 0
-              return (
-                <div className="barra-row" key={item.label}>
-                  <span style={{color:'#888',minWidth:'70px'}}>{item.label}</span>
-                  <div className="barra-bg">
-                    <div className="barra-fill" style={{width:`${pct}%`,background:item.cor}}/>
-                  </div>
-                  <span className="barra-val">{item.val}</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
 
       {/* Próximas + Últimas */}
       <div className="grid-2">
@@ -324,6 +313,40 @@ export default async function DashboardHome() {
               </Link>
             )
           })}
+        </div>
+      </div>
+
+      {/* Gráfico + Taxa */}
+      <div className="grid-main">
+        <div className="secao-card">
+          <div className="secao-titulo">Visitas nos últimos 6 meses</div>
+          <DashboardCharts dados={dadosGrafico} />
+        </div>
+        <div className="secao-card">
+          <div className="secao-titulo">Status — {periodoLabel}</div>
+          <div className="taxa-wrap">
+            <div className="taxa-num">{taxaConclusao}%</div>
+            <div className="taxa-label">Taxa de conclusão</div>
+          </div>
+          <div className="barra-status">
+            {[
+              { label: 'Realizadas', val: visitasRealizadas || 0, cor: '#27ae60' },
+              { label: 'Agendadas', val: visitasAgendadas || 0, cor: '#E67E22' },
+              { label: 'Canceladas', val: visitasCanceladas || 0, cor: '#e74c3c' },
+            ].map(item => {
+              const total = (visitasRealizadas||0)+(visitasAgendadas||0)+(visitasCanceladas||0)
+              const pct = total > 0 ? Math.round((item.val/total)*100) : 0
+              return (
+                <div className="barra-row" key={item.label}>
+                  <span style={{color:'#888',minWidth:'70px'}}>{item.label}</span>
+                  <div className="barra-bg">
+                    <div className="barra-fill" style={{width:`${pct}%`,background:item.cor}}/>
+                  </div>
+                  <span className="barra-val">{item.val}</span>
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
     </>

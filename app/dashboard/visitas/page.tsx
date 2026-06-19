@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import FiltrosPainel from '@/app/components/FiltrosPainel'
+import { type Filtros, defaultFiltros } from '@/lib/dateUtils'
 
 type Visita = {
   id: string
@@ -12,6 +14,8 @@ type Visita = {
   motivo_visita: string | null
   cliente: { id: string; nome: string; nome_fazenda: string; cidade: string; estado: string }
 }
+
+type Cliente = { id: string; nome: string }
 
 const statusCor: Record<string, string> = {
   agendada: '#E67E22',
@@ -27,9 +31,6 @@ function IconCheck({ color = 'currentColor' }: { color?: string }) {
 }
 function IconX({ color = 'currentColor' }: { color?: string }) {
   return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-}
-function IconSearch({ color = '#aaa' }: { color?: string }) {
-  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
 }
 function IconSprout({ color = 'currentColor' }: { color?: string }) {
   return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M7 20h10"/><path d="M10 20c0-4 .5-8 2-10"/><path d="M14 20c0-4-.5-8-2-10"/><path d="M5 5c1.5 0 3 1 3.5 3C7 8 5 7.5 4 6c-.5-1 0-1 1-1z"/><path d="M19 8c-1.5 0-3 .5-4 2 1.5 1 3 1 4 0 1-.5 1-1.5 0-2z"/></svg>
@@ -53,29 +54,39 @@ function statusIcon(status: string, color: string) {
 export default function VisitasPage() {
   const supabase = createClient()
   const [visitas, setVisitas] = useState<Visita[]>([])
+  const [clientes, setClientes] = useState<Cliente[]>([])
   const [carregando, setCarregando] = useState(true)
+  const [filtros, setFiltros] = useState<Filtros>(() => defaultFiltros('este-mes'))
   const [filtroStatus, setFiltroStatus] = useState('todos')
-  const [busca, setBusca] = useState('')
+
+  useEffect(() => {
+    supabase.from('clientes').select('id, nome').order('nome').then(({ data }) => {
+      setClientes(data || [])
+    })
+  }, [])
 
   useEffect(() => {
     async function carregar() {
-      const { data } = await supabase
+      setCarregando(true)
+      let query = supabase
         .from('visitas')
         .select('id, data_visita, hora_visita, status, motivo_visita, cliente:clientes(id, nome, nome_fazenda, cidade, estado)')
+        .gte('data_visita', filtros.dataInicio)
+        .lte('data_visita', filtros.dataFim)
         .order('data_visita', { ascending: false })
+
+      if (filtros.clienteId) query = query.eq('cliente_id', filtros.clienteId)
+
+      const { data } = await query
       setVisitas((data as unknown as Visita[]) || [])
       setCarregando(false)
     }
     carregar()
-  }, [])
+  }, [filtros.dataInicio, filtros.dataFim, filtros.clienteId])
 
-  const visitasFiltradas = visitas.filter(v => {
-    const matchStatus = filtroStatus === 'todos' || v.status === filtroStatus
-    const matchBusca = busca === '' ||
-      v.cliente?.nome?.toLowerCase().includes(busca.toLowerCase()) ||
-      v.cliente?.nome_fazenda?.toLowerCase().includes(busca.toLowerCase())
-    return matchStatus && matchBusca
-  })
+  const visitasFiltradas = visitas.filter(v =>
+    filtroStatus === 'todos' || v.status === filtroStatus
+  )
 
   return (
     <>
@@ -84,12 +95,8 @@ export default function VisitasPage() {
         .page-title{font-size:1.3rem;font-weight:700;color:#162a1e}
         .btn-nova{display:inline-flex;align-items:center;gap:.5rem;background:#E67E22;color:#fff;padding:.7rem 1.4rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;font-weight:700;text-decoration:none;transition:background .2s}
         .btn-nova:hover{background:#d35400}
-        .filtros{display:flex;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center}
-        .busca-wrap{flex:1;min-width:180px;position:relative;display:flex;align-items:center}
-        .busca-wrap svg{position:absolute;left:.9rem;pointer-events:none}
-        .busca{width:100%;padding:.6rem 1rem .6rem 2.2rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;background:#fff;outline:none;transition:border-color .2s;box-sizing:border-box}
-        .busca:focus{border-color:#E67E22}
-        .filtro-btn{display:inline-flex;align-items:center;gap:.35rem;padding:.5rem 1rem;border-radius:20px;border:1.5px solid #eae5de;font-family:'Comfortaa',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer;background:#fff;color:#888;transition:all .2s}
+        .status-filtros{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem}
+        .filtro-btn{display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .95rem;border-radius:20px;border:1.5px solid #eae5de;font-family:'Comfortaa',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer;background:#fff;color:#888;transition:all .2s}
         .filtro-btn.ativo{color:#fff}
         .visitas-lista{display:flex;flex-direction:column;gap:.7rem}
         .visita-card{background:#fff;border-radius:12px;padding:1rem 1.2rem;box-shadow:0 2px 6px rgba(0,0,0,.04);display:flex;align-items:center;gap:1rem;text-decoration:none;transition:box-shadow .2s;border-left:4px solid}
@@ -115,17 +122,14 @@ export default function VisitasPage() {
         <Link href="/dashboard/visitas/novo" className="btn-nova">+ Nova Visita</Link>
       </div>
 
-      <div className="filtros">
-        <div className="busca-wrap">
-          <IconSearch />
-          <input
-            className="busca"
-            placeholder="Buscar por cliente ou fazenda..."
-            value={busca}
-            onChange={e => setBusca(e.target.value)}
-          />
-        </div>
-        {['todos','agendada','realizada','cancelada'].map(s => (
+      <FiltrosPainel
+        value={filtros}
+        onChange={setFiltros}
+        clientes={clientes}
+      />
+
+      <div className="status-filtros">
+        {['todos', 'agendada', 'realizada', 'cancelada'].map(s => (
           <button
             key={s}
             className={`filtro-btn ${filtroStatus === s ? 'ativo' : ''}`}
