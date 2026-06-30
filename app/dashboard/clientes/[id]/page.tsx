@@ -28,6 +28,37 @@ type Visita = {
   created_at: string
 }
 
+function IconSprout({ color = 'currentColor', size = 14 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M7 20h10"/><path d="M10 20c0-4 .5-8 2-10"/><path d="M14 20c0-4-.5-8-2-10"/><path d="M5 5c1.5 0 3 1 3.5 3C7 8 5 7.5 4 6c-.5-1 0-1 1-1z"/><path d="M19 8c-1.5 0-3 .5-4 2 1.5 1 3 1 4 0 1-.5 1-1.5 0-2z"/></svg>
+}
+function IconPin({ color = 'currentColor', size = 14 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+}
+function IconLeaf({ color = 'currentColor', size = 14 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+}
+function IconPhone({ color = 'currentColor', size = 14 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+}
+function IconMail({ color = 'currentColor', size = 14 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+}
+function IconRuler({ color = 'currentColor', size = 14 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M21.3 8.7 8.7 21.3a1 1 0 0 1-1.4 0l-4.6-4.6a1 1 0 0 1 0-1.4L15.3 2.7a1 1 0 0 1 1.4 0l4.6 4.6a1 1 0 0 1 0 1.4Z"/><path d="m7.5 10.5 2 2"/><path d="m10.5 7.5 2 2"/><path d="m13.5 4.5 2 2"/><path d="m4.5 13.5 2 2"/></svg>
+}
+function IconNote({ color = 'currentColor', size = 16 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+}
+function IconClipboard({ color = 'currentColor', size = 16 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6"/><path d="M9 16h4"/></svg>
+}
+function IconEdit({ color = 'currentColor', size = 14 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
+}
+function IconTrash({ color = 'currentColor', size = 14 }: { color?: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+}
+
 export default function ClientePerfilPage() {
   const { id } = useParams()
   const router = useRouter()
@@ -72,15 +103,15 @@ export default function ClientePerfilPage() {
         .perfil-info{display:flex;align-items:center;gap:1rem}
         .perfil-avatar{width:56px;height:56px;border-radius:14px;background:#162a1e;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:1.5rem;flex-shrink:0}
         .perfil-nome{font-size:1.3rem;font-weight:700;color:#162a1e}
-        .perfil-fazenda{color:#E67E22;font-size:.85rem;font-weight:700;margin-top:.2rem}
+        .perfil-fazenda{color:#E67E22;font-size:.85rem;font-weight:700;margin-top:.2rem;display:flex;align-items:center;gap:.35rem}
         .perfil-acoes{display:flex;gap:.6rem;flex-wrap:wrap}
         .btn-editar{background:#162a1e;color:#fff;border:none;padding:.65rem 1.2rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:.4rem}
         .btn-visita{background:#E67E22;color:#fff;border:none;padding:.65rem 1.2rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:.4rem}
-        .btn-deletar{background:transparent;color:#e74c3c;border:1.5px solid #e74c3c;padding:.65rem 1.2rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer}
+        .btn-deletar{background:transparent;color:#e74c3c;border:1.5px solid #e74c3c;padding:.65rem 1.2rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem}
         .grid-info{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem}
         .info-card{background:#fff;border-radius:12px;padding:1.2rem;box-shadow:0 2px 8px rgba(0,0,0,.05);overflow:hidden}
         .info-label{font-size:.68rem;font-weight:700;color:#aaa;letter-spacing:.06em;text-transform:uppercase;margin-bottom:.3rem}
-        .info-valor{font-size:.85rem;font-weight:700;color:#162a1e;word-break:break-all}
+        .info-valor{font-size:.85rem;font-weight:700;color:#162a1e;word-break:break-all;display:flex;align-items:center;gap:.4rem}
         .secao-titulo{font-size:1rem;font-weight:700;color:#162a1e;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between}
         .visita-item{background:#fff;border-radius:10px;padding:1rem 1.2rem;margin-bottom:.7rem;box-shadow:0 2px 6px rgba(0,0,0,.04);display:flex;align-items:flex-start;gap:1rem;border-left:4px solid}
         .visita-data{font-size:.78rem;font-weight:700;color:#aaa;min-width:80px}
@@ -97,7 +128,7 @@ export default function ClientePerfilPage() {
           <div className="perfil-avatar">{cliente.nome?.charAt(0).toUpperCase()}</div>
           <div>
             <div className="perfil-nome">{cliente.nome}</div>
-            {cliente.nome_fazenda && <div className="perfil-fazenda">🌾 {cliente.nome_fazenda}</div>}
+            {cliente.nome_fazenda && <div className="perfil-fazenda"><IconSprout color="#E67E22" /> {cliente.nome_fazenda}</div>}
           </div>
         </div>
         <div className="perfil-acoes">
@@ -105,32 +136,32 @@ export default function ClientePerfilPage() {
             + Nova Visita
           </Link>
           <Link href={`/dashboard/clientes/${cliente.id}/editar`} className="btn-editar">
-            ✏️ Editar
+            <IconEdit /> Editar
           </Link>
           <button className="btn-deletar" onClick={deletarCliente} disabled={deletando}>
-            🗑️ Excluir
+            <IconTrash /> Excluir
           </button>
         </div>
       </div>
 
       <div className="grid-info">
-        {cliente.telefone && <div className="info-card"><div className="info-label">Telefone</div><div className="info-valor">📞 {cliente.telefone}</div></div>}
-        {cliente.email && <div className="info-card"><div className="info-label">E-mail</div><div className="info-valor">✉️ {cliente.email}</div></div>}
-        {cliente.cidade && <div className="info-card"><div className="info-label">Localização</div><div className="info-valor">📍 {cliente.cidade}/{cliente.estado}</div></div>}
-        {cliente.cultura_principal && <div className="info-card"><div className="info-label">Cultura</div><div className="info-valor">🌱 {cliente.cultura_principal}</div></div>}
-        {cliente.hectares && <div className="info-card"><div className="info-label">Área</div><div className="info-valor">📐 {cliente.hectares} ha</div></div>}
+        {cliente.telefone && <div className="info-card"><div className="info-label">Telefone</div><div className="info-valor"><IconPhone color="#E67E22" /> {cliente.telefone}</div></div>}
+        {cliente.email && <div className="info-card"><div className="info-label">E-mail</div><div className="info-valor"><IconMail color="#E67E22" /> {cliente.email}</div></div>}
+        {cliente.cidade && <div className="info-card"><div className="info-label">Localização</div><div className="info-valor"><IconPin color="#E67E22" /> {cliente.cidade}/{cliente.estado}</div></div>}
+        {cliente.cultura_principal && <div className="info-card"><div className="info-label">Cultura</div><div className="info-valor"><IconLeaf color="#E67E22" /> {cliente.cultura_principal}</div></div>}
+        {cliente.hectares && <div className="info-card"><div className="info-label">Área</div><div className="info-valor"><IconRuler color="#E67E22" /> {cliente.hectares} ha</div></div>}
         {cliente.cpf_cnpj && <div className="info-card"><div className="info-label">CPF/CNPJ</div><div className="info-valor">{cliente.cpf_cnpj}</div></div>}
       </div>
 
       {cliente.observacoes && (
         <>
-          <div className="secao-titulo">📝 Observações</div>
+          <div className="secao-titulo"><span style={{display:'inline-flex',alignItems:'center',gap:'.45rem'}}><IconNote color="#162a1e" /> Observações</span></div>
           <div className="obs-card">{cliente.observacoes}</div>
         </>
       )}
 
       <div className="secao-titulo">
-        📋 Histórico de Visitas
+        <span style={{display:'inline-flex',alignItems:'center',gap:'.45rem'}}><IconClipboard color="#162a1e" /> Histórico de Visitas</span>
         <span style={{fontSize:'.78rem',color:'#aaa',fontWeight:400}}>{visitas.length} visita{visitas.length !== 1 ? 's' : ''}</span>
       </div>
 
