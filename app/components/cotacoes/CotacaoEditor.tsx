@@ -350,6 +350,13 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
     const validos = itens.filter(i => i.produto_nome.trim())
     if (validos.length === 0) { setErro('Adicione ao menos um produto.'); return null }
     const statusDesejado = statusForcado ?? cab.status
+    const semQtd = validos.find(i => !(i.quantidade > 0))
+    if (semQtd && (statusDesejado === 'enviada' || statusDesejado === 'aprovada')) {
+      setErro(`Informe a quantidade de "${semQtd.produto_nome}" antes de enviar.`)
+      setFechados(f => { const n = new Set(f); n.delete(semQtd._k); return n })
+      setTimeout(() => document.querySelector<HTMLInputElement>(`[data-qtd="${semQtd._k}"]`)?.focus(), 50)
+      return null
+    }
     if (!admin && (statusDesejado === 'enviada' || statusDesejado === 'aprovada') && !liberada) {
       setErro('Há preço abaixo do mínimo permitido. Solicite a aprovação do administrador antes de enviar.')
       return null
@@ -949,6 +956,7 @@ function ItemCard({ it, idx, c, admin, produtos, aberto, minimo, abaixo, histori
   const nav = { 'data-nav': it._k }
   const semPreco = !it.preco_cliente
   const abaixoSugerido = !semPreco && c.diferenca < -0.005
+  const faltaQtd = !!it.produto_nome.trim() && !(it.quantidade > 0)
   const focarQtd = () => document.querySelector<HTMLInputElement>(`[data-qtd="${it._k}"]`)?.focus()
 
   return (
@@ -958,10 +966,6 @@ function ItemCard({ it, idx, c, admin, produtos, aberto, minimo, abaixo, histori
         <ProdutoPicker produtos={produtos} nome={it.produto_nome} produtoId={it.produto_id} onEscolher={onEscolher}
           onLivre={nome => onMudar({ produto_nome: nome, produto_id: null })} onConcluir={() => setTimeout(focarQtd, 0)}
           inputProps={{ 'data-picker': it._k, 'data-nav': it._k }} />
-        <div className="ce-qtd">
-          <NumInput className="ui-input" valor={it.quantidade} onChange={v => onMudar({ quantidade: v })} casas={2} placeholder="Qtd." ariaLabel="Quantidade" inputProps={{ ...nav, 'data-qtd': it._k }} />
-          <input className="ce-und" value={it.unidade ?? ''} onChange={e => onMudar({ unidade: e.target.value.toUpperCase() })} aria-label="Unidade" />
-        </div>
         <div className="ce-item-acoes">
           <button className="ce-ico" onClick={onDuplicar} title="Duplicar produto"><Ic d={D.copiar} /></button>
           <button className="ce-ico perigo" onClick={onRemover} title="Remover produto"><Ic d={D.lixo} /></button>
@@ -975,6 +979,7 @@ function ItemCard({ it, idx, c, admin, produtos, aberto, minimo, abaixo, histori
           <span>{num(it.quantidade, it.quantidade % 1 ? 2 : 0)} {it.unidade} × {brl(it.preco_cliente)}</span>
           <span>venc. {dataCurta(it.vencimento || it.data_final)}</span>
           {abaixo && <span className="ui-badge ui-badge-cancelada">abaixo do mínimo</span>}
+          {faltaQtd && <span className="ui-badge ui-badge-cancelada">sem quantidade</span>}
           <b>{brl(c.total)}</b>
         </button>
       ) : (
@@ -1020,6 +1025,14 @@ function ItemCard({ it, idx, c, admin, produtos, aberto, minimo, abaixo, histori
               <b>{brl(c.precoSugerido)}</b>
               <button type="button" onClick={() => onMudar({ preco_cliente: Math.round(c.precoSugerido * 100) / 100 })}><Ic d={D.varinha} size={12} /> Usar</button>
             </div>
+            <label className={`ce-qtd-campo ${faltaQtd ? 'falta' : ''}`}>
+              Quantidade
+              <div className="ce-qtd">
+                <NumInput className="ui-input" valor={it.quantidade} onChange={v => onMudar({ quantidade: v })} casas={it.quantidade % 1 ? 2 : 0} placeholder="0" ariaLabel="Quantidade" inputProps={{ ...nav, 'data-qtd': it._k }} />
+                <input className="ce-und" value={it.unidade ?? ''} onChange={e => onMudar({ unidade: e.target.value.toUpperCase() })} aria-label="Unidade" placeholder="UN" />
+              </div>
+              {faltaQtd && <small className="ce-qtd-aviso">Informe a quantidade</small>}
+            </label>
             <label className="ce-pc">
               Preço ao cliente
               <NumInput className={`ui-input ${abaixo || abaixoSugerido ? 'abaixo' : ''}`} valor={it.preco_cliente} onChange={v => onMudar({ preco_cliente: v })} placeholder={num(c.precoSugerido)} inputProps={nav} />
@@ -1105,10 +1118,14 @@ const EDITOR_CSS = `
   .ce-item:focus-within{box-shadow:0 0 0 2px rgba(230,126,34,.25),0 8px 24px rgba(22,42,30,.07)}
   .ce-item-head{display:flex;align-items:center;gap:.6rem;padding:.7rem .8rem .7rem 1rem}
   .ce-item-n{width:26px;height:26px;border-radius:8px;background:#fdf3e9;color:#E67E22;font-size:.72rem;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-  .ce-qtd{display:flex;align-items:center;border:1.5px solid #eae5de;border-radius:9px;overflow:hidden;background:#fff;flex-shrink:0}
-  .ce-qtd:focus-within{border-color:#E67E22}
-  .ce-qtd .ui-input{border:none;width:90px;text-align:right;padding:.5rem .55rem;font-weight:600;box-shadow:none !important}
-  .ce-und{width:52px;border:none;border-left:1px solid #f2efea;background:#faf8f5;padding:.5rem .4rem;font-family:inherit;font-size:.7rem;font-weight:600;color:#5b6660;text-align:center;outline:none;align-self:stretch}
+  .ce-qtd{display:flex;align-items:stretch;border:1.5px solid #f5d9bd;border-radius:9px;overflow:hidden;background:#fff;min-width:0}
+  .ce-qtd:focus-within{border-color:#E67E22;box-shadow:0 0 0 3px rgba(230,126,34,.12)}
+  .ce-qtd .ui-input{border:none;flex:1;min-width:0;width:auto;text-align:right;padding:.55rem .6rem;font-size:.95rem;font-weight:600;box-shadow:none !important}
+  .ce-qtd-campo.falta{color:#c0392b}
+  .ce-qtd-campo.falta .ce-qtd{border-color:#e8907f;background:#fff7f5}
+  .ce-qtd-campo.falta .ce-qtd .ui-input{background:#fff7f5}
+  .ce-qtd-aviso{font-size:.62rem;font-weight:600;color:#c0392b}
+  .ce-und{width:46px;flex-shrink:0;border:none;border-left:1px solid #f2efea;background:#faf8f5;padding:.5rem .4rem;font-family:inherit;font-size:.7rem;font-weight:600;color:#5b6660;text-align:center;outline:none;align-self:stretch}
   .ce-item-acoes{display:flex;gap:.15rem}
   .ce-ico{width:32px;height:32px;border:none;background:none;border-radius:8px;color:#8f978f;cursor:pointer;display:flex;align-items:center;justify-content:center}
   .ce-ico:hover{background:#f7f5f1;color:#162a1e}
@@ -1133,14 +1150,14 @@ const EDITOR_CSS = `
   .ce-chips button{border:1px solid #eae5de;background:#fff;border-radius:999px;padding:.18rem .48rem;font-family:inherit;font-size:.62rem;font-weight:600;color:#5b6660;cursor:pointer}
   .ce-chips button:hover{border-color:#E67E22;color:#E67E22}
   .ce-chips button.ativo{background:#162a1e;border-color:#162a1e;color:#fff}
-  .ce-preco{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr) minmax(0,1fr);gap:.8rem;align-items:end;padding:.85rem 1rem;border-top:1px solid #f2efea}
+  .ce-preco{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr) minmax(0,1fr) minmax(0,.9fr) minmax(0,1fr);gap:.75rem;align-items:start;padding:.85rem 1rem;border-top:1px solid #f2efea}
   .ce-sug{display:flex;flex-direction:column;gap:.15rem;font-size:.64rem;font-weight:600;color:#8f978f}
   .ce-sug b{font-size:1rem;color:#c0651a}
   .ce-sug button{align-self:flex-start;display:inline-flex;align-items:center;gap:.3rem;border:none;background:#fdf3e9;color:#c0651a;border-radius:7px;padding:.28rem .6rem;font-family:inherit;font-size:.66rem;font-weight:600;cursor:pointer;margin-top:.15rem}
   .ce-pc .ui-input{font-size:.95rem;font-weight:600;text-align:right;border-color:#f5d9bd}
   .ce-pc .ui-input.abaixo{border-color:#f0b4ab;background:#fffafa}
   .ce-venc .ui-input{padding:.6rem .5rem;font-size:.78rem}
-  .ce-total{text-align:right;display:flex;flex-direction:column;gap:.15rem}
+  .ce-total{text-align:right;display:flex;flex-direction:column;gap:.15rem;align-self:end}
   .ce-total span{font-size:.64rem;font-weight:600;color:#8f978f}
   .ce-total b{font-size:1.15rem;color:#162a1e;white-space:nowrap}
   .ce-hist{display:flex;flex-wrap:wrap;gap:.3rem 1.2rem;padding:0 1rem .75rem;font-size:.68rem;color:#8f978f}
@@ -1228,7 +1245,6 @@ const EDITOR_CSS = `
     .ce-campos{grid-template-columns:1fr 1fr}
     .ce-item-head{flex-wrap:wrap}
     .ce-item-head .pp-wrap{flex-basis:calc(100% - 26px - .6rem)}
-    .ce-qtd{margin-left:calc(26px + .6rem)}
     .ce-item-acoes{margin-left:auto}
     .ce-item-resumo{flex-wrap:wrap;gap:.3rem .8rem;padding-left:1rem}
     .ce-status-btn{padding:.4rem .5rem}
