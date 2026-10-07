@@ -6,7 +6,7 @@ export default async function AdminRelatorioClientesPage() {
   const [{ data: clientes }, { data: funcionarios }] = await Promise.all([
     supabase
       .from('clientes')
-      .select('id, nome, cidade, estado, nome_fazenda, cultura_principal, status')
+      .select('id, nome, cidade, estado, nome_fazenda, cultura_principal')
       .order('nome'),
     supabase
       .from('profiles')

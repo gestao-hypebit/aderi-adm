@@ -30,6 +30,17 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
+  // Usuário desativado pelo admin: encerra a sessão
+  if (user && path.startsWith('/dashboard')) {
+    const { data: perfil } = await supabase.from('profiles').select('ativo').eq('id', user.id).single()
+    if (perfil?.ativo === false) {
+      await supabase.auth.signOut()
+      const resposta = NextResponse.redirect(new URL('/login', request.url))
+      supabaseResponse.cookies.getAll().forEach(c => resposta.cookies.set(c))
+      return resposta
+    }
+  }
+
   // Logado tentando acessar rotas públicas
   if (user && rotasPublicas.includes(path)) {
     return NextResponse.redirect(new URL('/dashboard', request.url))

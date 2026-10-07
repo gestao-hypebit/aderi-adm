@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import ConfirmDialog from '../../_ui/ConfirmDialog'
 
 type Visita = {
   id: string
@@ -18,7 +19,8 @@ type Visita = {
   motivo_outro: string | null
   observacao_finalizacao: string | null
   cliente: { id: string; nome: string; nome_fazenda: string; cidade: string; estado: string }
-  funcionario: { nome_completo: string }
+  funcionario_id: string
+  funcionario: { id: string; nome_completo: string }
 }
 
 type FotoPreview = {
@@ -94,6 +96,9 @@ export default function VisitaDetalheAdmin() {
   const [obsEditada, setObsEditada] = useState('')
 
   const [fotos, setFotos] = useState<FotoSalva[]>([])
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false)
+  const [fotoParaExcluir, setFotoParaExcluir] = useState<FotoSalva | null>(null)
+  const [excluindo, setExcluindo] = useState(false)
   const [carregandoFotos, setCarregandoFotos] = useState(false)
   const [uploadandoFoto, setUploadandoFoto] = useState(false)
   const inputFotoAvulsaRef = useRef<HTMLInputElement>(null)
@@ -102,7 +107,7 @@ export default function VisitaDetalheAdmin() {
     async function carregar() {
       const { data } = await supabase
         .from('visitas')
-        .select('*, cliente:clientes(id, nome, nome_fazenda, cidade, estado), funcionario:profiles(nome_completo)')
+        .select('*, cliente:clientes(id, nome, nome_fazenda, cidade, estado), funcionario:profiles(id, nome_completo)')
         .eq('id', id)
         .single()
       setVisita(data)
@@ -216,18 +221,21 @@ export default function VisitaDetalheAdmin() {
     setEditandoObs(false)
   }
 
-  async function deletarFoto(fotoId: string, url: string) {
-    if (!confirm('Excluir esta foto?')) return
-    const path = url.split('/visita-fotos/')[1]
+  async function deletarFoto() {
+    if (!fotoParaExcluir) return
+    setExcluindo(true)
+    const path = fotoParaExcluir.url.split('/visita-fotos/')[1]
     await supabase.storage.from('visita-fotos').remove([path])
-    await supabase.from('visita_fotos').delete().eq('id', fotoId)
-    setFotos(prev => prev.filter(f => f.id !== fotoId))
+    await supabase.from('visita_fotos').delete().eq('id', fotoParaExcluir.id)
+    setFotos(prev => prev.filter(f => f.id !== fotoParaExcluir.id))
+    setFotoParaExcluir(null)
+    setExcluindo(false)
   }
 
   async function deletar() {
-    if (!confirm('Excluir esta visita?')) return
+    setExcluindo(true)
     await supabase.from('visitas').delete().eq('id', id)
-    router.push('/admin/agenda')
+    router.push('/admin/visitas')
   }
 
   const statusCor: Record<string, string> = {
@@ -240,101 +248,143 @@ export default function VisitaDetalheAdmin() {
     ? `Outros — ${visita.motivo_outro || ''}`
     : visita?.motivo_visita
 
-  if (carregando) return <div style={{textAlign:'center',padding:'3rem',color:'#aaa'}}>Carregando...</div>
-  if (!visita) return <div style={{textAlign:'center',padding:'3rem',color:'#aaa'}}>Visita não encontrada.</div>
+  if (carregando) {
+    return (
+      <div style={{ maxWidth: 1080 }}>
+        <div className="ui-skeleton" style={{ height: 14, width: 160, marginBottom: '1rem' }} />
+        <div className="ui-skeleton" style={{ height: 130, borderRadius: 16, marginBottom: '1.2rem' }} />
+        <div className="ui-skeleton" style={{ height: 220, borderRadius: 16 }} />
+      </div>
+    )
+  }
+  if (!visita) {
+    return (
+      <div className="ui-card" style={{ maxWidth: 520 }}>
+        <div className="ui-empty">
+          <div className="ui-empty-icon"><IconCalendar /></div>
+          <div className="ui-empty-title">Visita não encontrada</div>
+          <div className="ui-empty-text">Ela pode ter sido excluída.</div>
+          <Link href="/admin/visitas" className="ui-btn ui-btn-secondary ui-btn-sm">Voltar para visitas</Link>
+        </div>
+      </div>
+    )
+  }
 
   const data = new Date(visita.data_visita + 'T12:00:00')
+  const statusLabel = visita.status.charAt(0).toUpperCase() + visita.status.slice(1)
+  const local = [visita.cliente?.cidade, visita.cliente?.estado].filter(Boolean).join('/')
 
   return (
     <>
       <style>{`
-        .voltar{display:inline-flex;align-items:center;gap:.4rem;color:#E67E22;font-size:.82rem;font-weight:700;text-decoration:none;margin-bottom:1.2rem}
-        .visita-header{background:#fff;border-radius:14px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,.05);margin-bottom:1.2rem;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem}
-        .visita-data-grande{text-align:center;background:#f0ede8;border-radius:10px;padding:.8rem 1.2rem;min-width:70px}
-        .dia-num{font-size:2rem;font-weight:900;color:#162a1e;line-height:1}
-        .mes-txt{font-size:.72rem;font-weight:700;color:#aaa;text-transform:uppercase}
-        .visita-titulo{flex:1}
-        .cliente-nome{font-size:1.2rem;font-weight:700;color:#162a1e}
-        .cliente-fazenda{display:flex;align-items:center;gap:.35rem;color:#E67E22;font-size:.85rem;font-weight:700;margin:.3rem 0}
-        .cliente-loc{display:flex;align-items:center;gap:.35rem;color:#aaa;font-size:.78rem}
-        .status-atual{display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;font-weight:700;padding:.35rem 1rem;border-radius:20px;color:#fff;margin-top:.5rem}
-        .acoes{display:flex;gap:.6rem;flex-wrap:wrap}
-        .btn-acao{display:inline-flex;align-items:center;gap:.4rem;padding:.55rem 1rem;border-radius:8px;border:none;font-family:'Comfortaa',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .2s}
-        .secao{background:#fff;border-radius:12px;padding:1.2rem 1.5rem;box-shadow:0 2px 6px rgba(0,0,0,.04);margin-bottom:1rem}
-        .secao-label{font-size:.68rem;font-weight:700;color:#E67E22;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.6rem}
-        .secao-texto{font-size:.88rem;color:#444;line-height:1.8}
-        .status-btns{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem}
-        .status-btn{display:inline-flex;align-items:center;gap:.4rem;padding:.45rem 1rem;border-radius:20px;border:1.5px solid;font-family:'Comfortaa',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer;transition:all .2s;background:transparent}
-        .info-row{display:flex;gap:.6rem;align-items:center;font-size:.85rem;color:#444;margin-bottom:.4rem}
-        .info-row span{font-weight:700;color:#162a1e}
-        .link-cliente{display:inline-flex;align-items:center;gap:.4rem;color:#E67E22;font-size:.82rem;font-weight:700;text-decoration:none;margin-top:.5rem}
-        .info-chips{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.5rem}
-        .chip{display:inline-flex;align-items:center;gap:.4rem;background:#f0ede8;border-radius:20px;padding:.3rem .8rem;font-size:.78rem;font-weight:700;color:#162a1e}
-        .obs-vazia{font-size:.82rem;color:#aaa;font-style:italic}
-        .obs-texto{font-size:.88rem;color:#444;line-height:1.8;background:#f7f5f0;border-radius:8px;padding:.8rem 1rem}
-        .obs-acoes{display:flex;gap:.5rem;margin-top:.8rem}
-        .btn-obs{display:inline-flex;align-items:center;gap:.4rem;padding:.4rem .9rem;border-radius:8px;border:none;font-family:'Comfortaa',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer;transition:all .2s}
-        .btn-obs-edit{background:#f0ede8;color:#162a1e}
-        .btn-obs-edit:hover{background:#e0dbd2}
-        .btn-obs-salvar{background:#162a1e;color:#fff}
-        .btn-obs-salvar:hover{background:#0d1f14}
-        .btn-obs-salvar:disabled{opacity:.6;cursor:not-allowed}
-        .btn-obs-cancelar{background:transparent;color:#aaa;border:1px solid #eae5de}
-        .obs-textarea{width:100%;padding:.7rem 1rem;border:1.5px solid #E67E22;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;background:#fff;resize:vertical;min-height:90px;outline:none;box-sizing:border-box}
-        .fotos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1rem;margin-top:.8rem}
-        .foto-item{position:relative;border-radius:10px;overflow:hidden;border:1px solid #eae5de}
-        .foto-img{width:100%;height:140px;object-fit:cover;display:block}
-        .foto-legenda{padding:.5rem .7rem;font-size:.72rem;color:#555;background:#fafaf8;border-top:1px solid #f0ede8;font-style:italic}
-        .foto-del{position:absolute;top:5px;right:5px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-        .btn-add-foto{display:inline-flex;align-items:center;gap:.4rem;background:#f0ede8;color:#162a1e;border:none;padding:.5rem 1rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;transition:background .2s;margin-top:.8rem}
-        .btn-add-foto:hover{background:#e0dbd2}
-        .btn-add-foto:disabled{opacity:.6;cursor:not-allowed}
-        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem;overflow-y:auto}
-        .modal-box{background:#fff;border-radius:16px;padding:2rem;max-width:560px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.15);max-height:90vh;overflow-y:auto}
-        .modal-titulo{display:flex;align-items:center;gap:.5rem;font-size:1rem;font-weight:700;color:#162a1e;margin-bottom:.4rem}
-        .modal-sub{font-size:.82rem;color:#888;margin-bottom:1.2rem}
-        .modal-textarea{width:100%;padding:.8rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;background:#fafaf8;resize:vertical;min-height:90px;outline:none;box-sizing:border-box;transition:border-color .2s}
-        .modal-textarea:focus{border-color:#27ae60;background:#fff}
-        .modal-divider{border:none;border-top:1px solid #f0ede8;margin:1.2rem 0}
-        .modal-secao-label{display:flex;align-items:center;gap:.4rem;font-size:.7rem;font-weight:700;color:#E67E22;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.8rem}
-        .fotos-preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.8rem;margin-bottom:.8rem}
+        .vd-wrap{max-width:1080px}
+        .vd-hero{padding:1.4rem 1.5rem;display:flex;gap:1.2rem;align-items:flex-start;flex-wrap:wrap;margin-bottom:1.2rem;position:relative;overflow:hidden}
+        .vd-hero::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px}
+        .vd-hero.st-agendada::before{background:#E67E22}
+        .vd-hero.st-realizada::before{background:#27ae60}
+        .vd-hero.st-cancelada::before{background:#e74c3c}
+        .vd-data{text-align:center;background:#162a1e;color:#fff;border-radius:14px;padding:.75rem .9rem;min-width:74px;flex-shrink:0}
+        .vd-dia{font-size:1.9rem;font-weight:700;line-height:1}
+        .vd-mes{font-size:.66rem;font-weight:700;color:#E67E22;text-transform:uppercase;letter-spacing:.08em;margin-top:.3rem}
+        .vd-ano{font-size:.62rem;color:rgba(255,255,255,.5);margin-top:.1rem}
+        .vd-titulo{flex:1;min-width:220px}
+        .vd-cliente{font-size:1.35rem;font-weight:700;color:#162a1e;line-height:1.25}
+        .vd-meta{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.45rem;font-size:.78rem;color:#8f978f}
+        .vd-meta .vd-fazenda{display:inline-flex;align-items:center;gap:.3rem;color:#E67E22;font-weight:700}
+        .vd-meta span{display:inline-flex;align-items:center;gap:.3rem}
+        .vd-badges{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.8rem}
+        .vd-acoes{display:flex;gap:.5rem;flex-wrap:wrap}
+        .vd-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:1.2rem;align-items:start}
+        .vd-col{display:flex;flex-direction:column;gap:1.2rem;min-width:0}
+        .vd-body{padding:1.15rem 1.4rem 1.3rem}
+        .vd-texto{font-size:.86rem;color:#3d4a42;line-height:1.8;white-space:pre-wrap}
+        .vd-vazio{font-size:.8rem;color:#b8bdb6;font-style:italic}
+        .vd-status-btns{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
+        .vd-status-btn{display:flex;align-items:center;justify-content:center;gap:.45rem;padding:.7rem;border-radius:10px;border:1.5px solid #eae5de;background:#fff;font-family:'Comfortaa',sans-serif;font-size:.78rem;font-weight:700;color:#8f978f;cursor:pointer;transition:all .15s}
+        .vd-status-btn:hover:not(:disabled){border-color:#cfc8bd;color:#162a1e}
+        .vd-status-btn:disabled{cursor:default}
+        .vd-info{padding:.4rem 1.3rem .6rem}
+        .vd-info-item{display:flex;gap:.75rem;align-items:flex-start;padding:.75rem 0;border-bottom:1px solid #f2efea}
+        .vd-info-item:last-child{border-bottom:none}
+        .vd-info-icon{width:32px;height:32px;border-radius:9px;background:#f7f5f1;color:#5b6660;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .vd-info-label{font-size:.62rem;font-weight:700;color:#8f978f;text-transform:uppercase;letter-spacing:.06em}
+        .vd-info-valor{font-size:.82rem;font-weight:700;color:#162a1e;margin-top:.2rem;word-break:break-word}
+        .vd-links{padding:.9rem 1.3rem 1.2rem;display:flex;flex-direction:column;gap:.5rem;border-top:1px solid #f2efea}
+        .vd-links .ui-btn{width:100%}
+        .fotos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.8rem}
+        .foto-item{position:relative;border-radius:12px;overflow:hidden;border:1px solid #eae5de;background:#faf8f5}
+        .foto-item a{display:block}
+        .foto-img{width:100%;height:140px;object-fit:cover;display:block;transition:transform .3s}
+        .foto-item:hover .foto-img{transform:scale(1.03)}
+        .foto-legenda{padding:.5rem .7rem;font-size:.7rem;color:#5b6660;border-top:1px solid #f2efea}
+        .foto-del{position:absolute;top:6px;right:6px;background:rgba(13,31,20,.6);color:#fff;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s}
+        .foto-item:hover .foto-del{opacity:1}
+        @media(hover:none){.foto-del{opacity:1}}
+        .foto-add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4rem;min-height:140px;border:1.5px dashed #d8d1c6;border-radius:12px;background:#faf8f5;color:#8f978f;font-family:'Comfortaa',sans-serif;font-size:.74rem;font-weight:700;cursor:pointer;transition:all .15s}
+        .foto-add:hover:not(:disabled){border-color:#E67E22;color:#E67E22;background:#fffaf5}
+        .foto-add:disabled{cursor:not-allowed;opacity:.6}
+        .modal-titulo{display:flex;align-items:center;gap:.55rem;font-size:1.05rem;font-weight:700;color:#162a1e;margin-bottom:.3rem}
+        .modal-sub{font-size:.78rem;color:#8f978f;margin-bottom:1.2rem}
+        .modal-secao-label{display:flex;align-items:center;gap:.4rem;font-size:.66rem;font-weight:700;color:#8f978f;letter-spacing:.1em;text-transform:uppercase;margin:1.3rem 0 .7rem}
+        .fotos-preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.7rem;margin-bottom:.7rem}
         .foto-preview-item{border-radius:10px;overflow:hidden;border:1.5px solid #eae5de;position:relative}
-        .foto-preview-img{width:100%;height:120px;object-fit:cover;display:block}
-        .foto-preview-legenda{width:100%;padding:.4rem .5rem;border:none;border-top:1px solid #f0ede8;font-family:'Comfortaa',sans-serif;font-size:.72rem;color:#162a1e;background:#fafaf8;outline:none;box-sizing:border-box}
-        .foto-preview-legenda::placeholder{color:#bbb}
-        .foto-preview-del{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-        .btn-upload-foto{display:inline-flex;align-items:center;gap:.5rem;background:#f0ede8;color:#162a1e;border:1.5px dashed #ccc;padding:.7rem 1.2rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;transition:all .2s;width:100%;justify-content:center;box-sizing:border-box}
-        .btn-upload-foto:hover{background:#e0dbd2;border-color:#E67E22}
-        .modal-btns{display:flex;gap:.6rem;margin-top:1rem;justify-content:flex-end;flex-wrap:wrap}
-        .btn-modal-confirmar{display:inline-flex;align-items:center;gap:.4rem;background:#27ae60;color:#fff;border:none;padding:.7rem 1.4rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer;transition:background .2s}
-        .btn-modal-confirmar:hover{background:#219150}
-        .btn-modal-confirmar:disabled{opacity:.6;cursor:not-allowed}
-        .btn-modal-cancelar{background:transparent;color:#888;border:1.5px solid #eae5de;padding:.7rem 1.2rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer}
+        .foto-preview-img{width:100%;height:110px;object-fit:cover;display:block}
+        .foto-preview-legenda{width:100%;padding:.45rem .55rem;border:none;border-top:1px solid #f2efea;font-family:'Comfortaa',sans-serif;font-size:.7rem;color:#162a1e;background:#faf8f5;outline:none;box-sizing:border-box}
+        .foto-preview-legenda::placeholder{color:#b8bdb6}
+        .foto-preview-del{position:absolute;top:4px;right:4px;background:rgba(13,31,20,.6);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+        .btn-upload-foto{display:flex;align-items:center;justify-content:center;gap:.5rem;width:100%;padding:.85rem;border:1.5px dashed #d8d1c6;border-radius:10px;background:#faf8f5;color:#5b6660;font-family:'Comfortaa',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .15s}
+        .btn-upload-foto:hover{border-color:#E67E22;color:#E67E22}
+        .modal-btns{display:flex;gap:.6rem;margin-top:1.4rem;justify-content:flex-end;flex-wrap:wrap}
+        @media(max-width:960px){.vd-grid{grid-template-columns:1fr}}
+        @media(max-width:560px){.vd-status-btns{grid-template-columns:1fr}.vd-hero{padding:1.2rem}.vd-cliente{font-size:1.15rem}}
       `}</style>
 
+      <ConfirmDialog
+        aberto={confirmarExclusao}
+        titulo="Excluir esta visita?"
+        confirmarTexto="Excluir visita"
+        perigo
+        carregando={excluindo}
+        onConfirmar={deletar}
+        onCancelar={() => setConfirmarExclusao(false)}
+      >
+        A visita a <b>{visita.cliente?.nome}</b> em {data.toLocaleDateString('pt-BR')} será apagada junto com as fotos. Essa ação não pode ser desfeita.
+      </ConfirmDialog>
+      <ConfirmDialog
+        aberto={!!fotoParaExcluir}
+        titulo="Excluir esta foto?"
+        confirmarTexto="Excluir foto"
+        perigo
+        carregando={excluindo}
+        onConfirmar={deletarFoto}
+        onCancelar={() => setFotoParaExcluir(null)}
+      >
+        A foto será removida da visita permanentemente.
+      </ConfirmDialog>
+
       {modalAberto && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setModalAberto(false) }}>
-          <div className="modal-box">
-            <div className="modal-titulo"><IconCheck color="#27ae60" size={18} /> Finalizar visita</div>
-            <div className="modal-sub">Adicione uma observação e fotos da visita (opcional)</div>
+        <div className="ui-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setModalAberto(false) }}>
+          <div className="ui-modal" role="dialog" aria-modal="true" aria-labelledby="modal-finalizar">
+            <div className="modal-titulo" id="modal-finalizar"><IconCheck color="#27ae60" size={20} /> Finalizar visita</div>
+            <div className="modal-sub">Registre como foi a visita. A observação e as fotos são opcionais.</div>
+            <label className="ui-label">Observação</label>
             <textarea
-              className="modal-textarea"
+              className="ui-textarea"
               placeholder="Ex: Produtor demonstrou interesse nos produtos..."
               value={observacaoModal}
               onChange={e => setObservacaoModal(e.target.value)}
               autoFocus
             />
-            <hr className="modal-divider"/>
-            <div className="modal-secao-label"><IconCamera /> Fotos da visita</div>
+            <div className="modal-secao-label"><IconCamera size={13} /> Fotos da visita</div>
             {fotosModal.length > 0 && (
               <div className="fotos-preview-grid">
                 {fotosModal.map((foto, i) => (
                   <div key={i} className="foto-preview-item">
                     <img src={foto.preview} alt="" className="foto-preview-img"/>
-                    <button className="foto-preview-del" onClick={() => removerFotoModal(i)}><IconX size={12} /></button>
+                    <button className="foto-preview-del" onClick={() => removerFotoModal(i)} aria-label="Remover foto"><IconX size={12} /></button>
                     <input
                       className="foto-preview-legenda"
-                      placeholder="Legenda da foto..."
+                      placeholder="Legenda..."
                       value={foto.legenda}
                       onChange={e => atualizarLegenda(i, e.target.value)}
                     />
@@ -342,169 +392,229 @@ export default function VisitaDetalheAdmin() {
                 ))}
               </div>
             )}
-            <input
-              ref={inputFotoModalRef}
-              type="file"
-              accept="image/*"
-              multiple
-              style={{display:'none'}}
-              onChange={adicionarFotosModal}
-            />
+            <input ref={inputFotoModalRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={adicionarFotosModal} />
             <button className="btn-upload-foto" onClick={() => inputFotoModalRef.current?.click()}>
               <IconCamera /> {fotosModal.length > 0 ? 'Adicionar mais fotos' : 'Selecionar fotos'}
             </button>
             <div className="modal-btns">
-              <button className="btn-modal-cancelar" onClick={() => setModalAberto(false)}>Cancelar</button>
-              <button className="btn-modal-confirmar" onClick={confirmarFinalizacao} disabled={salvandoObs}>
-                {salvandoObs ? 'Salvando...' : (<><IconCheck size={14} /> Confirmar Finalização</>)}
+              <button className="ui-btn ui-btn-ghost" onClick={() => setModalAberto(false)}>Cancelar</button>
+              <button className="ui-btn ui-btn-success" onClick={confirmarFinalizacao} disabled={salvandoObs}>
+                {salvandoObs ? 'Salvando...' : (<><IconCheck size={14} /> Confirmar finalização</>)}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <Link href="/admin/agenda" className="voltar"><IconArrowLeft /> Voltar para a agenda</Link>
-
-      <div className="visita-header">
-        <div style={{display:'flex',gap:'1rem',alignItems:'flex-start',flex:1}}>
-          <div className="visita-data-grande">
-            <div className="dia-num">{String(data.getDate()).padStart(2,'0')}</div>
-            <div className="mes-txt">{data.toLocaleDateString('pt-BR',{month:'short'})}</div>
-            <div className="mes-txt">{data.getFullYear()}</div>
-          </div>
-          <div className="visita-titulo">
-            <div className="cliente-nome">{visita.cliente?.nome}</div>
-            {visita.cliente?.nome_fazenda && <div className="cliente-fazenda"><IconSprout color="#E67E22" />{visita.cliente.nome_fazenda}</div>}
-            <div className="cliente-loc"><IconPin />{visita.cliente?.cidade}/{visita.cliente?.estado}</div>
-            <div className="info-row" style={{marginTop:'.5rem'}}><IconUser color="#888" /> <span>{visita.funcionario?.nome_completo}</span></div>
-            <div className="info-chips">
-              {motivoExibido && <span className="chip"><IconTarget />{motivoExibido}</span>}
-              {visita.km_rodado != null && <span className="chip"><IconRoute />{visita.km_rodado} km</span>}
-            </div>
-            <div className="status-atual" style={{background: statusCor[visita.status]}}>
-              {statusIcon(visita.status, '#fff')} {visita.status}
-            </div>
-          </div>
+      <div className="vd-wrap">
+        <div className="ui-breadcrumb">
+          <Link href="/admin/visitas"><IconArrowLeft /> Visitas</Link>
+          <span className="ui-breadcrumb-sep">/</span>
+          <Link href="/admin/agenda">Agenda</Link>
+          <span className="ui-breadcrumb-sep">/</span>
+          <span className="ui-breadcrumb-atual">{visita.cliente?.nome ?? 'Visita'}</span>
         </div>
-        <div className="acoes">
-          <button className="btn-acao" style={{background:'#fef2f2',color:'#e74c3c'}} onClick={deletar}><IconTrash /> Excluir</button>
-        </div>
-      </div>
 
-      <div className="secao">
-        <div className="secao-label">Alterar Status</div>
-        <div className="status-btns">
-          {['agendada','realizada','cancelada'].map(s => (
-            <button key={s} className="status-btn"
-              style={{
-                borderColor: statusCor[s],
-                color: visita.status === s ? '#fff' : statusCor[s],
-                background: visita.status === s ? statusCor[s] : 'transparent',
-                opacity: atualizando ? 0.6 : 1
-              }}
-              onClick={() => mudarStatus(s)}
-              disabled={atualizando || visita.status === s}
+        <div className={`ui-card vd-hero st-${visita.status}`}>
+          <div className="vd-data">
+            <div className="vd-dia">{String(data.getDate()).padStart(2, '0')}</div>
+            <div className="vd-mes">{data.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}</div>
+            <div className="vd-ano">{data.getFullYear()}</div>
+          </div>
+          <div className="vd-titulo">
+            <div className="vd-cliente">{visita.cliente?.nome}</div>
+            <div className="vd-meta">
+              {visita.cliente?.nome_fazenda && <span className="vd-fazenda"><IconSprout color="#E67E22" size={13} />{visita.cliente.nome_fazenda}</span>}
+              {local && <><span className="ui-dot-sep" /><span><IconPin size={13} />{local}</span></>}
+            </div>
+            <div className="vd-badges">
+              <span className={`ui-badge ui-badge-${visita.status}`}>{statusLabel}</span>
+              {motivoExibido && <span className="ui-badge ui-badge-neutro">{motivoExibido}</span>}
+            </div>
+          </div>
+          <div className="vd-acoes">
+            <Link href={`/admin/visitas/${visita.id}/editar`} className="ui-btn ui-btn-secondary ui-btn-sm"><IconEdit /> Editar</Link>
+            <Link
+              href={`/admin/visitas/novo?cliente=${visita.cliente?.id ?? ''}&funcionario=${visita.funcionario_id}${visita.motivo_visita ? `&motivo=${encodeURIComponent(visita.motivo_visita)}` : ''}`}
+              className="ui-btn ui-btn-secondary ui-btn-sm"
+              title="Cria uma nova visita para o mesmo cliente e consultor"
             >
-              {statusIcon(s, visita.status === s ? '#fff' : statusCor[s])} {s.charAt(0).toUpperCase() + s.slice(1)}
-            </button>
-          ))}
+              <IconCalendar /> {visita.status === 'realizada' ? 'Agendar retorno' : 'Nova visita p/ cliente'}
+            </Link>
+            <button className="ui-btn ui-btn-danger ui-btn-sm" onClick={() => setConfirmarExclusao(true)} aria-label="Excluir visita"><IconTrash /></button>
+          </div>
         </div>
-      </div>
 
-      {(motivoExibido || visita.km_rodado != null) && (
-        <div className="secao">
-          <div className="secao-label">Deslocamento e Motivo</div>
-          {motivoExibido && <div className="info-row"><IconTarget color="#888" size={16} /> <span>{motivoExibido}</span></div>}
-          {visita.km_rodado != null && <div className="info-row"><IconRoute color="#888" size={16} /> <span>{visita.km_rodado} km rodados</span></div>}
-        </div>
-      )}
-
-      {visita.status === 'realizada' && (
-        <div className="secao">
-          <div className="secao-label">Observação de Finalização</div>
-          {editandoObs ? (
-            <>
-              <textarea className="obs-textarea" value={obsEditada}
-                onChange={e => setObsEditada(e.target.value)}
-                placeholder="Escreva uma observação..." autoFocus/>
-              <div className="obs-acoes">
-                <button className="btn-obs btn-obs-salvar" onClick={salvarEdicaoObs} disabled={salvandoObs}>
-                  {salvandoObs ? 'Salvando...' : (<><IconCheck size={13} /> Salvar</>)}
-                </button>
-                <button className="btn-obs btn-obs-cancelar" onClick={() => setEditandoObs(false)}>Cancelar</button>
+        <div className="vd-grid">
+          <div className="vd-col">
+            <div className="ui-card">
+              <div className="ui-card-header">
+                <div className="ui-card-title">Status da visita</div>
+                {atualizando && <span style={{ fontSize: '.7rem', color: '#8f978f' }}>Salvando...</span>}
               </div>
-            </>
-          ) : (
-            <>
-              {visita.observacao_finalizacao
-                ? <div className="obs-texto">{visita.observacao_finalizacao}</div>
-                : <div className="obs-vazia">Nenhuma observação registrada.</div>
-              }
-              <div className="obs-acoes">
-                <button className="btn-obs btn-obs-edit"
-                  onClick={() => { setObsEditada(visita.observacao_finalizacao || ''); setEditandoObs(true) }}>
-                  <IconEdit /> {visita.observacao_finalizacao ? 'Editar observação' : 'Adicionar observação'}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {visita.status === 'realizada' && (
-        <div className="secao">
-          <div className="secao-label">Fotos da Visita</div>
-          <input ref={inputFotoAvulsaRef} type="file" accept="image/*" multiple
-            style={{display:'none'}} onChange={uploadFotoAvulsa}/>
-          {carregandoFotos ? (
-            <div style={{color:'#aaa',fontSize:'.82rem'}}>Carregando fotos...</div>
-          ) : fotos.length === 0 ? (
-            <div className="obs-vazia">Nenhuma foto adicionada.</div>
-          ) : (
-            <div className="fotos-grid">
-              {fotos.map(foto => (
-                <div key={foto.id} className="foto-item">
-                  <img src={foto.url} alt={foto.legenda || ''} className="foto-img"/>
-                  <button className="foto-del" onClick={() => deletarFoto(foto.id, foto.url)}><IconX color="#fff" size={12} /></button>
-                  {foto.legenda && <div className="foto-legenda">{foto.legenda}</div>}
+              <div className="vd-body">
+                <div className="vd-status-btns">
+                  {['agendada', 'realizada', 'cancelada'].map(s => {
+                    const ativo = visita.status === s
+                    return (
+                      <button
+                        key={s}
+                        className="vd-status-btn"
+                        style={ativo ? { borderColor: statusCor[s], background: statusCor[s], color: '#fff' } : undefined}
+                        onClick={() => mudarStatus(s)}
+                        disabled={atualizando || ativo}
+                        aria-pressed={ativo}
+                      >
+                        {statusIcon(s, ativo ? '#fff' : statusCor[s])} {s === 'realizada' && !ativo ? 'Marcar realizada' : s.charAt(0).toUpperCase() + s.slice(1)}
+                      </button>
+                    )
+                  })}
                 </div>
-              ))}
+              </div>
             </div>
-          )}
-          <button className="btn-add-foto" onClick={() => inputFotoAvulsaRef.current?.click()} disabled={uploadandoFoto}>
-            <IconCamera /> {uploadandoFoto ? 'Enviando...' : 'Adicionar fotos'}
-          </button>
-        </div>
-      )}
 
-      {visita.descricao && (
-        <div className="secao">
-          <div className="secao-label">Descrição da Visita</div>
-          <div className="secao-texto">{visita.descricao}</div>
-        </div>
-      )}
+            {visita.status === 'realizada' && (
+              <div className="ui-card">
+                <div className="ui-card-header">
+                  <div className="ui-card-title">Observação de finalização</div>
+                  {!editandoObs && (
+                    <button className="ui-btn ui-btn-ghost ui-btn-sm"
+                      onClick={() => { setObsEditada(visita.observacao_finalizacao || ''); setEditandoObs(true) }}>
+                      <IconEdit /> {visita.observacao_finalizacao ? 'Editar' : 'Adicionar'}
+                    </button>
+                  )}
+                </div>
+                <div className="vd-body">
+                  {editandoObs ? (
+                    <>
+                      <textarea className="ui-textarea" value={obsEditada}
+                        onChange={e => setObsEditada(e.target.value)}
+                        placeholder="Escreva uma observação..." autoFocus/>
+                      <div style={{ display: 'flex', gap: '.5rem', marginTop: '.8rem', justifyContent: 'flex-end' }}>
+                        <button className="ui-btn ui-btn-ghost ui-btn-sm" onClick={() => setEditandoObs(false)}>Cancelar</button>
+                        <button className="ui-btn ui-btn-dark ui-btn-sm" onClick={salvarEdicaoObs} disabled={salvandoObs}>
+                          {salvandoObs ? 'Salvando...' : (<><IconCheck size={13} /> Salvar</>)}
+                        </button>
+                      </div>
+                    </>
+                  ) : visita.observacao_finalizacao
+                    ? <div className="vd-texto">{visita.observacao_finalizacao}</div>
+                    : <div className="vd-vazio">Nenhuma observação registrada.</div>}
+                </div>
+              </div>
+            )}
 
-      {visita.recomendacoes && (
-        <div className="secao">
-          <div className="secao-label">Recomendações</div>
-          <div className="secao-texto">{visita.recomendacoes}</div>
-        </div>
-      )}
+            {visita.status === 'realizada' && (
+              <div className="ui-card">
+                <div className="ui-card-header">
+                  <div className="ui-card-title">Fotos da visita{fotos.length > 0 && <span style={{ color: '#8f978f', fontWeight: 400 }}>· {fotos.length}</span>}</div>
+                </div>
+                <div className="vd-body">
+                  <input ref={inputFotoAvulsaRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={uploadFotoAvulsa}/>
+                  {carregandoFotos ? (
+                    <div className="fotos-grid">
+                      {[0, 1, 2].map(i => <div key={i} className="ui-skeleton" style={{ height: 140, borderRadius: 12 }} />)}
+                    </div>
+                  ) : (
+                    <div className="fotos-grid">
+                      {fotos.map(foto => (
+                        <div key={foto.id} className="foto-item">
+                          <a href={foto.url} target="_blank" rel="noreferrer"><img src={foto.url} alt={foto.legenda || ''} className="foto-img"/></a>
+                          <button className="foto-del" onClick={() => setFotoParaExcluir(foto)} aria-label="Excluir foto"><IconX color="#fff" size={12} /></button>
+                          {foto.legenda && <div className="foto-legenda">{foto.legenda}</div>}
+                        </div>
+                      ))}
+                      <button className="foto-add" onClick={() => inputFotoAvulsaRef.current?.click()} disabled={uploadandoFoto}>
+                        <IconCamera size={20} />
+                        {uploadandoFoto ? 'Enviando...' : 'Adicionar fotos'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
-      {visita.proximo_contato && (
-        <div className="secao">
-          <div className="secao-label">Próximo Contato</div>
-          <div className="info-row"><IconCalendar color="#888" /> <span>{new Date(visita.proximo_contato + 'T12:00:00').toLocaleDateString('pt-BR')}</span></div>
-        </div>
-      )}
+            <div className="ui-card">
+              <div className="ui-card-header"><div className="ui-card-title">Descrição da visita</div></div>
+              <div className="vd-body">
+                {visita.descricao
+                  ? <div className="vd-texto">{visita.descricao}</div>
+                  : <div className="vd-vazio">Sem descrição.</div>}
+              </div>
+            </div>
 
-      <div className="secao">
-        <div className="secao-label">Cliente</div>
-        <div className="info-row"><IconUser color="#888" /> <span>{visita.cliente?.nome}</span></div>
-        {visita.cliente?.nome_fazenda && <div className="info-row"><IconSprout color="#888" size={14} /> <span>{visita.cliente.nome_fazenda}</span></div>}
-        <Link href={`/admin/clientes/${visita.cliente?.id}`} className="link-cliente">
-          Ver perfil completo do cliente →
-        </Link>
+            {visita.recomendacoes && (
+              <div className="ui-card">
+                <div className="ui-card-header"><div className="ui-card-title">Recomendações</div></div>
+                <div className="vd-body"><div className="vd-texto">{visita.recomendacoes}</div></div>
+              </div>
+            )}
+          </div>
+
+          <div className="vd-col">
+            <div className="ui-card">
+              <div className="ui-card-header"><div className="ui-card-title">Informações</div></div>
+              <div className="vd-info">
+                <div className="vd-info-item">
+                  <div className="vd-info-icon"><IconUser size={15} /></div>
+                  <div>
+                    <div className="vd-info-label">Consultor</div>
+                    <div className="vd-info-valor">
+                      {visita.funcionario?.id
+                        ? <Link href={`/admin/consultores/${visita.funcionario.id}`} style={{ color: '#162a1e', textDecoration: 'none', borderBottom: '1px dashed #cfc8bd' }}>{visita.funcionario.nome_completo}</Link>
+                        : '—'}
+                    </div>
+                  </div>
+                </div>
+                <div className="vd-info-item">
+                  <div className="vd-info-icon"><IconCalendar /></div>
+                  <div>
+                    <div className="vd-info-label">Data</div>
+                    <div className="vd-info-valor">
+                      {data.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                      {visita.hora_visita && ` · ${visita.hora_visita.slice(0, 5)}`}
+                    </div>
+                  </div>
+                </div>
+                {motivoExibido && (
+                  <div className="vd-info-item">
+                    <div className="vd-info-icon"><IconTarget color="currentColor" size={15} /></div>
+                    <div>
+                      <div className="vd-info-label">Motivo</div>
+                      <div className="vd-info-valor">{motivoExibido}</div>
+                    </div>
+                  </div>
+                )}
+                <div className="vd-info-item">
+                  <div className="vd-info-icon"><IconRoute color="currentColor" size={15} /></div>
+                  <div>
+                    <div className="vd-info-label">Deslocamento</div>
+                    <div className="vd-info-valor">{visita.km_rodado != null ? `${visita.km_rodado.toLocaleString('pt-BR')} km` : <span className="vd-vazio">Não informado</span>}</div>
+                  </div>
+                </div>
+                {visita.proximo_contato && (
+                  <div className="vd-info-item">
+                    <div className="vd-info-icon"><IconCalendar color="#E67E22" /></div>
+                    <div>
+                      <div className="vd-info-label">Próximo contato</div>
+                      <div className="vd-info-valor">{new Date(visita.proximo_contato + 'T12:00:00').toLocaleDateString('pt-BR')}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="vd-links">
+                {visita.cliente?.id && (
+                  <Link href={`/admin/clientes/${visita.cliente.id}`} className="ui-btn ui-btn-secondary ui-btn-sm">
+                    Ficha do cliente
+                  </Link>
+                )}
+                <Link href={`/admin/relatorios/visitas/${visita.id}`} className="ui-btn ui-btn-ghost ui-btn-sm">
+                  Relatório em PDF
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </>
   )

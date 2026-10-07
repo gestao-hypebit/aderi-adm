@@ -1,0 +1,170 @@
+/* ─────────────────────────────────────────────────────────────
+   Aderi — design system compartilhado (admin + app)
+   Classes prefixadas com "ui-" para não colidir com os <style>
+   inline das páginas. Paleta: verde #162a1e · laranja #E67E22 · fundo #f0ede8
+   ───────────────────────────────────────────────────────────── */
+
+:root {
+  --verde: #162a1e;
+  --verde-2: #1f3a2a;
+  --verde-escuro: #0d1f14;
+  --laranja: #E67E22;
+  --laranja-escuro: #c96a16;
+  --laranja-suave: #fdf3e9;
+  --laranja-borda: #f5d9bd;
+  --fundo: #f0ede8;
+  --fundo-2: #f7f5f1;
+  --superficie: #ffffff;
+  --borda: #eae5de;
+  --borda-suave: #f2efea;
+
+  --texto: #162a1e;
+  --texto-2: #5b6660;
+  --texto-3: #8f978f;
+  --texto-4: #b8bdb6;
+
+  --ok: #27ae60;
+  --ok-suave: #eaf7ef;
+  --erro: #e74c3c;
+  --erro-suave: #fdeeec;
+  --agendada: var(--laranja);
+  --agendada-suave: var(--laranja-suave);
+
+  --raio-sm: 8px;
+  --raio: 12px;
+  --raio-lg: 16px;
+  --sombra: 0 1px 2px rgba(22, 42, 30, .04), 0 2px 10px rgba(22, 42, 30, .04);
+  --sombra-hover: 0 2px 4px rgba(22, 42, 30, .05), 0 10px 28px rgba(22, 42, 30, .09);
+  --fonte: 'Comfortaa', system-ui, sans-serif;
+}
+
+/* ── Cabeçalho de página ─────────────────────────────────── */
+.ui-page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem }
+.ui-eyebrow { font-size: .68rem; font-weight: 700; color: var(--laranja); letter-spacing: .12em; text-transform: uppercase; margin-bottom: .45rem }
+.ui-title { font-size: 1.5rem; font-weight: 700; color: var(--texto); line-height: 1.2; letter-spacing: -.01em }
+.ui-sub { font-size: .8rem; color: var(--texto-3); margin-top: .35rem; line-height: 1.5 }
+.ui-header-actions { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center }
+
+.ui-breadcrumb { display: flex; align-items: center; gap: .45rem; font-size: .74rem; font-weight: 700; color: var(--texto-3); margin-bottom: .55rem; flex-wrap: wrap }
+.ui-breadcrumb a { color: var(--texto-3); text-decoration: none; display: inline-flex; align-items: center; gap: .3rem; transition: color .15s }
+.ui-breadcrumb a:hover { color: var(--laranja) }
+.ui-breadcrumb-sep { color: var(--texto-4) }
+.ui-breadcrumb-atual { color: var(--texto-2) }
+
+/* ── Botões ──────────────────────────────────────────────── */
+.ui-btn { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; padding: .62rem 1.15rem; border-radius: var(--raio-sm); border: 1.5px solid transparent; font-family: var(--fonte); font-size: .8rem; font-weight: 700; line-height: 1; cursor: pointer; text-decoration: none; white-space: nowrap; transition: background .15s, border-color .15s, color .15s, box-shadow .15s, transform .15s }
+.ui-btn:active { transform: translateY(1px) }
+.ui-btn:disabled { opacity: .55; cursor: not-allowed; transform: none }
+.ui-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(230, 126, 34, .25) }
+.ui-btn-primary { background: var(--laranja); color: #fff; box-shadow: 0 2px 8px rgba(230, 126, 34, .25) }
+.ui-btn-primary:hover:not(:disabled) { background: var(--laranja-escuro) }
+.ui-btn-dark { background: var(--verde); color: #fff }
+.ui-btn-dark:hover:not(:disabled) { background: var(--verde-escuro) }
+.ui-btn-secondary { background: var(--superficie); color: var(--texto); border-color: var(--borda) }
+.ui-btn-secondary:hover:not(:disabled) { border-color: var(--laranja); color: var(--laranja) }
+.ui-btn-ghost { background: transparent; color: var(--texto-2) }
+.ui-btn-ghost:hover:not(:disabled) { background: var(--fundo-2); color: var(--texto) }
+.ui-btn-danger { background: var(--superficie); color: var(--erro); border-color: #f6d3cf }
+.ui-btn-danger:hover:not(:disabled) { background: var(--erro-suave); border-color: var(--erro) }
+.ui-btn-success { background: var(--ok); color: #fff }
+.ui-btn-success:hover:not(:disabled) { background: #219150 }
+.ui-btn-sm { padding: .45rem .8rem; font-size: .72rem }
+.ui-btn-icon { width: 34px; height: 34px; padding: 0 }
+
+/* ── Cartões ─────────────────────────────────────────────── */
+.ui-card { background: var(--superficie); border-radius: var(--raio-lg); box-shadow: var(--sombra); border: 1px solid var(--borda-suave) }
+.ui-card-pad { padding: 1.25rem 1.4rem }
+.ui-card-header { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: 1.05rem 1.4rem; border-bottom: 1px solid var(--borda-suave) }
+.ui-card-title { font-size: .86rem; font-weight: 700; color: var(--texto); display: flex; align-items: center; gap: .5rem }
+.ui-card-title svg { color: var(--laranja) }
+.ui-card-link { font-size: .72rem; font-weight: 700; color: var(--laranja); text-decoration: none; display: inline-flex; align-items: center; gap: .25rem; white-space: nowrap }
+.ui-card-link:hover { text-decoration: underline }
+a.ui-card-hover, .ui-card-hover { transition: box-shadow .2s, transform .2s, border-color .2s }
+a.ui-card-hover:hover, .ui-card-hover:hover { box-shadow: var(--sombra-hover); transform: translateY(-2px) }
+
+.ui-section-label { font-size: .68rem; font-weight: 700; color: var(--texto-3); text-transform: uppercase; letter-spacing: .1em; margin: 1.6rem 0 .75rem; display: flex; align-items: center; gap: .6rem }
+.ui-section-label::after { content: ''; flex: 1; height: 1px; background: var(--borda) }
+
+/* ── KPIs ────────────────────────────────────────────────── */
+.ui-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 1rem; margin-bottom: 1.4rem }
+.ui-kpi { background: var(--superficie); border-radius: var(--raio-lg); padding: 1.15rem 1.25rem; box-shadow: var(--sombra); border: 1px solid var(--borda-suave); display: flex; gap: .9rem; align-items: flex-start }
+.ui-kpi-icon { width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0 }
+.ui-kpi-body { min-width: 0 }
+.ui-kpi-label { font-size: .68rem; font-weight: 700; color: var(--texto-3); text-transform: uppercase; letter-spacing: .06em }
+.ui-kpi-num { font-size: 1.55rem; font-weight: 700; color: var(--texto); line-height: 1.15; margin-top: .3rem; letter-spacing: -.02em; white-space: nowrap }
+.ui-kpi-num small { font-size: .78rem; font-weight: 700; color: var(--texto-3); margin-left: .15rem; letter-spacing: 0 }
+.ui-kpi-sub { font-size: .7rem; color: var(--texto-3); margin-top: .3rem }
+
+/* ── Status (badge suave) ────────────────────────────────── */
+.ui-badge { display: inline-flex; align-items: center; gap: .35rem; font-size: .68rem; font-weight: 700; padding: .28rem .65rem; border-radius: 999px; white-space: nowrap; line-height: 1.1 }
+.ui-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0 }
+.ui-badge-agendada { background: var(--agendada-suave); color: #c0651a }
+.ui-badge-realizada { background: var(--ok-suave); color: #1e8a4c }
+.ui-badge-cancelada { background: var(--erro-suave); color: #c0392b }
+.ui-badge-neutro { background: var(--fundo-2); color: var(--texto-2) }
+
+/* ── Segmentado / pills ──────────────────────────────────── */
+.ui-segmented { display: inline-flex; background: var(--fundo-2); border: 1px solid var(--borda); border-radius: 10px; padding: 3px; gap: 2px; flex-wrap: wrap }
+.ui-segmented button { font-family: var(--fonte); font-size: .72rem; font-weight: 700; color: var(--texto-3); background: transparent; border: none; border-radius: 7px; padding: .42rem .8rem; cursor: pointer; display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap; transition: background .15s, color .15s, box-shadow .15s }
+.ui-segmented button:hover { color: var(--texto) }
+.ui-segmented button.ativo { background: var(--superficie); color: var(--texto); box-shadow: 0 1px 3px rgba(22, 42, 30, .12) }
+.ui-segmented .ui-count { font-size: .66rem; background: var(--borda); color: var(--texto-2); border-radius: 999px; padding: .1rem .4rem; min-width: 1.3rem; text-align: center }
+.ui-segmented button.ativo .ui-count { background: var(--verde); color: #fff }
+
+/* ── Formulários ─────────────────────────────────────────── */
+.ui-field { margin-bottom: 1rem }
+.ui-label { display: block; font-size: .72rem; font-weight: 700; color: var(--texto-2); margin-bottom: .4rem }
+.ui-label .ui-req { color: var(--laranja) }
+.ui-hint { font-size: .7rem; color: var(--texto-3); margin-top: .35rem }
+.ui-input, .ui-select, .ui-textarea { width: 100%; padding: .7rem .9rem; border: 1.5px solid var(--borda); border-radius: var(--raio-sm); background: var(--superficie); font-family: var(--fonte); font-size: .84rem; color: var(--texto); outline: none; transition: border-color .15s, box-shadow .15s; box-sizing: border-box }
+.ui-input:hover, .ui-select:hover, .ui-textarea:hover { border-color: #ddd6cc }
+.ui-input:focus, .ui-select:focus, .ui-textarea:focus { border-color: var(--laranja); box-shadow: 0 0 0 3px rgba(230, 126, 34, .12) }
+.ui-input::placeholder, .ui-textarea::placeholder { color: var(--texto-4) }
+.ui-textarea { resize: vertical; min-height: 96px; line-height: 1.6 }
+.ui-select { appearance: none; -webkit-appearance: none; padding-right: 2.2rem; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238f978f' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .85rem center }
+.ui-input-sm, .ui-select-sm { padding: .45rem .75rem; font-size: .76rem; border-radius: 8px; width: auto }
+.ui-select-sm { padding-right: 2rem; background-position: right .65rem center }
+.ui-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem }
+@media (max-width: 640px) { .ui-grid-2 { grid-template-columns: 1fr } }
+
+/* ── Alertas ─────────────────────────────────────────────── */
+.ui-alert { display: flex; align-items: center; gap: .55rem; padding: .7rem .95rem; border-radius: var(--raio-sm); font-size: .8rem; font-weight: 700; margin-bottom: 1rem }
+.ui-alert-erro { background: var(--erro-suave); color: #b03a2e; border: 1px solid #f6d3cf }
+.ui-alert-ok { background: var(--ok-suave); color: #1e7a45; border: 1px solid #bfe6cf }
+
+/* ── Estados vazios e carregamento ───────────────────────── */
+.ui-empty { text-align: center; padding: 2.6rem 1.2rem; color: var(--texto-3) }
+.ui-empty-icon { width: 52px; height: 52px; border-radius: 50%; background: var(--fundo-2); color: var(--texto-4); display: flex; align-items: center; justify-content: center; margin: 0 auto .85rem }
+.ui-empty-title { font-size: .88rem; font-weight: 700; color: var(--texto-2) }
+.ui-empty-text { font-size: .76rem; margin-top: .3rem; line-height: 1.5 }
+.ui-empty .ui-btn { margin-top: 1rem }
+
+.ui-skeleton { background: linear-gradient(90deg, #f1eee9 25%, #f8f6f2 50%, #f1eee9 75%); background-size: 200% 100%; animation: ui-shimmer 1.3s infinite; border-radius: 8px }
+@keyframes ui-shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+
+/* ── Avatar e data compacta ──────────────────────────────── */
+.ui-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--verde); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .85rem; flex-shrink: 0 }
+.ui-avatar-sm { width: 26px; height: 26px; font-size: .68rem }
+.ui-avatar-lg { width: 46px; height: 46px; font-size: 1.05rem }
+
+.ui-date { width: 46px; flex-shrink: 0; text-align: center; background: var(--fundo-2); border: 1px solid var(--borda-suave); border-radius: 10px; padding: .35rem 0 .3rem }
+.ui-date-dia { font-size: 1.05rem; font-weight: 700; color: var(--texto); line-height: 1 }
+.ui-date-mes { font-size: .58rem; font-weight: 700; color: var(--texto-3); text-transform: uppercase; letter-spacing: .05em; margin-top: .2rem }
+
+/* ── Linhas de lista ─────────────────────────────────────── */
+.ui-row { display: flex; align-items: center; gap: .85rem; padding: .75rem 1.4rem; border-bottom: 1px solid var(--borda-suave); text-decoration: none; transition: background .15s }
+.ui-row:last-child { border-bottom: none }
+a.ui-row:hover { background: #fcfaf7 }
+.ui-row-main { flex: 1; min-width: 0 }
+.ui-row-title { font-size: .84rem; font-weight: 700; color: var(--texto); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.ui-row-meta { display: flex; align-items: center; gap: .35rem; font-size: .7rem; color: var(--texto-3); margin-top: .2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.ui-row-meta .ui-fazenda { color: var(--laranja); font-weight: 700 }
+.ui-dot-sep { width: 3px; height: 3px; border-radius: 50%; background: var(--texto-4); flex-shrink: 0 }
+
+/* ── Barra de progresso ──────────────────────────────────── */
+.ui-progress { height: 6px; background: var(--fundo-2); border-radius: 999px; overflow: hidden }
+.ui-progress > span { display: block; height: 100%; border-radius: 999px; background: var(--ok); transition: width .4s }
+
+/* ── Modal ───────────────────────────────────────────────── */
+.ui-modal-overlay { position: fixed; inset: 0; background: rgba(13, 31, 20, .45); backdrop-filter: blur(2px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; overflow-y: auto }
+.ui-modal { background: var(--superficie); border-radius: 18px; padding: 1.8rem; max-width: 560px; width: 100%; box-shadow: 0 24px 60px rgba(13, 31, 20, .25); max-height: 90vh; overflow-y: auto }

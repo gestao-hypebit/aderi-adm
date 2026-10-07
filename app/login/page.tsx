@@ -25,9 +25,16 @@ export default function LoginPage() {
     // Verifica o role do usuário para direcionar ao lugar certo
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, ativo')
       .eq('id', data.user.id)
       .single()
+
+    if (profile?.ativo === false) {
+      await supabase.auth.signOut()
+      setErro('Seu acesso está desativado. Fale com o administrador.')
+      setCarregando(false)
+      return
+    }
 
     if (profile?.role === 'admin') {
       router.push('/admin')

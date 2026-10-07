@@ -9,6 +9,36 @@ type SearchParams = Promise<{ inicio?: string; fim?: string; func?: string }>
 
 const MESES_ABREV = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
+const STATUS_LABEL: Record<string, string> = { agendada: 'Agendada', realizada: 'Realizada', cancelada: 'Cancelada' }
+
+function IconPlus() {
+  return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+}
+function IconCalendar() {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+}
+function IconCheck() {
+  return <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+}
+function IconTarget() {
+  return <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+}
+function IconRoute() {
+  return <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="6" cy="19" r="3"/><circle cx="18" cy="5" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/></svg>
+}
+function IconFuel() {
+  return <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 22V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v17"/><line x1="2" y1="22" x2="16" y2="22"/><line x1="6" y1="9" x2="12" y2="9"/><path d="M15 12h2a2 2 0 0 1 2 2v3a2 2 0 0 0 4 0V9l-3-3"/></svg>
+}
+function IconActivity() {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+}
+function IconUsers() {
+  return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+}
+function IconAlert() {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+}
+
 export default async function AdminPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
   const defaults = defaultFiltros('este-mes')
@@ -17,11 +47,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
   const funcionarioFiltro = params.func ?? ''
 
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: meuPerfil } = user
+    ? await supabase.from('profiles').select('nome_completo').eq('id', user.id).single()
+    : { data: null }
   const hoje = new Date().toISOString().split('T')[0]
 
   // Lista de colaboradores e clientes para o filter bar
   const [{ data: colaboradores }, { data: clientes }] = await Promise.all([
-    supabase.from('profiles').select('id, nome_completo').eq('role', 'colaborador').order('nome_completo'),
+    supabase.from('profiles').select('id, nome_completo').eq('role', 'colaborador').eq('ativo', true).order('nome_completo'),
     supabase.from('clientes').select('id, nome').order('nome'),
   ])
 
@@ -93,7 +127,30 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
     { data: historico },
     { data: proximasVisitas },
     { data: ultimasVisitas },
-  ] = await Promise.all([visitasQuery, kmQuery, abastQuery, historicoQuery, proximasQuery, ultimasQuery])
+    { data: atrasadas, count: totalAtrasadas },
+    { data: ultimasPorCliente },
+  ] = await Promise.all([
+    visitasQuery, kmQuery, abastQuery, historicoQuery, proximasQuery, ultimasQuery,
+    supabase
+      .from('visitas')
+      .select('id, data_visita, cliente:clientes(nome, nome_fazenda), funcionario:profiles(nome_completo)', { count: 'exact' })
+      .eq('status', 'agendada')
+      .lt('data_visita', hoje)
+      .order('data_visita')
+      .limit(5),
+    supabase.from('visitas').select('cliente_id, data_visita').eq('status', 'realizada').order('data_visita', { ascending: false }),
+  ])
+
+  // Clientes sem visita realizada há mais de 60 dias (ou nunca visitados)
+  const limite60 = new Date()
+  limite60.setDate(limite60.getDate() - 60)
+  const limite60ISO = limite60.toISOString().slice(0, 10)
+  const ultimaPorCliente = new Map<string, string>()
+  ;(ultimasPorCliente ?? []).forEach((v: any) => { if (!ultimaPorCliente.has(v.cliente_id)) ultimaPorCliente.set(v.cliente_id, v.data_visita) })
+  const esquecidos = clientesLista
+    .map(c => ({ ...c, ultima: ultimaPorCliente.get(c.id) ?? null }))
+    .filter(c => !c.ultima || c.ultima < limite60ISO)
+    .sort((a, b) => (a.ultima ?? '').localeCompare(b.ultima ?? ''))
 
   const visitasList = visitas ?? []
   const kmList = kms ?? []
@@ -175,57 +232,46 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
     ? colab.find(c => c.id === funcionarioFiltro)
     : null
 
+  const horaBR = Number(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false }))
+  const saudacao = horaBR < 12 ? 'Bom dia' : horaBR < 18 ? 'Boa tarde' : 'Boa noite'
+  const primeiroNome = (meuPerfil?.nome_completo ?? '').split(' ')[0]
+  const alertas = dadosColaboradores.filter(c => c.agendadas > 0 && c.realizadas === 0)
+  const fmtMoeda = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+
   return (
     <>
       <style>{`
-        .adm-page-header{margin-bottom:1.4rem}
-        .adm-page-title{font-size:1.4rem;font-weight:700;color:#162a1e}
-        .adm-page-sub{font-size:.8rem;color:#aaa;margin-top:.2rem}
-        .adm-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:1rem;margin-bottom:1.2rem}
-        .adm-kpi{background:#fff;border-radius:12px;padding:1.1rem 1.2rem;box-shadow:0 2px 8px rgba(0,0,0,.05);border-top:3px solid}
-        .adm-kpi-num{font-size:1.8rem;font-weight:900;color:#162a1e;line-height:1.1}
-        .adm-kpi-label{font-size:.7rem;font-weight:700;color:#aaa;margin-top:.3rem;text-transform:uppercase;letter-spacing:.04em}
-        .adm-kpi-sub{font-size:.7rem;color:#aaa;margin-top:.25rem}
-        .adm-colab-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1.2rem;margin-bottom:1.2rem}
-        .adm-colab-card{background:#fff;border-radius:14px;padding:1.3rem}
-        .adm-colab-header{display:flex;align-items:center;gap:.7rem;margin-bottom:1.1rem}
-        .adm-colab-avatar{width:42px;height:42px;border-radius:50%;background:#162a1e;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.05rem;flex-shrink:0}
-        .adm-colab-nome{font-weight:700;font-size:1rem;color:#162a1e}
-        .adm-colab-taxa{font-size:.72rem;color:#aaa;margin-top:.1rem}
-        .adm-bloco{margin-bottom:1rem}
-        .adm-bloco-titulo{font-size:.65rem;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem}
-        .adm-bloco-num{font-size:1.4rem;font-weight:700;color:#162a1e;line-height:1}
-        .adm-bloco-sub{font-size:.72rem;color:#888;margin-top:.2rem}
-        .adm-alert{margin-top:.6rem;padding:.6rem .8rem;background:#fdf3e9;border:1px solid #f5d9bd;border-radius:8px;font-size:.75rem;color:#b5651d}
-        .adm-empty{color:#aaa;text-align:center;padding:2rem}
-        .adm-link-visitas{display:inline-flex;align-items:center;gap:.4rem;font-size:.72rem;color:#E67E22;font-weight:700;text-decoration:none;margin-top:.8rem}
-        .adm-link-visitas:hover{text-decoration:underline}
-        .adm-atalhos{display:flex;gap:.8rem;margin-bottom:1.2rem;flex-wrap:wrap}
-        .adm-atalho{display:inline-flex;align-items:center;gap:.5rem;background:#fff;border-radius:10px;padding:.65rem 1.1rem;font-size:.78rem;font-weight:700;color:#162a1e;text-decoration:none;box-shadow:0 2px 6px rgba(0,0,0,.05);border:1.5px solid transparent;transition:all .15s}
-        .adm-atalho:hover{border-color:#E67E22;color:#E67E22}
-        .adm-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.2rem}
-        .adm-secao-card{background:#fff;border-radius:12px;padding:1.2rem 1.4rem;box-shadow:0 2px 8px rgba(0,0,0,.05)}
-        .adm-secao-titulo{font-size:.82rem;font-weight:700;color:#162a1e;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between}
-        .adm-secao-titulo a{font-size:.72rem;color:#E67E22;text-decoration:none;font-weight:700}
-        .adm-visita-row{display:flex;align-items:center;gap:.8rem;padding:.55rem 0;border-bottom:1px solid #f5f3ef;text-decoration:none}
-        .adm-visita-row:last-child{border-bottom:none}
-        .adm-data-mini{background:#f0ede8;border-radius:6px;padding:.25rem .5rem;text-align:center;min-width:36px;flex-shrink:0}
-        .adm-dia-mini{font-size:.88rem;font-weight:900;color:#162a1e;line-height:1}
-        .adm-mes-mini{font-size:.58rem;font-weight:700;color:#aaa;text-transform:uppercase}
-        .adm-info-mini{flex:1;min-width:0}
-        .adm-nome-mini{font-size:.82rem;font-weight:700;color:#162a1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .adm-fazenda-mini{font-size:.7rem;color:#E67E22;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .adm-colab-mini{font-size:.68rem;color:#aaa;margin-top:.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .adm-status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-        .adm-vazio-mini{text-align:center;padding:1.2rem;color:#aaa;font-size:.8rem}
-        @media(max-width:768px){.adm-grid-2{grid-template-columns:1fr}}
+        .adm-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;margin-bottom:1.4rem}
+        .adm-colab-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.1rem;margin-bottom:1.4rem}
+        .adm-colab-card{padding:1.25rem 1.3rem;display:flex;flex-direction:column;gap:1rem}
+        .adm-colab-header{display:flex;align-items:center;gap:.75rem}
+        .adm-colab-nome{font-weight:700;font-size:.95rem;color:#162a1e}
+        .adm-colab-sub{font-size:.7rem;color:#8f978f;margin-top:.15rem}
+        .adm-taxa-row{display:flex;justify-content:space-between;align-items:baseline;font-size:.7rem;color:#8f978f;font-weight:700;margin-bottom:.4rem}
+        .adm-taxa-row b{font-size:.85rem;color:#162a1e}
+        .adm-stats{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #f2efea;border-radius:12px;overflow:hidden}
+        .adm-stat{padding:.7rem .75rem;border-right:1px solid #f2efea;min-width:0}
+        .adm-stat:last-child{border-right:none}
+        .adm-stat-num{font-size:1rem;font-weight:700;color:#162a1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .adm-stat-label{font-size:.6rem;font-weight:700;color:#8f978f;text-transform:uppercase;letter-spacing:.06em;margin-top:.2rem}
+        .adm-stat-sub{font-size:.62rem;color:#b8bdb6;margin-top:.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .adm-colab-footer{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-top:auto}
+        .adm-alerta{display:flex;align-items:center;gap:.6rem;background:#fdf3e9;border:1px solid #f5d9bd;color:#a85a14;border-radius:12px;padding:.75rem 1rem;font-size:.78rem;font-weight:700;margin-bottom:1.4rem}
+        @media(max-width:900px){.adm-grid-2{grid-template-columns:1fr}}
       `}</style>
 
-      <div className="adm-page-header">
-        <div className="adm-page-title">Painel do Administrador</div>
-        <div className="adm-page-sub">
-          {colabFiltrado ? colabFiltrado.nome_completo : `${colab.length} colaborador(es)`}
-          {' · '}{nomePeriodo}
+      <div className="ui-page-header">
+        <div>
+          <div className="ui-eyebrow">Painel do administrador</div>
+          <div className="ui-title">{saudacao}{primeiroNome ? `, ${primeiroNome}` : ''}</div>
+          <div className="ui-sub">
+            {colabFiltrado ? `Exibindo dados de ${colabFiltrado.nome_completo}` : `Visão da equipe · ${colab.length} consultor${colab.length !== 1 ? 'es' : ''}`}
+            {' · '}{nomePeriodo}
+          </div>
+        </div>
+        <div className="ui-header-actions">
+          <Link href="/admin/agenda" className="ui-btn ui-btn-secondary"><IconCalendar /> Agenda</Link>
+          <Link href="/admin/visitas/novo" className="ui-btn ui-btn-primary"><IconPlus /> Nova visita</Link>
         </div>
       </div>
 
@@ -239,157 +285,211 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
         />
       </Suspense>
 
-      <div className="adm-atalhos">
-        <Link href="/admin/visitas" className="adm-atalho">Lista de visitas →</Link>
-        <Link href="/admin/relatorios" className="adm-atalho">Relatórios →</Link>
+      {/* KPIs */}
+      <div className="ui-kpis">
+        <div className="ui-kpi">
+          <div className="ui-kpi-icon" style={{ background: '#eaf7ef', color: '#27ae60' }}><IconCheck /></div>
+          <div className="ui-kpi-body">
+            <div className="ui-kpi-label">Visitas realizadas</div>
+            <div className="ui-kpi-num">{totalRealizadas}</div>
+            <div className="ui-kpi-sub">{totalAgendadas} ainda agendada{totalAgendadas !== 1 ? 's' : ''}</div>
+          </div>
+        </div>
+        <div className="ui-kpi">
+          <div className="ui-kpi-icon" style={{ background: '#e8ece9', color: '#162a1e' }}><IconTarget /></div>
+          <div className="ui-kpi-body">
+            <div className="ui-kpi-label">Taxa de conclusão</div>
+            <div className="ui-kpi-num">{taxaConclusao}<small>%</small></div>
+            <div className="ui-progress" style={{ marginTop: '.5rem', width: 120 }}><span style={{ width: `${taxaConclusao}%` }} /></div>
+          </div>
+        </div>
+        <div className="ui-kpi">
+          <div className="ui-kpi-icon" style={{ background: '#e8ece9', color: '#162a1e' }}><IconRoute /></div>
+          <div className="ui-kpi-body">
+            <div className="ui-kpi-label">KM rodado</div>
+            <div className="ui-kpi-num">{totalKm.toLocaleString('pt-BR')}<small>km</small></div>
+            <div className="ui-kpi-sub">no período</div>
+          </div>
+        </div>
+        <div className="ui-kpi">
+          <div className="ui-kpi-icon" style={{ background: '#fdf3e9', color: '#E67E22' }}><IconFuel /></div>
+          <div className="ui-kpi-body">
+            <div className="ui-kpi-label">Combustível</div>
+            <div className="ui-kpi-num">{fmtMoeda(totalGasto)}</div>
+            <div className="ui-kpi-sub">{totalLitros.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} litros abastecidos</div>
+          </div>
+        </div>
       </div>
 
-      {/* KPIs */}
-      <div className="adm-kpis">
-        <div className="adm-kpi" style={{ borderTopColor: '#27ae60' }}>
-          <div className="adm-kpi-num">{totalRealizadas}</div>
-          <div className="adm-kpi-label">Visitas realizadas</div>
-          <div className="adm-kpi-sub">{totalAgendadas} agendadas</div>
-        </div>
-        <div className="adm-kpi" style={{ borderTopColor: '#3498db' }}>
-          <div className="adm-kpi-num">{taxaConclusao}%</div>
-          <div className="adm-kpi-label">Taxa de conclusão</div>
-          <div className="adm-kpi-sub">{totalVisitas} visitas no período</div>
-        </div>
-        <div className="adm-kpi" style={{ borderTopColor: '#162a1e' }}>
-          <div className="adm-kpi-num" style={{ fontSize: '1.4rem' }}>
-            {totalKm.toLocaleString('pt-BR')} km
+      {/* Pendências */}
+      <div className="adm-grid-2">
+        <div className="ui-card">
+          <div className="ui-card-header">
+            <div className="ui-card-title" style={{ color: (totalAtrasadas ?? 0) > 0 ? '#c0392b' : undefined }}>
+              <IconAlert /> Visitas atrasadas
+              {(totalAtrasadas ?? 0) > 0 && <span className="ui-badge ui-badge-cancelada">{totalAtrasadas}</span>}
+            </div>
+            <Link href="/admin/visitas?status=atrasada" className="ui-card-link">Resolver →</Link>
           </div>
-          <div className="adm-kpi-label">KM rodado</div>
-          <div className="adm-kpi-sub">no período</div>
+          {!atrasadas?.length ? (
+            <div className="ui-empty" style={{ padding: '1.8rem 1rem' }}>
+              <div className="ui-empty-title">Nenhuma visita atrasada</div>
+              <div className="ui-empty-text">Toda visita agendada com data passada aparece aqui para ser finalizada ou reagendada.</div>
+            </div>
+          ) : atrasadas.map((v: any) => <LinhaVisita key={v.id} v={{ ...v, status: 'atrasada' }} />)}
         </div>
-        <div className="adm-kpi" style={{ borderTopColor: '#E67E22' }}>
-          <div className="adm-kpi-num" style={{ fontSize: '1.3rem' }}>
-            R$ {totalGasto.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+
+        <div className="ui-card">
+          <div className="ui-card-header">
+            <div className="ui-card-title"><IconUsers /> Clientes sem visita há 60+ dias
+              {esquecidos.length > 0 && <span className="ui-badge ui-badge-agendada">{esquecidos.length}</span>}
+            </div>
+            <Link href="/admin/clientes" className="ui-card-link">Ver carteira →</Link>
           </div>
-          <div className="adm-kpi-label">Gasto em combustível</div>
-          <div className="adm-kpi-sub">
-            {totalLitros.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} litros
-          </div>
+          {esquecidos.length === 0 ? (
+            <div className="ui-empty" style={{ padding: '1.8rem 1rem' }}>
+              <div className="ui-empty-title">Carteira em dia</div>
+              <div className="ui-empty-text">Todos os clientes receberam visita nos últimos 60 dias.</div>
+            </div>
+          ) : esquecidos.slice(0, 5).map(c => (
+            <div key={c.id} className="ui-row">
+              <div className="ui-avatar" style={{ borderRadius: 10, background: '#fdf3e9', color: '#E67E22' }}>{c.nome.charAt(0).toUpperCase()}</div>
+              <Link href={`/admin/clientes/${c.id}`} className="ui-row-main" style={{ textDecoration: 'none' }}>
+                <div className="ui-row-title">{c.nome}</div>
+                <div className="ui-row-meta">{c.ultima ? `Última visita em ${new Date(c.ultima + 'T12:00').toLocaleDateString('pt-BR')}` : 'Nunca visitado'}</div>
+              </Link>
+              <Link href={`/admin/visitas/novo?cliente=${c.id}`} className="ui-btn ui-btn-secondary ui-btn-sm"><IconPlus /> Agendar</Link>
+            </div>
+          ))}
         </div>
       </div>
+
+      {alertas.length > 0 && (
+        <div className="adm-alerta">
+          <IconAlert />
+          {alertas.length === 1
+            ? `${alertas[0].nome} tem visitas agendadas e nenhuma realizada no período.`
+            : `${alertas.length} consultores têm visitas agendadas e nenhuma realizada no período.`}
+        </div>
+      )}
 
       {/* Próximas visitas + Últimas atividades */}
       <div className="adm-grid-2">
-        <div className="adm-secao-card">
-          <div className="adm-secao-titulo">
-            Próximas visitas
-            <Link href="/admin/agenda">Ver agenda →</Link>
+        <div className="ui-card">
+          <div className="ui-card-header">
+            <div className="ui-card-title"><IconCalendar /> Próximas visitas</div>
+            <Link href="/admin/agenda" className="ui-card-link">Ver agenda →</Link>
           </div>
           {!proximasVisitas?.length ? (
-            <div className="adm-vazio-mini">Nenhuma visita agendada</div>
-          ) : proximasVisitas.map((v: any) => {
-            const d = new Date(v.data_visita + 'T12:00:00')
-            return (
-              <Link key={v.id} href={`/admin/visitas/${v.id}`} className="adm-visita-row">
-                <div className="adm-data-mini">
-                  <div className="adm-dia-mini">{String(d.getDate()).padStart(2, '0')}</div>
-                  <div className="adm-mes-mini">{d.toLocaleDateString('pt-BR', { month: 'short' })}</div>
-                </div>
-                <div className="adm-info-mini">
-                  <div className="adm-nome-mini">{v.cliente?.nome}</div>
-                  {v.cliente?.nome_fazenda && <div className="adm-fazenda-mini">{v.cliente.nome_fazenda}</div>}
-                  {v.funcionario?.nome_completo && <div className="adm-colab-mini">{v.funcionario.nome_completo}</div>}
-                </div>
-                <div className="adm-status-dot" style={{ background: '#E67E22' }} />
-              </Link>
-            )
-          })}
+            <div className="ui-empty">
+              <div className="ui-empty-icon"><IconCalendar /></div>
+              <div className="ui-empty-title">Nenhuma visita agendada</div>
+              <div className="ui-empty-text">As próximas visitas da equipe aparecem aqui.</div>
+            </div>
+          ) : proximasVisitas.map((v: any) => <LinhaVisita key={v.id} v={v} />)}
         </div>
 
-        <div className="adm-secao-card">
-          <div className="adm-secao-titulo">
-            Últimas atividades
-            <Link href="/admin/visitas">Ver todas →</Link>
+        <div className="ui-card">
+          <div className="ui-card-header">
+            <div className="ui-card-title"><IconActivity /> Últimas atividades</div>
+            <Link href="/admin/visitas" className="ui-card-link">Ver todas →</Link>
           </div>
           {!ultimasVisitas?.length ? (
-            <div className="adm-vazio-mini">Nenhuma atividade ainda</div>
-          ) : ultimasVisitas.map((v: any) => {
-            const d = new Date(v.data_visita + 'T12:00:00')
-            const statusCor: Record<string, string> = { agendada: '#E67E22', realizada: '#27ae60', cancelada: '#e74c3c' }
-            return (
-              <Link key={v.id} href={`/admin/visitas/${v.id}`} className="adm-visita-row">
-                <div className="adm-data-mini">
-                  <div className="adm-dia-mini">{String(d.getDate()).padStart(2, '0')}</div>
-                  <div className="adm-mes-mini">{d.toLocaleDateString('pt-BR', { month: 'short' })}</div>
-                </div>
-                <div className="adm-info-mini">
-                  <div className="adm-nome-mini">{v.cliente?.nome}</div>
-                  {v.cliente?.nome_fazenda && <div className="adm-fazenda-mini">{v.cliente.nome_fazenda}</div>}
-                  {v.funcionario?.nome_completo && <div className="adm-colab-mini">{v.funcionario.nome_completo}</div>}
-                </div>
-                <div className="adm-status-dot" style={{ background: statusCor[v.status] || '#aaa' }} />
-              </Link>
-            )
-          })}
+            <div className="ui-empty">
+              <div className="ui-empty-icon"><IconActivity /></div>
+              <div className="ui-empty-title">Nenhuma atividade ainda</div>
+              <div className="ui-empty-text">Visitas registradas pela equipe aparecem aqui.</div>
+            </div>
+          ) : ultimasVisitas.map((v: any) => <LinhaVisita key={v.id} v={v} />)}
         </div>
       </div>
 
-      {/* Charts */}
-      <AdminCharts visitasPorMes={visitasPorMes} colaboradores={dadosColaboradores} />
-
-      {/* Cards por colaborador */}
+      {/* Equipe */}
+      <div className="ui-section-label">Desempenho da equipe</div>
       {dadosColaboradores.length === 0 ? (
-        <div className="adm-empty">Nenhum colaborador cadastrado.</div>
+        <div className="ui-card">
+          <div className="ui-empty">
+            <div className="ui-empty-icon"><IconUsers /></div>
+            <div className="ui-empty-title">Nenhum consultor cadastrado</div>
+            <div className="ui-empty-text">Quando um colaborador criar a conta, ele aparece aqui.</div>
+          </div>
+        </div>
       ) : (
         <div className="adm-colab-grid">
           {dadosColaboradores.map(c => {
-            const taxa = (c.realizadas + c.agendadas) > 0
-              ? Math.round((c.realizadas / (c.realizadas + c.agendadas)) * 100)
-              : 0
+            const total = c.realizadas + c.agendadas
+            const taxa = total > 0 ? Math.round((c.realizadas / total) * 100) : 0
             const consumo = c.litros > 0 ? (c.km / c.litros) : null
             return (
-              <div key={c.id} className="adm-colab-card">
+              <div key={c.id} className="ui-card adm-colab-card">
                 <div className="adm-colab-header">
-                  <div className="adm-colab-avatar">{c.nome.charAt(0).toUpperCase()}</div>
-                  <div>
-                    <div className="adm-colab-nome">{c.nome}</div>
-                    <div className="adm-colab-taxa" style={{ color: taxa >= 70 ? '#27ae60' : '#E67E22' }}>
-                      {taxa}% de conclusão
-                    </div>
+                  <div className="ui-avatar ui-avatar-lg">{c.nome.charAt(0).toUpperCase()}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <Link href={`/admin/consultores/${c.id}`} className="adm-colab-nome" style={{ textDecoration: 'none', display: 'block' }}>{c.nome}</Link>
+                    <div className="adm-colab-sub">{total} visita{total !== 1 ? 's' : ''} no período</div>
                   </div>
                 </div>
 
-                <div className="adm-bloco">
-                  <div className="adm-bloco-titulo">Visitas</div>
-                  <div className="adm-bloco-num">{c.realizadas} <span style={{ fontSize: '.85rem', color: '#888', fontWeight: 400 }}>realizadas</span></div>
-                  <div className="adm-bloco-sub">{c.agendadas} agendadas · {c.canceladas} canceladas</div>
-                </div>
-
-                <div className="adm-bloco">
-                  <div className="adm-bloco-titulo">KM rodado</div>
-                  <div className="adm-bloco-num">{c.km.toLocaleString('pt-BR')} km</div>
-                </div>
-
-                <div className="adm-bloco" style={{ marginBottom: 0 }}>
-                  <div className="adm-bloco-titulo">Combustível</div>
-                  <div className="adm-bloco-num" style={{ fontSize: '1.2rem' }}>
-                    R$ {c.gasto.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  </div>
-                  <div className="adm-bloco-sub">
-                    {c.litros.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} litros
-                    {consumo != null && (
-                      <> · {consumo.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km/L</>
-                    )}
+                <div>
+                  <div className="adm-taxa-row"><span>Conclusão</span><b>{taxa}%</b></div>
+                  <div className="ui-progress">
+                    <span style={{ width: `${taxa}%`, background: taxa >= 70 ? '#27ae60' : '#E67E22' }} />
                   </div>
                 </div>
 
-                <Link
-                  href={`/admin/agenda?func=${c.id}`}
-                  className="adm-link-visitas"
-                >
-                  Ver agenda →
-                </Link>
+                <div className="adm-stats">
+                  <div className="adm-stat">
+                    <div className="adm-stat-num">{c.realizadas}</div>
+                    <div className="adm-stat-label">Realizadas</div>
+                    <div className="adm-stat-sub">{c.agendadas} agend. · {c.canceladas} canc.</div>
+                  </div>
+                  <div className="adm-stat">
+                    <div className="adm-stat-num">{c.km.toLocaleString('pt-BR')}</div>
+                    <div className="adm-stat-label">KM</div>
+                    <div className="adm-stat-sub">{consumo != null ? `${consumo.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km/L` : '—'}</div>
+                  </div>
+                  <div className="adm-stat">
+                    <div className="adm-stat-num">{fmtMoeda(c.gasto)}</div>
+                    <div className="adm-stat-label">Combustível</div>
+                    <div className="adm-stat-sub">{c.litros.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} L</div>
+                  </div>
+                </div>
+
+                <div className="adm-colab-footer">
+                  <Link href={`/admin/agenda?func=${c.id}`} className="ui-btn ui-btn-secondary ui-btn-sm">Ver agenda</Link>
+                  <Link href={`/admin/visitas/novo?funcionario=${c.id}`} className="ui-btn ui-btn-ghost ui-btn-sm"><IconPlus /> Agendar</Link>
+                </div>
               </div>
             )
           })}
         </div>
       )}
+
+      {/* Charts */}
+      <div className="ui-section-label">Tendências</div>
+      <AdminCharts visitasPorMes={visitasPorMes} colaboradores={dadosColaboradores} />
     </>
+  )
+}
+
+function LinhaVisita({ v }: { v: any }) {
+  const d = new Date(v.data_visita + 'T12:00:00')
+  return (
+    <Link href={`/admin/visitas/${v.id}`} className="ui-row">
+      <div className="ui-date">
+        <div className="ui-date-dia">{String(d.getDate()).padStart(2, '0')}</div>
+        <div className="ui-date-mes">{d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}</div>
+      </div>
+      <div className="ui-row-main">
+        <div className="ui-row-title">{v.cliente?.nome ?? 'Cliente removido'}</div>
+        <div className="ui-row-meta">
+          {v.cliente?.nome_fazenda && <><span className="ui-fazenda">{v.cliente.nome_fazenda}</span><span className="ui-dot-sep" /></>}
+          {v.funcionario?.nome_completo && <span>{v.funcionario.nome_completo}</span>}
+        </div>
+      </div>
+      {v.status === 'atrasada'
+        ? <span className="ui-badge ui-badge-cancelada">Atrasada</span>
+        : <span className={`ui-badge ui-badge-${v.status}`}>{STATUS_LABEL[v.status] ?? v.status}</span>}
+    </Link>
   )
 }

@@ -93,40 +93,36 @@ export default function RelatorioVisitasContent({ isAdmin, backUrl }: Props) {
   return (
     <>
       <style>{`
-        .rvp-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;flex-wrap:wrap;gap:.8rem}
-        .rvp-title-area{display:flex;align-items:center;gap:.7rem}
-        .rvp-back{display:inline-flex;align-items:center;gap:.35rem;color:#E67E22;font-size:.82rem;font-weight:700;text-decoration:none;background:none;border:none;cursor:pointer;font-family:'Comfortaa',sans-serif;padding:0}
-        .rvp-title{font-size:1.2rem;font-weight:700;color:#162a1e}
-        .rvp-sep{color:#ccc}
         .status-filtros{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem}
-        .rvp-btn{display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .95rem;border-radius:20px;border:1.5px solid #eae5de;font-family:'Comfortaa',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer;background:#fff;color:#888;transition:all .2s}
-        .rvp-btn.ativo{color:#fff}
         .rvp-lista{display:flex;flex-direction:column;gap:.7rem}
-        .rvp-card{background:#fff;border-radius:12px;padding:1rem 1.2rem;box-shadow:0 2px 6px rgba(0,0,0,.04);display:flex;align-items:center;gap:1rem;text-decoration:none;transition:box-shadow .2s;border-left:4px solid}
-        .rvp-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.1)}
-        .rvp-data-box{text-align:center;background:#f0ede8;border-radius:8px;padding:.4rem .7rem;min-width:44px;flex-shrink:0}
-        .rvp-dia{font-size:1.2rem;font-weight:900;color:#162a1e;line-height:1}
+        .rvp-card{background:#fff;border-radius:14px;padding:.95rem 1.2rem;box-shadow:0 1px 2px rgba(22,42,30,.04),0 2px 10px rgba(22,42,30,.04);border:1px solid #f2efea;display:flex;align-items:center;gap:1rem;text-decoration:none;transition:box-shadow .2s}
+        .rvp-card:hover{box-shadow:0 10px 28px rgba(22,42,30,.09)}
+        .rvp-data-box{text-align:center;background:#f7f5f1;border:1px solid #f2efea;border-radius:10px;padding:.4rem 0;width:48px;flex-shrink:0}
+        .rvp-dia{font-size:1.1rem;font-weight:700;color:#162a1e;line-height:1}
         .rvp-mes{font-size:.62rem;font-weight:700;color:#aaa;text-transform:uppercase}
         .rvp-info{flex:1;min-width:0}
         .rvp-cliente{font-size:.92rem;font-weight:700;color:#162a1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .rvp-fazenda{display:flex;align-items:center;gap:.3rem;font-size:.75rem;color:#E67E22;font-weight:700;margin:.15rem 0}
         .rvp-func{display:flex;align-items:center;gap:.3rem;font-size:.72rem;color:#888;margin-top:.1rem}
         .rvp-motivo{display:flex;align-items:center;gap:.3rem;font-size:.72rem;color:#888;margin-top:.1rem}
-        .rvp-actions{display:flex;flex-direction:column;align-items:flex-end;gap:.4rem;flex-shrink:0}
-        .rvp-status{font-size:.7rem;font-weight:700;padding:.2rem .6rem;border-radius:20px;color:#fff;white-space:nowrap}
+        .rvp-actions{display:flex;align-items:center;gap:.7rem;flex-shrink:0}
         .rvp-pdf{display:inline-flex;align-items:center;gap:.35rem;font-size:.75rem;font-weight:700;color:#E67E22;background:#fdf3e9;border:1.5px solid #f5d9bd;border-radius:8px;padding:.35rem .8rem;white-space:nowrap;transition:background .15s}
         .rvp-pdf:hover{background:#fbe7d3}
         .rvp-vazio{text-align:center;padding:3rem 1rem;color:#aaa}
         .rvp-vazio-icon{display:flex;justify-content:center;margin-bottom:.8rem}
-        .rvp-contador{font-size:.78rem;color:#aaa;margin-bottom:.8rem}
-        @media(max-width:600px){.rvp-card{flex-wrap:wrap}}
+        .rvp-contador{font-size:.74rem;color:#8f978f;font-weight:700;margin-bottom:.8rem}
+        @media(max-width:600px){.rvp-card{flex-wrap:wrap}.rvp-actions{width:100%;justify-content:space-between}}
       `}</style>
 
-      <div className="rvp-header">
-        <div className="rvp-title-area">
-          <Link href={backUrl} className="rvp-back"><IconArrowLeft /> Relatórios</Link>
-          <span className="rvp-sep">/</span>
-          <div className="rvp-title">Visitas</div>
+      <div className="ui-breadcrumb">
+        <Link href={backUrl}><IconArrowLeft /> Relatórios</Link>
+        <span className="ui-breadcrumb-sep">/</span>
+        <span className="ui-breadcrumb-atual">Visitas</span>
+      </div>
+      <div className="ui-page-header">
+        <div>
+          <div className="ui-title">Visitas</div>
+          <div className="ui-sub">Abra o relatório em PDF de cada visita, com dados do produtor, recomendações e fotos</div>
         </div>
       </div>
 
@@ -139,16 +135,20 @@ export default function RelatorioVisitasContent({ isAdmin, backUrl }: Props) {
       />
 
       <div className="status-filtros">
-        {(['todos', 'agendada', 'realizada', 'cancelada'] as const).map(s => (
-          <button
-            key={s}
-            className={`rvp-btn ${filtroStatus === s ? 'ativo' : ''}`}
-            style={filtroStatus === s ? { background: s === 'todos' ? '#162a1e' : statusCor[s], borderColor: s === 'todos' ? '#162a1e' : statusCor[s] } : {}}
-            onClick={() => setFiltroStatus(s)}
-          >
-            {s === 'todos' ? 'Todas' : s.charAt(0).toUpperCase() + s.slice(1)}
-          </button>
-        ))}
+        <div className="ui-segmented" role="tablist" aria-label="Filtrar por status">
+          {(['todos', 'agendada', 'realizada', 'cancelada'] as const).map(s => (
+            <button
+              key={s}
+              role="tab"
+              aria-selected={filtroStatus === s}
+              className={filtroStatus === s ? 'ativo' : ''}
+              onClick={() => setFiltroStatus(s)}
+            >
+              {s !== 'todos' && <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusCor[s] }} />}
+              {s === 'todos' ? 'Todas' : s.charAt(0).toUpperCase() + s.slice(1) + 's'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {!carregando && (
@@ -169,7 +169,7 @@ export default function RelatorioVisitasContent({ isAdmin, backUrl }: Props) {
           {visitasFiltradas.map(v => {
             const d = new Date(v.data_visita + 'T12:00:00')
             return (
-              <div key={v.id} className="rvp-card" style={{ borderLeftColor: statusCor[v.status] || '#ccc' }}>
+              <div key={v.id} className="rvp-card">
                 <div className="rvp-data-box">
                   <div className="rvp-dia">{String(d.getDate()).padStart(2, '0')}</div>
                   <div className="rvp-mes">{d.toLocaleDateString('pt-BR', { month: 'short' })}</div>
@@ -183,10 +183,10 @@ export default function RelatorioVisitasContent({ isAdmin, backUrl }: Props) {
                   {v.motivo_visita && <div className="rvp-motivo">{v.motivo_visita}</div>}
                 </div>
                 <div className="rvp-actions">
-                  <div className="rvp-status" style={{ background: statusCor[v.status] || '#aaa' }}>
+                  <span className={`ui-badge ui-badge-${v.status}`}>
                     {v.status.charAt(0).toUpperCase() + v.status.slice(1)}
-                  </div>
-                  <Link href={`/dashboard/relatorios/visitas/${v.id}`} className="rvp-pdf">
+                  </span>
+                  <Link href={isAdmin ? `/admin/relatorios/visitas/${v.id}` : `/dashboard/relatorios/visitas/${v.id}`} className="rvp-pdf">
                     <IconPdf /> Ver PDF
                   </Link>
                 </div>

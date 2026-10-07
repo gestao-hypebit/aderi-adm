@@ -27,8 +27,10 @@ type Props = {
   colaboradores: DadosColaborador[]
 }
 
-const FONT = { fontSize: 11, fontFamily: 'Comfortaa', fill: '#aaa' }
-const TOOLTIP_STYLE = { fontFamily: 'Comfortaa', fontSize: 12, borderRadius: 8, border: '1px solid #eae5de' }
+const FONT = { fontSize: 11, fontFamily: 'Comfortaa', fill: '#8f978f' }
+const TOOLTIP_STYLE = { fontFamily: 'Comfortaa', fontSize: 12, borderRadius: 10, border: '1px solid #eae5de', boxShadow: '0 8px 24px rgba(22,42,30,.12)', padding: '.5rem .75rem' }
+const CURSOR = { fill: 'rgba(22,42,30,.04)' }
+const LEGEND = { fontSize: 11, fontFamily: 'Comfortaa', paddingTop: 6 }
 
 export default function AdminCharts({ visitasPorMes, colaboradores }: Props) {
   const dadosVisitas = colaboradores.map(c => ({
@@ -47,70 +49,74 @@ export default function AdminCharts({ visitasPorMes, colaboradores }: Props) {
   return (
     <>
       <style>{`
-        .adm-charts-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.2rem}
+        .adm-charts-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.1rem;margin-bottom:1.4rem}
         @media(max-width:1100px){.adm-charts-grid{grid-template-columns:1fr 1fr}}
         @media(max-width:700px){.adm-charts-grid{grid-template-columns:1fr}}
-        .adm-chart-card{background:#fff;border-radius:12px;padding:1.2rem 1.4rem;box-shadow:0 2px 8px rgba(0,0,0,.05)}
-        .adm-chart-titulo{font-size:.78rem;font-weight:700;color:#162a1e;margin-bottom:.9rem}
-        .adm-chart-vazio{color:#bbb;font-size:.78rem;text-align:center;padding:1.5rem 0}
+        .adm-chart-card{padding:1.15rem 1.25rem 1rem}
+        .adm-chart-titulo{font-size:.84rem;font-weight:700;color:#162a1e}
+        .adm-chart-sub{font-size:.68rem;color:#8f978f;margin:.2rem 0 .9rem}
+        .adm-chart-vazio{color:#b8bdb6;font-size:.78rem;text-align:center;padding:3.5rem 0}
       `}</style>
 
       <div className="adm-charts-grid">
         {/* Visitas por mês */}
-        <div className="adm-chart-card">
-          <div className="adm-chart-titulo">Visitas — últimos 6 meses</div>
+        <div className="ui-card adm-chart-card">
+          <div className="adm-chart-titulo">Visitas por mês</div>
+          <div className="adm-chart-sub">Últimos 6 meses</div>
           {visitasPorMes.length === 0 ? (
             <div className="adm-chart-vazio">Sem dados</div>
           ) : (
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer width="100%" height={200}>
               <BarChart data={visitasPorMes} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0ede8" />
-                <XAxis dataKey="mes" tick={FONT} />
-                <YAxis tick={FONT} allowDecimals={false} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} />
-                <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'Comfortaa' }} />
-                <Bar dataKey="realizadas" name="Realizadas" fill="#27ae60" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="agendadas" name="Agendadas" fill="#E67E22" radius={[3, 3, 0, 0]} />
+                <CartesianGrid vertical={false} stroke="#f2efea" />
+                <XAxis dataKey="mes" tick={FONT} axisLine={false} tickLine={false} />
+                <YAxis tick={FONT} allowDecimals={false} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={CURSOR} />
+                <Legend wrapperStyle={LEGEND} iconType="circle" iconSize={8} />
+                <Bar dataKey="realizadas" name="Realizadas" fill="#27ae60" radius={[5, 5, 0, 0]} maxBarSize={28} />
+                <Bar dataKey="agendadas" name="Agendadas" fill="#E67E22" radius={[5, 5, 0, 0]} maxBarSize={28} />
               </BarChart>
             </ResponsiveContainer>
           )}
         </div>
 
         {/* Visitas por colaborador */}
-        <div className="adm-chart-card">
-          <div className="adm-chart-titulo">Visitas por consultor — período</div>
+        <div className="ui-card adm-chart-card">
+          <div className="adm-chart-titulo">Visitas por consultor</div>
+          <div className="adm-chart-sub">Período selecionado</div>
           {dadosVisitas.length === 0 ? (
             <div className="adm-chart-vazio">Sem dados</div>
           ) : (
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer width="100%" height={200}>
               <BarChart data={dadosVisitas} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0ede8" />
-                <XAxis dataKey="nome" tick={FONT} />
-                <YAxis tick={FONT} allowDecimals={false} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} />
-                <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'Comfortaa' }} />
-                <Bar dataKey="Realizadas" fill="#27ae60" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="Agendadas" fill="#E67E22" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="Canceladas" fill="#e74c3c" radius={[3, 3, 0, 0]} />
+                <CartesianGrid vertical={false} stroke="#f2efea" />
+                <XAxis dataKey="nome" tick={FONT} axisLine={false} tickLine={false} />
+                <YAxis tick={FONT} allowDecimals={false} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={CURSOR} />
+                <Legend wrapperStyle={LEGEND} iconType="circle" iconSize={8} />
+                <Bar dataKey="Realizadas" fill="#27ae60" radius={[5, 5, 0, 0]} maxBarSize={28} />
+                <Bar dataKey="Agendadas" fill="#E67E22" radius={[5, 5, 0, 0]} maxBarSize={28} />
+                <Bar dataKey="Canceladas" fill="#e74c3c" radius={[5, 5, 0, 0]} maxBarSize={28} />
               </BarChart>
             </ResponsiveContainer>
           )}
         </div>
 
         {/* KM por colaborador */}
-        <div className="adm-chart-card">
-          <div className="adm-chart-titulo">KM por consultor — período</div>
+        <div className="ui-card adm-chart-card">
+          <div className="adm-chart-titulo">KM por consultor</div>
+          <div className="adm-chart-sub">Período selecionado</div>
           {dadosKm.length === 0 ? (
             <div className="adm-chart-vazio">Sem dados</div>
           ) : (
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer width="100%" height={200}>
               <BarChart data={dadosKm} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0ede8" />
-                <XAxis dataKey="nome" tick={FONT} />
-                <YAxis tick={FONT} allowDecimals={false} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} />
-                <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'Comfortaa' }} />
-                <Bar dataKey="KM rodado" fill="#162a1e" radius={[3, 3, 0, 0]} />
+                <CartesianGrid vertical={false} stroke="#f2efea" />
+                <XAxis dataKey="nome" tick={FONT} axisLine={false} tickLine={false} />
+                <YAxis tick={FONT} allowDecimals={false} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={CURSOR} />
+                <Legend wrapperStyle={LEGEND} iconType="circle" iconSize={8} />
+                <Bar dataKey="KM rodado" fill="#162a1e" radius={[5, 5, 0, 0]} maxBarSize={28} />
               </BarChart>
             </ResponsiveContainer>
           )}

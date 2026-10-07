@@ -31,6 +31,7 @@ type Colaborador = { id: string; nome_completo: string }
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 const DIAS_SEMANA = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
+const DIAS_SEMANA_LONGO = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado']
 
 const statusCor: Record<string, string> = {
   agendada: '#E67E22',
@@ -46,6 +47,13 @@ function IconUser({ color = '#888', size = 12 }: { color?: string; size?: number
 }
 function IconCalendarEmpty({ color = '#ccc' }: { color?: string }) {
   return <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+}
+
+function IconPlus() {
+  return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+}
+function IconChevron({ dir }: { dir: 'left' | 'right' }) {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><polyline points={dir === 'left' ? '15 18 9 12 15 6' : '9 18 15 12 9 6'}/></svg>
 }
 
 function normalizar(raw: VisitaRaw): Visita {
@@ -66,10 +74,11 @@ export default function AdminAgendaPage() {
   const [visitas, setVisitas] = useState<Visita[]>([])
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([])
   const [diaSelecionado, setDiaSelecionado] = useState<number | null>(hoje.getDate())
+  const [visao, setVisao] = useState<'mes' | 'lista'>('mes')
   const [funcionarioId, setFuncionarioId] = useState(() => searchParams.get('func') ?? '')
 
   useEffect(() => {
-    supabase.from('profiles').select('id, nome_completo').eq('role', 'colaborador').order('nome_completo')
+    supabase.from('profiles').select('id, nome_completo').eq('role', 'colaborador').eq('ativo', true).order('nome_completo')
       .then(({ data }) => setColaboradores(data || []))
   }, [])
 
@@ -129,169 +138,261 @@ export default function AdminAgendaPage() {
   const isHoje = (dia: number) =>
     dia === hoje.getDate() && mes === hoje.getMonth() && ano === hoje.getFullYear()
 
+  function irParaHoje() {
+    setMes(hoje.getMonth())
+    setAno(hoje.getFullYear())
+    setDiaSelecionado(hoje.getDate())
+  }
+
+  const totalMes = visitas.length
+  const realizadasMes = visitas.filter(v => v.status === 'realizada').length
+  const agendadasMes = visitas.filter(v => v.status === 'agendada').length
+  const diaSemanaSel = diaSelecionado ? DIAS_SEMANA_LONGO[new Date(ano, mes, diaSelecionado).getDay()] : ''
+
   return (
     <>
       <style>{`
-        .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem}
-        .page-title{font-size:1.3rem;font-weight:700;color:#162a1e}
-        .page-sub{font-size:.8rem;color:#aaa;margin-top:.2rem}
-        .btn-nova{display:inline-flex;align-items:center;gap:.5rem;background:#E67E22;color:#fff;padding:.7rem 1.4rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;font-weight:700;border:none;cursor:pointer;transition:background .2s;text-decoration:none}
-        .btn-nova:hover{background:#d35400}
-        .cal-card{background:#fff;border-radius:16px;padding:1.5rem;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:1.2rem}
-        .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem}
-        .cal-mes-ano{font-size:1.05rem;font-weight:700;color:#162a1e}
-        .cal-btn{background:#f0ede8;border:none;border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:1rem;color:#162a1e;display:flex;align-items:center;justify-content:center;transition:background .2s}
-        .cal-btn:hover{background:#e0dbd2}
-        .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-        .cal-header-dia{text-align:center;font-size:.65rem;font-weight:700;color:#aaa;letter-spacing:.04em;padding:.3rem 0;text-transform:uppercase}
-        .cal-cel{min-height:52px;border-radius:10px;padding:4px;cursor:pointer;transition:all .15s;position:relative;display:flex;flex-direction:column;align-items:center}
-        .cal-cel:hover{background:#f0ede8}
-        .cal-cel.vazia{cursor:default;pointer-events:none}
-        .cal-cel.hoje .cal-num{background:#162a1e;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center}
-        .cal-cel.selecionado{background:#fff8f3;border:1.5px solid #E67E22}
-        .cal-cel.tem-visita{background:#fdfaf6}
-        .cal-num{font-size:.82rem;font-weight:700;color:#162a1e;width:26px;height:26px;display:flex;align-items:center;justify-content:center;margin-bottom:2px}
-        .cal-num.passado{color:#ccc}
-        .cal-dots{display:flex;gap:2px;flex-wrap:wrap;justify-content:center;max-width:44px}
-        .cal-dot{width:6px;height:6px;border-radius:50%}
-        .legenda{display:flex;gap:1rem;margin-top:.8rem;flex-wrap:wrap}
-        .legenda-item{display:flex;align-items:center;gap:.4rem;font-size:.72rem;color:#888}
-        .legenda-dot{width:8px;height:8px;border-radius:50%}
-        .dia-painel{background:#fff;border-radius:16px;padding:1.5rem;box-shadow:0 2px 12px rgba(0,0,0,.06)}
-        .dia-titulo{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;flex-wrap:wrap;gap:.8rem}
-        .dia-titulo-texto{font-size:1rem;font-weight:700;color:#162a1e}
-        .dia-titulo-sub{font-size:.78rem;color:#aaa;margin-top:.15rem}
-        .btn-agendar{display:inline-flex;align-items:center;gap:.4rem;background:#162a1e;color:#fff;padding:.6rem 1.2rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.78rem;font-weight:700;text-decoration:none;transition:background .2s}
-        .btn-agendar:hover{background:#0d1f14}
-        .visita-item{display:flex;align-items:flex-start;gap:.8rem;padding:.9rem 1rem;border-radius:10px;border:1px solid #f0ede8;margin-bottom:.6rem;transition:border-color .2s;cursor:pointer;text-decoration:none}
-        .visita-item:hover{border-color:#E67E22;background:#fff8f3}
-        .visita-status-bar{width:3px;border-radius:2px;align-self:stretch;flex-shrink:0}
-        .visita-info{flex:1;min-width:0}
-        .visita-cliente{font-size:.88rem;font-weight:700;color:#162a1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .visita-fazenda{display:flex;align-items:center;gap:.35rem;font-size:.75rem;color:#E67E22;font-weight:700;margin:.15rem 0}
-        .visita-colab{display:flex;align-items:center;gap:.35rem;font-size:.72rem;color:#888}
-        .visita-badge{display:inline-flex;align-items:center;gap:.3rem;font-size:.68rem;font-weight:700;padding:.2rem .5rem;border-radius:10px;color:#fff;margin-top:.3rem}
-        .dia-vazio{text-align:center;padding:2.5rem 1rem;color:#bbb}
-        .dia-vazio-icon{display:flex;justify-content:center;margin-bottom:.5rem}
-        .dia-vazio-txt{font-size:.85rem}
-        @media(max-width:600px){.cal-cel{min-height:44px}.cal-num{font-size:.75rem}}
+        .ag-colabs{display:flex;gap:.45rem;flex-wrap:wrap;margin-bottom:1.3rem}
+        .ag-colab{display:inline-flex;align-items:center;gap:.5rem;background:#fff;border:1.5px solid #eae5de;border-radius:999px;padding:.3rem .85rem .3rem .3rem;font-family:'Comfortaa',sans-serif;font-size:.74rem;font-weight:700;color:#5b6660;cursor:pointer;transition:all .15s}
+        .ag-colab:hover{border-color:#cfc8bd;color:#162a1e}
+        .ag-colab.ativo{background:#162a1e;border-color:#162a1e;color:#fff}
+        .ag-colab.ativo .ui-avatar{background:#E67E22}
+        .ag-colab-todos{padding:.45rem .9rem}
+        .ag-layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:1.2rem;align-items:start}
+        .ag-cal{padding:1.3rem 1.4rem 1.2rem}
+        .ag-nav{display:flex;align-items:center;gap:.6rem;margin-bottom:1.1rem}
+        .ag-mes{font-size:1.1rem;font-weight:700;color:#162a1e;margin-right:auto}
+        .ag-mes-resumo{font-size:.7rem;color:#8f978f;font-weight:700;margin-top:.2rem}
+        .ag-nav-btn{background:#fff;border:1.5px solid #eae5de;border-radius:9px;width:34px;height:34px;cursor:pointer;color:#162a1e;display:flex;align-items:center;justify-content:center;transition:all .15s}
+        .ag-nav-btn:hover{border-color:#E67E22;color:#E67E22}
+        .ag-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+        .ag-dow{text-align:center;font-size:.62rem;font-weight:700;color:#8f978f;letter-spacing:.08em;padding:.3rem 0 .45rem;text-transform:uppercase}
+        .ag-cel{min-height:78px;border-radius:11px;padding:.45rem .5rem;cursor:pointer;transition:background .15s,border-color .15s;border:1.5px solid transparent;background:#faf8f5;display:flex;flex-direction:column;gap:.35rem;text-align:left;font-family:'Comfortaa',sans-serif}
+        .ag-cel:hover{background:#f3efe9}
+        .ag-cel.vazia{background:transparent;cursor:default;pointer-events:none}
+        .ag-cel.fim-semana{background:#f7f5f1}
+        .ag-cel.selecionado{background:#fff;border-color:#E67E22;box-shadow:0 4px 14px rgba(230,126,34,.15)}
+        .ag-num{font-size:.78rem;font-weight:700;color:#162a1e;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+        .ag-num.passado{color:#b8bdb6}
+        .ag-cel.hoje .ag-num{background:#162a1e;color:#fff}
+        .ag-pills{display:flex;flex-direction:column;gap:3px;min-width:0}
+        .ag-pill{display:flex;align-items:center;gap:.3rem;font-size:.6rem;font-weight:700;border-radius:5px;padding:.15rem .35rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .ag-pill-agendada{background:#fdf3e9;color:#b5651d}
+        .ag-pill-realizada{background:#eaf7ef;color:#1e8a4c}
+        .ag-pill-cancelada{background:#fdeeec;color:#c0392b;text-decoration:line-through}
+        .ag-mais{font-size:.6rem;font-weight:700;color:#8f978f;padding-left:.35rem}
+        .ag-legenda{display:flex;gap:1rem;margin-top:1rem;flex-wrap:wrap}
+        .ag-lista{display:flex;flex-direction:column;gap:.2rem}
+        .ag-lista-dia{display:flex;gap:1rem;padding:.7rem 0;border-bottom:1px solid #f2efea}
+        .ag-lista-dia:last-child{border-bottom:none}
+        .ag-lista-data{width:52px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:.15rem;background:none;border:none;cursor:pointer;font-family:'Comfortaa',sans-serif;padding-top:.3rem}
+        .ag-lista-num{font-size:1.25rem;font-weight:700;color:#162a1e;line-height:1}
+        .ag-lista-dow{font-size:.6rem;font-weight:700;color:#8f978f;text-transform:uppercase;letter-spacing:.08em}
+        .ag-lista-dia.hoje .ag-lista-num{color:#E67E22}
+        .ag-lista-itens{flex:1;min-width:0;display:flex;flex-direction:column;gap:.3rem}
+        .ag-lista-item{display:flex;align-items:center;gap:.75rem;padding:.6rem .75rem;border-radius:10px;text-decoration:none;transition:background .15s}
+        .ag-lista-item:hover{background:#faf8f5}
+        .ag-legenda-item{display:flex;align-items:center;gap:.4rem;font-size:.68rem;color:#8f978f;font-weight:700}
+        .ag-legenda-dot{width:8px;height:8px;border-radius:50%}
+
+        .ag-dia{position:sticky;top:80px;overflow:hidden}
+        .ag-dia-head{padding:1.2rem 1.3rem 1rem;border-bottom:1px solid #f2efea}
+        .ag-dia-semana{font-size:.66rem;font-weight:700;color:#E67E22;text-transform:uppercase;letter-spacing:.1em}
+        .ag-dia-titulo{font-size:1.05rem;font-weight:700;color:#162a1e;margin-top:.25rem}
+        .ag-dia-sub{font-size:.72rem;color:#8f978f;margin-top:.2rem}
+        .ag-dia-head .ui-btn{margin-top:.9rem;width:100%}
+        .ag-dia-lista{padding:.6rem;max-height:calc(100vh - 300px);overflow-y:auto}
+        .ag-item{display:flex;gap:.75rem;padding:.75rem .8rem;border-radius:11px;text-decoration:none;transition:background .15s}
+        .ag-item:hover{background:#faf8f5}
+        .ag-item-bar{width:3px;border-radius:3px;align-self:stretch;flex-shrink:0}
+        .ag-item-info{flex:1;min-width:0}
+        .ag-item-cliente{font-size:.84rem;font-weight:700;color:#162a1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .ag-item-fazenda{display:flex;align-items:center;gap:.3rem;font-size:.7rem;color:#E67E22;font-weight:700;margin-top:.15rem}
+        .ag-item-meta{display:flex;align-items:center;gap:.4rem;font-size:.7rem;color:#8f978f;margin-top:.35rem;flex-wrap:wrap}
+        .ag-item-foot{margin-top:.45rem}
+
+        @media(max-width:1100px){.ag-layout{grid-template-columns:1fr}.ag-dia{position:static}.ag-dia-lista{max-height:none}}
+        @media(max-width:640px){
+          .ag-cal{padding:1rem .8rem}
+          .ag-cel{min-height:48px;padding:.3rem;align-items:center}
+          .ag-pills{flex-direction:row;justify-content:center;gap:2px}
+          .ag-pill{width:6px;height:6px;padding:0;border-radius:50%;font-size:0}
+          .ag-pill-agendada{background:#E67E22}.ag-pill-realizada{background:#27ae60}.ag-pill-cancelada{background:#e74c3c}
+          .ag-mais{display:none}
+        }
       `}</style>
 
-      <div className="page-header">
+      <div className="ui-page-header">
         <div>
-          <div className="page-title">Agenda dos Colaboradores</div>
-          <div className="page-sub">Visualize e agende visitas para a equipe</div>
+          <div className="ui-title">Agenda da equipe</div>
+          <div className="ui-sub">Clique em um dia para ver as visitas e agendar para um consultor</div>
         </div>
-        <Link href={`/admin/visitas/novo?data=${dataParaNovaVisita}${colabParam}`} className="btn-nova">
-          + Nova Visita
-        </Link>
-      </div>
-
-      <div style={{background:'#fff',borderRadius:12,padding:'.85rem 1.2rem',boxShadow:'0 2px 8px rgba(0,0,0,.04)',marginBottom:'1.2rem',display:'flex',alignItems:'center',gap:'.65rem'}}>
-        <select
-          value={funcionarioId}
-          onChange={e => setFuncionarioId(e.target.value)}
-          style={{padding:'.3rem .6rem',border:'1.5px solid #eae5de',borderRadius:7,fontFamily:"'Comfortaa',sans-serif",fontSize:'.76rem',color:'#162a1e',background:'#fff',outline:'none',cursor:'pointer'}}
-        >
-          <option value="">Todos os consultores</option>
-          {colaboradores.map(f => (
-            <option key={f.id} value={f.id}>{f.nome_completo}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="cal-card">
-        <div className="cal-nav">
-          <button className="cal-btn" onClick={mesAnterior}>‹</button>
-          <div className="cal-mes-ano">{MESES[mes]} {ano}</div>
-          <button className="cal-btn" onClick={proximoMes}>›</button>
-        </div>
-
-        <div className="cal-grid">
-          {DIAS_SEMANA.map(d => (
-            <div key={d} className="cal-header-dia">{d}</div>
-          ))}
-          {celulas.map((dia, i) => {
-            if (!dia) return <div key={i} className="cal-cel vazia" />
-            const visitasDia = visitasPorDia[dia] || []
-            const passado = new Date(ano, mes, dia) < new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate())
-            return (
-              <div
-                key={i}
-                className={[
-                  'cal-cel',
-                  isHoje(dia) ? 'hoje' : '',
-                  diaSelecionado === dia ? 'selecionado' : '',
-                  visitasDia.length > 0 ? 'tem-visita' : '',
-                ].join(' ')}
-                onClick={() => setDiaSelecionado(dia === diaSelecionado ? null : dia)}
-              >
-                <div className={`cal-num${passado && !isHoje(dia) ? ' passado' : ''}`}>{dia}</div>
-                {visitasDia.length > 0 && (
-                  <div className="cal-dots">
-                    {visitasDia.slice(0, 4).map((v, j) => (
-                      <div key={j} className="cal-dot" style={{ background: statusCor[v.status] || '#aaa' }} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-
-        <div className="legenda">
-          <div className="legenda-item"><div className="legenda-dot" style={{background:'#E67E22'}}/>Agendada</div>
-          <div className="legenda-item"><div className="legenda-dot" style={{background:'#27ae60'}}/>Realizada</div>
-          <div className="legenda-item"><div className="legenda-dot" style={{background:'#e74c3c'}}/>Cancelada</div>
-          <div className="legenda-item"><div className="legenda-dot" style={{background:'#162a1e'}}/>Hoje</div>
+        <div className="ui-header-actions">
+          <Link href={`/admin/visitas/novo?data=${dataParaNovaVisita}${colabParam}`} className="ui-btn ui-btn-primary">
+            <IconPlus /> Nova visita
+          </Link>
         </div>
       </div>
 
-      {diaSelecionado && (
-        <div className="dia-painel">
-          <div className="dia-titulo">
+      <div className="ag-colabs" role="tablist" aria-label="Filtrar por consultor">
+        <button className={`ag-colab ag-colab-todos ${!funcionarioId ? 'ativo' : ''}`} onClick={() => setFuncionarioId('')}>
+          Toda a equipe
+        </button>
+        {colaboradores.map(c => (
+          <button key={c.id} className={`ag-colab ${funcionarioId === c.id ? 'ativo' : ''}`} onClick={() => setFuncionarioId(c.id)}>
+            <span className="ui-avatar ui-avatar-sm">{(c.nome_completo || '?').charAt(0).toUpperCase()}</span>
+            {c.nome_completo}
+          </button>
+        ))}
+      </div>
+
+      <div className="ag-layout">
+        <div className="ui-card ag-cal">
+          <div className="ag-nav">
             <div>
-              <div className="dia-titulo-texto">{diaSelecionado} de {MESES[mes]} de {ano}</div>
-              <div className="dia-titulo-sub">
-                {visitasDoDia.length === 0
-                  ? 'Nenhuma visita neste dia'
-                  : `${visitasDoDia.length} visita${visitasDoDia.length > 1 ? 's' : ''} marcada${visitasDoDia.length > 1 ? 's' : ''}`
-                }
+              <div className="ag-mes">{MESES[mes]} {ano}</div>
+              <div className="ag-mes-resumo">
+                {totalMes} visita{totalMes !== 1 ? 's' : ''} · {realizadasMes} realizada{realizadasMes !== 1 ? 's' : ''} · {agendadasMes} agendada{agendadasMes !== 1 ? 's' : ''}
               </div>
             </div>
-            <Link href={`/admin/visitas/novo?data=${dataParaNovaVisita}${colabParam}`} className="btn-agendar">
-              + Agendar neste dia
-            </Link>
+            <div className="ui-segmented" style={{ marginLeft: 'auto' }}>
+              <button className={visao === 'mes' ? 'ativo' : ''} onClick={() => setVisao('mes')}>Mês</button>
+              <button className={visao === 'lista' ? 'ativo' : ''} onClick={() => setVisao('lista')}>Lista</button>
+            </div>
+            <button className="ui-btn ui-btn-secondary ui-btn-sm" onClick={irParaHoje}>Hoje</button>
+            <button className="ag-nav-btn" onClick={mesAnterior} aria-label="Mês anterior"><IconChevron dir="left" /></button>
+            <button className="ag-nav-btn" onClick={proximoMes} aria-label="Próximo mês"><IconChevron dir="right" /></button>
           </div>
 
-          {visitasDoDia.length === 0 ? (
-            <div className="dia-vazio">
-              <div className="dia-vazio-icon"><IconCalendarEmpty /></div>
-              <div className="dia-vazio-txt">Nenhuma visita agendada para este dia.</div>
-            </div>
-          ) : (
-            visitasDoDia.map(v => {
-              const motivo = v.motivo_visita === 'Outros' ? `Outros — ${v.motivo_outro || ''}` : v.motivo_visita
-              return (
-                <Link key={v.id} href={`/admin/visitas/${v.id}`} className="visita-item">
-                  <div className="visita-status-bar" style={{background: statusCor[v.status]}}/>
-                  <div className="visita-info">
-                    <div className="visita-cliente">{v.cliente?.nome}</div>
-                    {v.cliente?.nome_fazenda && (
-                      <div className="visita-fazenda"><IconSprout color="#E67E22" />{v.cliente.nome_fazenda}</div>
-                    )}
-                    <div className="visita-colab"><IconUser />{v.funcionario?.nome_completo}</div>
-                    {motivo && <div style={{fontSize:'.72rem',color:'#888',marginTop:'.2rem'}}>{motivo}</div>}
-                    <div className="visita-badge" style={{background: statusCor[v.status]}}>
-                      {v.status.charAt(0).toUpperCase() + v.status.slice(1)}
+          {visao === 'lista' ? (
+            <div className="ag-lista">
+              {Object.keys(visitasPorDia).length === 0 ? (
+                <div className="ui-empty">
+                  <div className="ui-empty-title">Nenhuma visita em {MESES[mes]}</div>
+                  <Link href={`/admin/visitas/novo${colabParam ? `?${colabParam.slice(1)}` : ''}`} className="ui-btn ui-btn-secondary ui-btn-sm"><IconPlus /> Agendar visita</Link>
+                </div>
+              ) : Object.keys(visitasPorDia).map(Number).sort((a, b) => a - b).map(dia => {
+                const dt = new Date(ano, mes, dia)
+                return (
+                  <div key={dia} className={`ag-lista-dia ${isHoje(dia) ? 'hoje' : ''}`}>
+                    <button className="ag-lista-data" onClick={() => { setDiaSelecionado(dia); setVisao('mes') }}>
+                      <span className="ag-lista-num">{dia}</span>
+                      <span className="ag-lista-dow">{DIAS_SEMANA[dt.getDay()]}</span>
+                    </button>
+                    <div className="ag-lista-itens">
+                      {visitasPorDia[dia].map(v => (
+                        <Link key={v.id} href={`/admin/visitas/${v.id}`} className="ag-lista-item">
+                          <span className="ag-item-bar" style={{ background: statusCor[v.status] }} />
+                          <span style={{ minWidth: 0, flex: 1 }}>
+                            <span className="ag-item-cliente" style={{ display: 'block' }}>{v.cliente?.nome}</span>
+                            <span className="ag-item-meta" style={{ marginTop: '.15rem' }}>{v.funcionario?.nome_completo}{v.motivo_visita ? ` · ${v.motivo_visita}` : ''}</span>
+                          </span>
+                          <span className={`ui-badge ui-badge-${v.status}`}>{v.status.charAt(0).toUpperCase() + v.status.slice(1)}</span>
+                        </Link>
+                      ))}
                     </div>
                   </div>
-                </Link>
+                )
+              })}
+            </div>
+          ) : (
+          <div className="ag-grid">
+            {DIAS_SEMANA.map(d => <div key={d} className="ag-dow">{d}</div>)}
+            {celulas.map((dia, i) => {
+              if (!dia) return <div key={i} className="ag-cel vazia" />
+              const visitasDia = visitasPorDia[dia] || []
+              const passado = new Date(ano, mes, dia) < new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate())
+              const dow = i % 7
+              return (
+                <button
+                  key={i}
+                  className={[
+                    'ag-cel',
+                    isHoje(dia) ? 'hoje' : '',
+                    diaSelecionado === dia ? 'selecionado' : '',
+                    dow === 0 || dow === 6 ? 'fim-semana' : '',
+                  ].join(' ')}
+                  onClick={() => setDiaSelecionado(dia === diaSelecionado ? null : dia)}
+                  aria-label={`${dia} de ${MESES[mes]}, ${visitasDia.length} visita(s)`}
+                >
+                  <span className={`ag-num${passado && !isHoje(dia) ? ' passado' : ''}`}>{dia}</span>
+                  {visitasDia.length > 0 && (
+                    <span className="ag-pills">
+                      {visitasDia.slice(0, 2).map(v => (
+                        <span key={v.id} className={`ag-pill ag-pill-${v.status}`}>{v.cliente?.nome?.split(' ')[0] ?? 'Visita'}</span>
+                      ))}
+                      {visitasDia.length > 2 && <span className="ag-mais">+{visitasDia.length - 2} mais</span>}
+                    </span>
+                  )}
+                </button>
               )
-            })
+            })}
+          </div>
+
+          )}
+
+          <div className="ag-legenda">
+            <div className="ag-legenda-item"><div className="ag-legenda-dot" style={{ background: '#E67E22' }} />Agendada</div>
+            <div className="ag-legenda-item"><div className="ag-legenda-dot" style={{ background: '#27ae60' }} />Realizada</div>
+            <div className="ag-legenda-item"><div className="ag-legenda-dot" style={{ background: '#e74c3c' }} />Cancelada</div>
+            <div className="ag-legenda-item"><div className="ag-legenda-dot" style={{ background: '#162a1e' }} />Hoje</div>
+          </div>
+        </div>
+
+        <div className="ui-card ag-dia">
+          {!diaSelecionado ? (
+            <div className="ui-empty" style={{ padding: '3rem 1.5rem' }}>
+              <div className="ui-empty-icon"><IconCalendarEmpty color="currentColor" /></div>
+              <div className="ui-empty-title">Selecione um dia</div>
+              <div className="ui-empty-text">Clique em um dia do calendário para ver as visitas e agendar.</div>
+            </div>
+          ) : (
+            <>
+              <div className="ag-dia-head">
+                <div className="ag-dia-semana">{isHoje(diaSelecionado) ? 'Hoje · ' : ''}{diaSemanaSel}</div>
+                <div className="ag-dia-titulo">{diaSelecionado} de {MESES[mes]} de {ano}</div>
+                <div className="ag-dia-sub">
+                  {visitasDoDia.length === 0
+                    ? 'Nenhuma visita neste dia'
+                    : `${visitasDoDia.length} visita${visitasDoDia.length > 1 ? 's' : ''} marcada${visitasDoDia.length > 1 ? 's' : ''}`}
+                </div>
+                <Link href={`/admin/visitas/novo?data=${dataParaNovaVisita}${colabParam}`} className="ui-btn ui-btn-dark">
+                  <IconPlus /> Agendar neste dia
+                </Link>
+              </div>
+              <div className="ag-dia-lista">
+                {visitasDoDia.length === 0 ? (
+                  <div className="ui-empty" style={{ padding: '2rem 1rem' }}>
+                    <div className="ui-empty-text">Dia livre na agenda{funcionarioId ? ' deste consultor' : ' da equipe'}.</div>
+                  </div>
+                ) : (
+                  visitasDoDia.map(v => {
+                    const motivo = v.motivo_visita === 'Outros' ? `Outros — ${v.motivo_outro || ''}` : v.motivo_visita
+                    return (
+                      <Link key={v.id} href={`/admin/visitas/${v.id}`} className="ag-item">
+                        <div className="ag-item-bar" style={{ background: statusCor[v.status] }} />
+                        <div className="ag-item-info">
+                          <div className="ag-item-cliente">{v.cliente?.nome}</div>
+                          {v.cliente?.nome_fazenda && (
+                            <div className="ag-item-fazenda"><IconSprout color="#E67E22" />{v.cliente.nome_fazenda}</div>
+                          )}
+                          <div className="ag-item-meta">
+                            <IconUser color="#8f978f" />{v.funcionario?.nome_completo}
+                            {motivo && <><span className="ui-dot-sep" />{motivo}</>}
+                          </div>
+                          <div className="ag-item-foot">
+                            <span className={`ui-badge ui-badge-${v.status}`}>{v.status.charAt(0).toUpperCase() + v.status.slice(1)}</span>
+                          </div>
+                        </div>
+                      </Link>
+                    )
+                  })
+                )}
+              </div>
+            </>
           )}
         </div>
-      )}
+      </div>
     </>
   )
 }

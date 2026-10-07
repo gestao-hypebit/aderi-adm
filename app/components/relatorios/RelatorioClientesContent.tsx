@@ -13,7 +13,6 @@ type Cliente = {
   estado: string | null
   nome_fazenda: string | null
   cultura_principal: string | null
-  status: string | null
 }
 
 type VisitaStat = {
@@ -68,7 +67,7 @@ export default function RelatorioClientesContent({ isAdmin, backUrl, clientesIni
     if (clientesIniciais !== undefined) return
     async function init() {
       const [{ data: clis }, { data: funcs }] = await Promise.all([
-        supabase.from('clientes').select('id, nome, cidade, estado, nome_fazenda, cultura_principal, status').order('nome'),
+        supabase.from('clientes').select('id, nome, cidade, estado, nome_fazenda, cultura_principal').order('nome'),
         isAdmin
           ? supabase.from('profiles').select('id, nome_completo').eq('role', 'colaborador').order('nome_completo')
           : Promise.resolve({ data: [] as Funcionario[] }),
@@ -120,45 +119,47 @@ export default function RelatorioClientesContent({ isAdmin, backUrl, clientesIni
   return (
     <>
       <style>{`
-        .rcp-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;flex-wrap:wrap;gap:.8rem}
-        .rcp-title-area{display:flex;align-items:center;gap:.7rem}
-        .rcp-back{display:inline-flex;align-items:center;gap:.35rem;color:#E67E22;font-size:.82rem;font-weight:700;text-decoration:none;background:none;border:none;cursor:pointer;font-family:'Comfortaa',sans-serif;padding:0}
-        .rcp-title{font-size:1.2rem;font-weight:700;color:#162a1e}
-        .rcp-sep{color:#ccc}
-        .rcp-busca{padding:.45rem .8rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.8rem;color:#162a1e;outline:none;width:220px;transition:border-color .15s}
+        .rcp-busca{width:240px !important;padding-left:2.1rem !important;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238f978f' stroke-width='2.2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") no-repeat .75rem center !important}
         .rcp-busca:focus{border-color:#E67E22}
-        .rcp-section-label{font-size:.7rem;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin:1rem 0 .5rem}
+        .rcp-section-label{font-size:.68rem;font-weight:700;color:#8f978f;text-transform:uppercase;letter-spacing:.1em;margin:1.4rem 0 .75rem;display:flex;align-items:center;gap:.6rem}
+        .rcp-section-label::after{content:'';flex:1;height:1px;background:#eae5de}
         .rcp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.9rem;margin-bottom:1rem}
-        .rcp-card{background:#fff;border-radius:12px;padding:1.1rem 1.2rem;box-shadow:0 2px 6px rgba(0,0,0,.04);text-decoration:none;display:flex;flex-direction:column;gap:.35rem;transition:box-shadow .2s;border-left:4px solid #162a1e}
-        .rcp-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.1)}
+        .rcp-card{background:#fff;border-radius:16px;padding:1.15rem 1.25rem;box-shadow:0 1px 2px rgba(22,42,30,.04),0 2px 10px rgba(22,42,30,.04);border:1px solid #f2efea;text-decoration:none;display:flex;flex-direction:column;gap:.35rem;transition:box-shadow .2s,transform .2s}
+        .rcp-card:hover{box-shadow:0 10px 28px rgba(22,42,30,.09);transform:translateY(-2px)}
         .rcp-card-nome{font-size:.95rem;font-weight:700;color:#162a1e}
         .rcp-card-meta{display:flex;align-items:center;gap:.35rem;font-size:.72rem;color:#888}
-        .rcp-card-stats{display:flex;gap:.8rem;margin-top:.2rem}
-        .rcp-stat{text-align:center}
-        .rcp-stat-num{font-size:1.1rem;font-weight:900;color:#162a1e;line-height:1}
-        .rcp-stat-label{font-size:.62rem;color:#aaa;font-weight:700;text-transform:uppercase}
-        .rcp-ultima{display:inline-flex;align-items:center;gap:.35rem;font-size:.72rem;font-weight:700;padding:.2rem .6rem;border-radius:20px;color:#fff;margin-top:.15rem}
+        .rcp-card-stats{display:flex;gap:1.2rem;margin-top:.6rem;padding-top:.7rem;border-top:1px solid #f2efea}
+        .rcp-stat{text-align:left}
+        .rcp-stat-num{font-size:1.05rem;font-weight:700;color:#162a1e;line-height:1}
+        .rcp-stat-label{font-size:.6rem;color:#8f978f;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:.25rem}
+        .rcp-ultima{align-self:flex-start;margin-top:.35rem}
         .rcp-card-link{display:inline-flex;align-items:center;gap:.35rem;font-size:.75rem;font-weight:700;color:#E67E22;margin-top:.5rem;align-self:flex-end}
-        .rcp-card-sem{border-left-color:#eae5de}
-        .rcp-card-sem .rcp-card-nome{color:#aaa}
+        .rcp-card-sem{background:#faf8f5;box-shadow:none}
+        .rcp-card-sem .rcp-card-nome{color:#5b6660}
         .rcp-vazio{text-align:center;padding:2.5rem 1rem;color:#aaa}
         .rcp-vazio-icon{display:flex;justify-content:center;margin-bottom:.8rem}
         .rcp-contador{font-size:.78rem;color:#aaa;margin-bottom:.5rem}
-        @media(max-width:500px){.rcp-busca{width:100%}}
+        @media(max-width:600px){.rcp-busca{width:100% !important}.ui-header-actions{width:100%}}
       `}</style>
 
-      <div className="rcp-header">
-        <div className="rcp-title-area">
-          <Link href={backUrl} className="rcp-back"><IconArrowLeft /> Relatórios</Link>
-          <span className="rcp-sep">/</span>
-          <div className="rcp-title">Clientes</div>
+      <div className="ui-breadcrumb">
+        <Link href={backUrl}><IconArrowLeft /> Relatórios</Link>
+        <span className="ui-breadcrumb-sep">/</span>
+        <span className="ui-breadcrumb-atual">Clientes</span>
+      </div>
+      <div className="ui-page-header">
+        <div>
+          <div className="ui-title">Clientes</div>
+          <div className="ui-sub">Produtores atendidos no período e quem ainda não recebeu visita</div>
         </div>
-        <input
-          className="rcp-busca"
-          placeholder="Buscar cliente..."
-          value={busca}
-          onChange={e => setBusca(e.target.value)}
-        />
+        <div className="ui-header-actions">
+          <input
+            className="ui-input rcp-busca"
+            placeholder="Buscar cliente..."
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+          />
+        </div>
       </div>
 
       <FiltrosPainel
@@ -188,7 +189,7 @@ export default function RelatorioClientesContent({ isAdmin, backUrl, clientesIni
                 {clientesComVisitas.map(c => {
                   const s = stats.get(c.id)!
                   return (
-                    <Link key={c.id} href={`/dashboard/relatorios/clientes/${c.id}`} className="rcp-card">
+                    <Link key={c.id} href={isAdmin ? `/admin/clientes/${c.id}` : `/dashboard/relatorios/clientes/${c.id}`} className="rcp-card">
                       <div className="rcp-card-nome">{c.nome}</div>
                       {c.nome_fazenda && <div className="rcp-card-meta"><IconSprout />{c.nome_fazenda}</div>}
                       {c.cidade && <div className="rcp-card-meta"><IconPin />{c.cidade}/{c.estado}</div>}
@@ -211,9 +212,9 @@ export default function RelatorioClientesContent({ isAdmin, backUrl, clientesIni
                         )}
                       </div>
                       {s.ultimo_status && (
-                        <div className="rcp-ultima" style={{ background: statusCor[s.ultimo_status] || '#aaa' }}>
-                          {s.ultimo_status.charAt(0).toUpperCase() + s.ultimo_status.slice(1)}
-                        </div>
+                        <span className={`ui-badge ui-badge-${s.ultimo_status} rcp-ultima`}>
+                          Última: {s.ultimo_status}
+                        </span>
                       )}
                       <div className="rcp-card-link">Ver ficha <IconArrow /></div>
                     </Link>
@@ -232,7 +233,7 @@ export default function RelatorioClientesContent({ isAdmin, backUrl, clientesIni
               </div>
               <div className="rcp-grid">
                 {clientesSemVisitas.map(c => (
-                  <Link key={c.id} href={`/dashboard/relatorios/clientes/${c.id}`} className="rcp-card rcp-card-sem">
+                  <Link key={c.id} href={isAdmin ? `/admin/clientes/${c.id}` : `/dashboard/relatorios/clientes/${c.id}`} className="rcp-card rcp-card-sem">
                     <div className="rcp-card-nome">{c.nome}</div>
                     {c.nome_fazenda && <div className="rcp-card-meta"><IconSprout color="#ccc" />{c.nome_fazenda}</div>}
                     {c.cidade && <div className="rcp-card-meta"><IconPin color="#ccc" />{c.cidade}/{c.estado}</div>}

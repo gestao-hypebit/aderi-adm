@@ -147,27 +147,20 @@ export default function RelatorioKmContent({ isAdmin, backUrl, funcionariosInici
   return (
     <>
       <style>{`
-        .rkm-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;flex-wrap:wrap;gap:.8rem}
-        .rkm-title-area{display:flex;align-items:center;gap:.7rem}
-        .rkm-back{display:inline-flex;align-items:center;gap:.35rem;color:#E67E22;font-size:.82rem;font-weight:700;text-decoration:none;background:none;border:none;cursor:pointer;font-family:'Comfortaa',sans-serif;padding:0}
-        .rkm-title{font-size:1.2rem;font-weight:700;color:#162a1e}
-        .rkm-sep{color:#ccc}
-        .rkm-actions{display:flex;gap:.6rem}
-        .rkm-btn-print{display:inline-flex;align-items:center;gap:.5rem;background:#162a1e;color:#fff;padding:.6rem 1.2rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.8rem;font-weight:700;border:none;cursor:pointer}
-        .rkm-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:.8rem;margin-bottom:1.2rem}
-        .rkm-kpi{background:#fff;border-radius:12px;padding:1rem 1.1rem;box-shadow:0 2px 6px rgba(0,0,0,.04);border-top:3px solid}
-        .rkm-kpi-num{font-size:1.5rem;font-weight:900;color:#162a1e;line-height:1.1}
-        .rkm-kpi-label{font-size:.65rem;font-weight:700;color:#aaa;margin-top:.3rem;text-transform:uppercase;letter-spacing:.04em}
-        .rkm-secao{background:#fff;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,.05);margin-bottom:1.2rem;overflow:hidden}
+        .rkm-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1rem;margin-bottom:1.4rem}
+        .rkm-kpi{background:#fff;border-radius:16px;padding:1.05rem 1.2rem;box-shadow:0 1px 2px rgba(22,42,30,.04),0 2px 10px rgba(22,42,30,.04);border:1px solid #f2efea;border-top:3px solid}
+        .rkm-kpi-num{font-size:1.45rem;font-weight:700;color:#162a1e;line-height:1.1;letter-spacing:-.02em}
+        .rkm-kpi-label{font-size:.64rem;font-weight:700;color:#8f978f;margin-top:.35rem;text-transform:uppercase;letter-spacing:.06em}
+        .rkm-secao{background:#fff;border-radius:16px;box-shadow:0 1px 2px rgba(22,42,30,.04),0 2px 10px rgba(22,42,30,.04);border:1px solid #f2efea;margin-bottom:1.2rem;overflow:hidden}
         .rkm-secao-header{display:flex;align-items:center;gap:.8rem;padding:1rem 1.3rem;border-bottom:1px solid #f0ede8}
         .rkm-secao-avatar{width:36px;height:36px;border-radius:50%;background:#162a1e;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;flex-shrink:0}
         .rkm-secao-nome{font-weight:700;color:#162a1e;font-size:.95rem}
         .rkm-secao-sub{font-size:.72rem;color:#aaa;margin-top:.1rem}
         .rkm-table{width:100%;border-collapse:collapse}
-        .rkm-table th{text-align:left;font-size:.62rem;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;padding:.55rem 1.3rem;background:#fafafa;border-bottom:1px solid #f0ede8}
+        .rkm-table th{text-align:left;font-size:.62rem;font-weight:700;color:#8f978f;text-transform:uppercase;letter-spacing:.08em;padding:.65rem 1.3rem;background:#faf8f5;border-bottom:1px solid #f2efea}
         .rkm-table th.num{text-align:right}
         .rkm-mes-row{cursor:pointer;transition:background .1s}
-        .rkm-mes-row:hover{background:#fafafa}
+        .rkm-mes-row:hover{background:#fcfaf7}
         .rkm-mes-row td{padding:.7rem 1.3rem;border-bottom:1px solid #f7f5f0;font-size:.82rem}
         .rkm-mes-label{font-weight:700;color:#162a1e;display:flex;align-items:center;gap:.5rem}
         .rkm-num{text-align:right;color:#162a1e;font-weight:700}
@@ -178,11 +171,11 @@ export default function RelatorioKmContent({ isAdmin, backUrl, funcionariosInici
         .rkm-dia-row td{padding:.45rem 1.3rem .45rem 2.5rem;font-size:.76rem;border-bottom:1px solid #eee;color:#555}
         .rkm-dia-row:last-child td{border-bottom:none}
         .rkm-dia-data{color:#888}
-        .rkm-total-row td{padding:.7rem 1.3rem;font-weight:700;font-size:.82rem;border-top:2px solid #f0ede8;background:#fafafa}
+        .rkm-total-row td{padding:.8rem 1.3rem;font-weight:700;font-size:.82rem;border-top:1px solid #eae5de;background:#faf8f5}
         .rkm-vazio{text-align:center;padding:3rem 1rem;color:#aaa}
         .rkm-vazio-icon{display:flex;justify-content:center;margin-bottom:.8rem}
         @media print {
-          .rkm-header .rkm-actions,.fp-wrap{display:none !important}
+          .rkm-actions,.fp-wrap,.ui-breadcrumb{display:none !important}
           .sidebar,.topbar{display:none !important}
           .main{margin-left:0 !important;width:100% !important}
           .content{padding:0 !important}
@@ -193,14 +186,18 @@ export default function RelatorioKmContent({ isAdmin, backUrl, funcionariosInici
         }
       `}</style>
 
-      <div className="rkm-header">
-        <div className="rkm-title-area">
-          <Link href={backUrl} className="rkm-back"><IconArrowLeft /> Relatórios</Link>
-          <span className="rkm-sep">/</span>
-          <div className="rkm-title">KM / Combustível</div>
+      <div className="ui-breadcrumb">
+        <Link href={backUrl}><IconArrowLeft /> Relatórios</Link>
+        <span className="ui-breadcrumb-sep">/</span>
+        <span className="ui-breadcrumb-atual">KM / Combustível</span>
+      </div>
+      <div className="ui-page-header">
+        <div>
+          <div className="ui-title">KM / Combustível</div>
+          <div className="ui-sub">Quilometragem e abastecimentos por mês. Clique em um mês para ver o detalhe dia a dia</div>
         </div>
-        <div className="rkm-actions">
-          <button className="rkm-btn-print" onClick={() => window.print()}>
+        <div className="ui-header-actions rkm-actions">
+          <button className="ui-btn ui-btn-dark" onClick={() => window.print()}>
             <IconPrinter /> Imprimir / PDF
           </button>
         </div>
@@ -225,7 +222,7 @@ export default function RelatorioKmContent({ isAdmin, backUrl, funcionariosInici
             <div className="rkm-kpi-num">R$ {totalGasto.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
             <div className="rkm-kpi-label">Gasto em combustível</div>
           </div>
-          <div className="rkm-kpi" style={{ borderTopColor: '#3498db' }}>
+          <div className="rkm-kpi" style={{ borderTopColor: '#5b6660' }}>
             <div className="rkm-kpi-num">{totalLitros.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} L</div>
             <div className="rkm-kpi-label">Litros abastecidos</div>
           </div>

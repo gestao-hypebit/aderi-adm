@@ -46,7 +46,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [menuAberto, setMenuAberto] = useState(false)
   const [nomeUsuario, setNomeUsuario] = useState('')
   const [inicialUsuario, setInicialUsuario] = useState('')
-  const [isAdmin, setIsAdmin] = useState(false)
+  const [role, setRole] = useState<string | null>(null)
+  const isAdmin = role === 'admin'
   const pathname = usePathname()
 
   useEffect(() => {
@@ -63,7 +64,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         const nome = data.nome_completo || user.email || ''
         setNomeUsuario(nome.split(' ')[0])
         setInicialUsuario(nome.charAt(0).toUpperCase())
-        setIsAdmin(data.role === 'admin')
+        setRole(data.role)
       }
     }
     carregarPerfil()
@@ -104,6 +105,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         .topbar-titulo{font-weight:700;color:#162a1e}
         .topbar-user{display:flex;align-items:center;gap:.75rem}
         .user-nome{font-size:.82rem;font-weight:700;color:#555}
+        .user-role{font-size:.66rem;font-weight:700;padding:.28rem .65rem;border-radius:20px;letter-spacing:.03em;white-space:nowrap}
+        .user-role.admin{background:rgba(230,126,34,.12);color:#c0651a;border:1px solid rgba(230,126,34,.3)}
+        .user-role.colab{background:rgba(22,42,30,.08);color:#162a1e;border:1px solid rgba(22,42,30,.18)}
         .user-avatar{width:34px;height:34px;border-radius:50%;background:#E67E22;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.85rem;flex-shrink:0}
         .content{padding:2rem;flex:1}
 
@@ -167,6 +171,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </span>
             <div className="topbar-user">
               {nomeUsuario && <span className="user-nome">{nomeUsuario}</span>}
+              {role && (
+                <span className={`user-role ${isAdmin ? 'admin' : 'colab'}`}>
+                  {isAdmin ? 'Administrador' : 'Colaborador'}
+                </span>
+              )}
               <div className="user-avatar">
                 {inicialUsuario || '?'}
               </div>
