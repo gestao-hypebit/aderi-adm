@@ -176,16 +176,16 @@ export default function ConsultorForm({ consultorId }: Props) {
         .csf-wrap{max-width:760px}
         .csf-secao{padding:1.35rem 1.5rem;border-bottom:1px solid #f2efea}
         .csf-secao-head{display:flex;align-items:center;gap:.7rem;margin-bottom:1.05rem}
-        .csf-passo{width:26px;height:26px;border-radius:50%;background:#fdf3e9;color:#E67E22;font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .csf-secao-titulo{font-size:.9rem;font-weight:700;color:#162a1e}
+        .csf-passo{width:26px;height:26px;border-radius:50%;background:#fdf3e9;color:#E67E22;font-size:.72rem;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .csf-secao-titulo{font-size:.9rem;font-weight:600;color:#162a1e}
         .csf-secao-desc{font-size:.7rem;color:#8f978f;margin-top:.1rem}
         .csf-senha{display:flex;gap:.5rem}
         .csf-senha .ui-input{font-family:monospace;font-size:.9rem;letter-spacing:.04em}
         .csf-papel{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
-        .csf-papel-opt{text-align:left;border:1.5px solid #eae5de;border-radius:12px;padding:.85rem 1rem;background:#fff;cursor:pointer;font-family:'Comfortaa',sans-serif;transition:all .15s}
+        .csf-papel-opt{text-align:left;border:1.5px solid #eae5de;border-radius:12px;padding:.85rem 1rem;background:#fff;cursor:pointer;font-family:'Poppins',sans-serif;transition:all .15s}
         .csf-papel-opt:hover{border-color:#cfc8bd}
         .csf-papel-opt.ativo{border-color:#E67E22;background:#fffaf5;box-shadow:0 0 0 3px rgba(230,126,34,.12)}
-        .csf-papel-titulo{font-size:.82rem;font-weight:700;color:#162a1e}
+        .csf-papel-titulo{font-size:.82rem;font-weight:600;color:#162a1e}
         .csf-papel-desc{font-size:.68rem;color:#8f978f;margin-top:.25rem;line-height:1.5}
         .csf-switch{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.9rem 1rem;border:1.5px solid #eae5de;border-radius:12px}
         .csf-toggle{width:44px;height:24px;border-radius:999px;border:none;background:#d8d1c6;position:relative;cursor:pointer;flex-shrink:0;transition:background .2s}

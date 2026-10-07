@@ -250,7 +250,7 @@ export default function VisitaDetalheAdmin() {
 
   if (carregando) {
     return (
-      <div style={{ maxWidth: 1080 }}>
+      <div>
         <div className="ui-skeleton" style={{ height: 14, width: 160, marginBottom: '1rem' }} />
         <div className="ui-skeleton" style={{ height: 130, borderRadius: 16, marginBottom: '1.2rem' }} />
         <div className="ui-skeleton" style={{ height: 220, borderRadius: 16 }} />
@@ -277,20 +277,20 @@ export default function VisitaDetalheAdmin() {
   return (
     <>
       <style>{`
-        .vd-wrap{max-width:1080px}
+        .vd-wrap{width:100%}
         .vd-hero{padding:1.4rem 1.5rem;display:flex;gap:1.2rem;align-items:flex-start;flex-wrap:wrap;margin-bottom:1.2rem;position:relative;overflow:hidden}
         .vd-hero::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px}
         .vd-hero.st-agendada::before{background:#E67E22}
         .vd-hero.st-realizada::before{background:#27ae60}
         .vd-hero.st-cancelada::before{background:#e74c3c}
         .vd-data{text-align:center;background:#162a1e;color:#fff;border-radius:14px;padding:.75rem .9rem;min-width:74px;flex-shrink:0}
-        .vd-dia{font-size:1.9rem;font-weight:700;line-height:1}
-        .vd-mes{font-size:.66rem;font-weight:700;color:#E67E22;text-transform:uppercase;letter-spacing:.08em;margin-top:.3rem}
+        .vd-dia{font-size:1.9rem;font-weight:600;line-height:1}
+        .vd-mes{font-size:.66rem;font-weight:600;color:#E67E22;text-transform:uppercase;letter-spacing:.08em;margin-top:.3rem}
         .vd-ano{font-size:.62rem;color:rgba(255,255,255,.5);margin-top:.1rem}
         .vd-titulo{flex:1;min-width:220px}
-        .vd-cliente{font-size:1.35rem;font-weight:700;color:#162a1e;line-height:1.25}
+        .vd-cliente{font-size:1.35rem;font-weight:600;color:#162a1e;line-height:1.25}
         .vd-meta{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.45rem;font-size:.78rem;color:#8f978f}
-        .vd-meta .vd-fazenda{display:inline-flex;align-items:center;gap:.3rem;color:#E67E22;font-weight:700}
+        .vd-meta .vd-fazenda{display:inline-flex;align-items:center;gap:.3rem;color:#E67E22;font-weight:600}
         .vd-meta span{display:inline-flex;align-items:center;gap:.3rem}
         .vd-badges{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.8rem}
         .vd-acoes{display:flex;gap:.5rem;flex-wrap:wrap}
@@ -300,15 +300,15 @@ export default function VisitaDetalheAdmin() {
         .vd-texto{font-size:.86rem;color:#3d4a42;line-height:1.8;white-space:pre-wrap}
         .vd-vazio{font-size:.8rem;color:#b8bdb6;font-style:italic}
         .vd-status-btns{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
-        .vd-status-btn{display:flex;align-items:center;justify-content:center;gap:.45rem;padding:.7rem;border-radius:10px;border:1.5px solid #eae5de;background:#fff;font-family:'Comfortaa',sans-serif;font-size:.78rem;font-weight:700;color:#8f978f;cursor:pointer;transition:all .15s}
+        .vd-status-btn{display:flex;align-items:center;justify-content:center;gap:.45rem;padding:.7rem;border-radius:10px;border:1.5px solid #eae5de;background:#fff;font-family:'Poppins',sans-serif;font-size:.78rem;font-weight:600;color:#8f978f;cursor:pointer;transition:all .15s}
         .vd-status-btn:hover:not(:disabled){border-color:#cfc8bd;color:#162a1e}
         .vd-status-btn:disabled{cursor:default}
         .vd-info{padding:.4rem 1.3rem .6rem}
         .vd-info-item{display:flex;gap:.75rem;align-items:flex-start;padding:.75rem 0;border-bottom:1px solid #f2efea}
         .vd-info-item:last-child{border-bottom:none}
         .vd-info-icon{width:32px;height:32px;border-radius:9px;background:#f7f5f1;color:#5b6660;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .vd-info-label{font-size:.62rem;font-weight:700;color:#8f978f;text-transform:uppercase;letter-spacing:.06em}
-        .vd-info-valor{font-size:.82rem;font-weight:700;color:#162a1e;margin-top:.2rem;word-break:break-word}
+        .vd-info-label{font-size:.62rem;font-weight:600;color:#8f978f;text-transform:uppercase;letter-spacing:.06em}
+        .vd-info-valor{font-size:.82rem;font-weight:600;color:#162a1e;margin-top:.2rem;word-break:break-word}
         .vd-links{padding:.9rem 1.3rem 1.2rem;display:flex;flex-direction:column;gap:.5rem;border-top:1px solid #f2efea}
         .vd-links .ui-btn{width:100%}
         .fotos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.8rem}
@@ -320,19 +320,19 @@ export default function VisitaDetalheAdmin() {
         .foto-del{position:absolute;top:6px;right:6px;background:rgba(13,31,20,.6);color:#fff;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s}
         .foto-item:hover .foto-del{opacity:1}
         @media(hover:none){.foto-del{opacity:1}}
-        .foto-add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4rem;min-height:140px;border:1.5px dashed #d8d1c6;border-radius:12px;background:#faf8f5;color:#8f978f;font-family:'Comfortaa',sans-serif;font-size:.74rem;font-weight:700;cursor:pointer;transition:all .15s}
+        .foto-add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4rem;min-height:140px;border:1.5px dashed #d8d1c6;border-radius:12px;background:#faf8f5;color:#8f978f;font-family:'Poppins',sans-serif;font-size:.74rem;font-weight:600;cursor:pointer;transition:all .15s}
         .foto-add:hover:not(:disabled){border-color:#E67E22;color:#E67E22;background:#fffaf5}
         .foto-add:disabled{cursor:not-allowed;opacity:.6}
-        .modal-titulo{display:flex;align-items:center;gap:.55rem;font-size:1.05rem;font-weight:700;color:#162a1e;margin-bottom:.3rem}
+        .modal-titulo{display:flex;align-items:center;gap:.55rem;font-size:1.05rem;font-weight:600;color:#162a1e;margin-bottom:.3rem}
         .modal-sub{font-size:.78rem;color:#8f978f;margin-bottom:1.2rem}
-        .modal-secao-label{display:flex;align-items:center;gap:.4rem;font-size:.66rem;font-weight:700;color:#8f978f;letter-spacing:.1em;text-transform:uppercase;margin:1.3rem 0 .7rem}
+        .modal-secao-label{display:flex;align-items:center;gap:.4rem;font-size:.66rem;font-weight:600;color:#8f978f;letter-spacing:.1em;text-transform:uppercase;margin:1.3rem 0 .7rem}
         .fotos-preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.7rem;margin-bottom:.7rem}
         .foto-preview-item{border-radius:10px;overflow:hidden;border:1.5px solid #eae5de;position:relative}
         .foto-preview-img{width:100%;height:110px;object-fit:cover;display:block}
-        .foto-preview-legenda{width:100%;padding:.45rem .55rem;border:none;border-top:1px solid #f2efea;font-family:'Comfortaa',sans-serif;font-size:.7rem;color:#162a1e;background:#faf8f5;outline:none;box-sizing:border-box}
+        .foto-preview-legenda{width:100%;padding:.45rem .55rem;border:none;border-top:1px solid #f2efea;font-family:'Poppins',sans-serif;font-size:.7rem;color:#162a1e;background:#faf8f5;outline:none;box-sizing:border-box}
         .foto-preview-legenda::placeholder{color:#b8bdb6}
         .foto-preview-del{position:absolute;top:4px;right:4px;background:rgba(13,31,20,.6);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-        .btn-upload-foto{display:flex;align-items:center;justify-content:center;gap:.5rem;width:100%;padding:.85rem;border:1.5px dashed #d8d1c6;border-radius:10px;background:#faf8f5;color:#5b6660;font-family:'Comfortaa',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .15s}
+        .btn-upload-foto{display:flex;align-items:center;justify-content:center;gap:.5rem;width:100%;padding:.85rem;border:1.5px dashed #d8d1c6;border-radius:10px;background:#faf8f5;color:#5b6660;font-family:'Poppins',sans-serif;font-size:.78rem;font-weight:600;cursor:pointer;transition:all .15s}
         .btn-upload-foto:hover{border-color:#E67E22;color:#E67E22}
         .modal-btns{display:flex;gap:.6rem;margin-top:1.4rem;justify-content:flex-end;flex-wrap:wrap}
         @media(max-width:960px){.vd-grid{grid-template-columns:1fr}}
@@ -608,9 +608,6 @@ export default function VisitaDetalheAdmin() {
                     Ficha do cliente
                   </Link>
                 )}
-                <Link href={`/admin/relatorios/visitas/${visita.id}`} className="ui-btn ui-btn-ghost ui-btn-sm">
-                  Relatório em PDF
-                </Link>
               </div>
             </div>
           </div>

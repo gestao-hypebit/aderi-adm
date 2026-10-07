@@ -1,5 +1,6 @@
 'use client'
 
+import { hojeISO } from '@/lib/dateUtils'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -49,7 +50,6 @@ function statusIcon(status: string, color: string) {
   return <IconX color={color} />
 }
 
-const hojeISO = () => new Date().toISOString().split('T')[0]
 
 export default function VisitaForm({ visitaId }: { visitaId?: string }) {
   const editando = !!visitaId
@@ -163,7 +163,7 @@ export default function VisitaForm({ visitaId }: { visitaId?: string }) {
 
   if (carregandoDados) {
     return (
-      <div style={{ maxWidth: 1080 }}>
+      <div>
         <div className="ui-skeleton" style={{ height: 14, width: 160, marginBottom: '1rem' }} />
         <div className="ui-skeleton" style={{ height: 36, width: 280, marginBottom: '1.5rem' }} />
         <div className="ui-skeleton" style={{ height: 480, borderRadius: 16 }} />
@@ -174,29 +174,29 @@ export default function VisitaForm({ visitaId }: { visitaId?: string }) {
   return (
     <>
       <style>{`
-        .nv-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:1.2rem;align-items:start;max-width:1080px}
+        .nv-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:1.2rem;align-items:start}
         .nv-secao{padding:1.35rem 1.5rem;border-bottom:1px solid #f2efea}
         .nv-secao-head{display:flex;align-items:center;gap:.7rem;margin-bottom:1.05rem}
-        .nv-passo{width:26px;height:26px;border-radius:50%;background:#fdf3e9;color:#E67E22;font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .nv-secao-titulo{font-size:.9rem;font-weight:700;color:#162a1e}
+        .nv-passo{width:26px;height:26px;border-radius:50%;background:#fdf3e9;color:#E67E22;font-size:.72rem;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .nv-secao-titulo{font-size:.9rem;font-weight:600;color:#162a1e}
         .nv-secao-desc{font-size:.7rem;color:#8f978f;margin-top:.1rem}
         .nv-colabs{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:.55rem}
-        .nv-colab{display:flex;align-items:center;gap:.65rem;padding:.65rem .8rem;border:1.5px solid #eae5de;border-radius:12px;background:#fff;cursor:pointer;font-family:'Comfortaa',sans-serif;font-size:.8rem;font-weight:700;color:#5b6660;text-align:left;transition:all .15s}
+        .nv-colab{display:flex;align-items:center;gap:.65rem;padding:.65rem .8rem;border:1.5px solid #eae5de;border-radius:12px;background:#fff;cursor:pointer;font-family:'Poppins',sans-serif;font-size:.8rem;font-weight:600;color:#5b6660;text-align:left;transition:all .15s}
         .nv-colab:hover{border-color:#cfc8bd;color:#162a1e}
         .nv-colab.ativo{border-color:#E67E22;background:#fffaf5;color:#162a1e;box-shadow:0 0 0 3px rgba(230,126,34,.12)}
         .nv-colab.ativo .ui-avatar{background:#E67E22}
         .nv-grid-3{display:grid;grid-template-columns:1fr 130px 1fr;gap:0 1rem}
         .nv-status{display:grid;grid-template-columns:repeat(3,1fr);gap:.55rem}
-        .nv-status-opt{display:flex;align-items:center;justify-content:center;gap:.45rem;border:1.5px solid #eae5de;border-radius:10px;padding:.7rem;cursor:pointer;font-family:'Comfortaa',sans-serif;font-size:.78rem;font-weight:700;color:#8f978f;background:#fff;transition:all .15s}
+        .nv-status-opt{display:flex;align-items:center;justify-content:center;gap:.45rem;border:1.5px solid #eae5de;border-radius:10px;padding:.7rem;cursor:pointer;font-family:'Poppins',sans-serif;font-size:.78rem;font-weight:600;color:#8f978f;background:#fff;transition:all .15s}
         .nv-status-opt:hover{border-color:#cfc8bd}
         .nv-actions{display:flex;gap:.6rem;justify-content:flex-end;padding:1rem 1.5rem;background:#faf8f5;border-radius:0 0 16px 16px;position:sticky;bottom:0;border-top:1px solid #f2efea}
         .nv-resumo{position:sticky;top:80px;padding:1.2rem 1.25rem}
-        .nv-resumo-titulo{font-size:.66rem;font-weight:700;color:#8f978f;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.9rem}
+        .nv-resumo-titulo{font-size:.66rem;font-weight:600;color:#8f978f;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.9rem}
         .nv-resumo-item{display:flex;gap:.65rem;align-items:flex-start;padding:.6rem 0;border-bottom:1px dashed #eae5de}
         .nv-resumo-item:last-child{border-bottom:none}
         .nv-resumo-icon{width:30px;height:30px;border-radius:9px;background:#f7f5f1;color:#8f978f;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .nv-resumo-label{font-size:.62rem;font-weight:700;color:#8f978f;text-transform:uppercase;letter-spacing:.06em}
-        .nv-resumo-valor{font-size:.8rem;font-weight:700;color:#162a1e;margin-top:.15rem;word-break:break-word}
+        .nv-resumo-label{font-size:.62rem;font-weight:600;color:#8f978f;text-transform:uppercase;letter-spacing:.06em}
+        .nv-resumo-valor{font-size:.8rem;font-weight:600;color:#162a1e;margin-top:.15rem;word-break:break-word}
         .nv-resumo-valor.vazio{color:#b8bdb6;font-weight:400}
         @media(max-width:960px){.nv-layout{grid-template-columns:1fr}.nv-resumo{display:none}}
         @media(max-width:640px){.nv-secao{padding:1.15rem 1.1rem}.nv-actions{padding:.9rem 1.1rem}.nv-status{grid-template-columns:1fr}.nv-grid-3{grid-template-columns:1fr 1fr}.nv-grid-3>:last-child{grid-column:1/-1}.nv-actions .ui-btn{flex:1}}
@@ -235,7 +235,7 @@ export default function VisitaForm({ visitaId }: { visitaId?: string }) {
               </div>
             </div>
             {colabsVisiveis.length === 0 ? (
-              <div className="ui-hint">Nenhum consultor ativo. <Link href="/admin/consultores/novo" style={{ color: '#E67E22', fontWeight: 700 }}>Cadastrar consultor</Link></div>
+              <div className="ui-hint">Nenhum consultor ativo. <Link href="/admin/consultores/novo" style={{ color: '#E67E22', fontWeight: 600 }}>Cadastrar consultor</Link></div>
             ) : (
               <div className="nv-colabs" role="radiogroup" aria-label="Consultor">
                 {colabsVisiveis.map(c => (

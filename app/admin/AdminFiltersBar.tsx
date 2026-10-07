@@ -34,6 +34,7 @@ export default function AdminFiltersBar({ clientes, funcionarios, inicio, fim, f
       value={value}
       onChange={handleChange}
       showFuncionario
+      showCliente={false}
       clientes={clientes}
       funcionarios={funcionarios}
     />

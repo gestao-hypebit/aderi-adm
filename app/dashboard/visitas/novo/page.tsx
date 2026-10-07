@@ -1,5 +1,6 @@
 'use client'
 
+import { hojeISO } from '@/lib/dateUtils'
 import { useEffect, useState, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -43,7 +44,7 @@ function NovaVisitaForm() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [form, setForm] = useState({
     cliente_id: '',
-    data_visita: new Date().toISOString().split('T')[0],
+    data_visita: hojeISO(),
     hora_visita: '',
     status: 'agendada',
     descricao: '',
@@ -117,33 +118,33 @@ function NovaVisitaForm() {
   return (
     <>
       <style>{`
-        .voltar{display:inline-flex;align-items:center;gap:.4rem;color:#E67E22;font-size:.82rem;font-weight:700;text-decoration:none;margin-bottom:1.2rem}
-        .page-title{font-size:1.3rem;font-weight:700;color:#162a1e;margin-bottom:1.5rem}
+        .voltar{display:inline-flex;align-items:center;gap:.4rem;color:#E67E22;font-size:.82rem;font-weight:600;text-decoration:none;margin-bottom:1.2rem}
+        .page-title{font-size:1.3rem;font-weight:600;color:#162a1e;margin-bottom:1.5rem}
         .form-card{background:#fff;border-radius:12px;padding:1.8rem;box-shadow:0 2px 8px rgba(0,0,0,.05);max-width:720px;margin:0 auto}
-        .form-section{font-size:.7rem;font-weight:700;color:#E67E22;letter-spacing:.08em;text-transform:uppercase;margin:1.2rem 0 .8rem;padding-bottom:.4rem;border-bottom:1px solid #f0ede8}
+        .form-section{font-size:.7rem;font-weight:600;color:#E67E22;letter-spacing:.08em;text-transform:uppercase;margin:1.2rem 0 .8rem;padding-bottom:.4rem;border-bottom:1px solid #f0ede8}
         .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
         .form-full{grid-column:1/-1}
-        .campo label{display:block;font-size:.72rem;font-weight:700;color:#555;letter-spacing:.04em;margin-bottom:.35rem}
-        .campo input,.campo select,.campo textarea{width:100%;padding:.7rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;outline:none;transition:border-color .2s;background:#fafaf8;box-sizing:border-box}
+        .campo label{display:block;font-size:.72rem;font-weight:600;color:#555;letter-spacing:.04em;margin-bottom:.35rem}
+        .campo input,.campo select,.campo textarea{width:100%;padding:.7rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Poppins',sans-serif;font-size:.85rem;color:#162a1e;outline:none;transition:border-color .2s;background:#fafaf8;box-sizing:border-box}
         .campo input:focus,.campo select:focus,.campo textarea:focus{border-color:#E67E22;background:#fff}
         .campo textarea{resize:vertical;min-height:100px}
         .status-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
-        .status-opt{display:flex;align-items:center;justify-content:center;gap:.4rem;border:1.5px solid #eae5de;border-radius:8px;padding:.6rem;text-align:center;cursor:pointer;font-size:.78rem;font-weight:700;color:#888;transition:all .2s;background:#fafaf8}
+        .status-opt{display:flex;align-items:center;justify-content:center;gap:.4rem;border:1.5px solid #eae5de;border-radius:8px;padding:.6rem;text-align:center;cursor:pointer;font-size:.78rem;font-weight:600;color:#888;transition:all .2s;background:#fafaf8}
         .status-opt.sel-agendada{border-color:#E67E22;background:#fff8f3;color:#E67E22}
         .status-opt.sel-realizada{border-color:#27ae60;background:#f0fdf4;color:#27ae60}
         .status-opt.sel-cancelada{border-color:#e74c3c;background:#fef2f2;color:#e74c3c}
-        .motivo-select{width:100%;padding:.7rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#162a1e;outline:none;transition:border-color .2s;background:#fafaf8;cursor:pointer;box-sizing:border-box}
+        .motivo-select{width:100%;padding:.7rem 1rem;border:1.5px solid #eae5de;border-radius:8px;font-family:'Poppins',sans-serif;font-size:.85rem;color:#162a1e;outline:none;transition:border-color .2s;background:#fafaf8;cursor:pointer;box-sizing:border-box}
         .motivo-select:focus{border-color:#E67E22;background:#fff}
         .motivo-outro-box{margin-top:.6rem;animation:fadeIn .2s ease}
         @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
         .err{display:flex;align-items:center;gap:.5rem;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:.6rem 1rem;border-radius:8px;font-size:.8rem;margin-bottom:1rem}
-        .sucesso{display:flex;align-items:center;gap:.5rem;background:#f0fdf4;border:1px solid #86efac;color:#166534;padding:.8rem 1rem;border-radius:8px;font-size:.85rem;font-weight:700;margin-bottom:1rem;animation:fadeIn .3s ease}
+        .sucesso{display:flex;align-items:center;gap:.5rem;background:#f0fdf4;border:1px solid #86efac;color:#166534;padding:.8rem 1rem;border-radius:8px;font-size:.85rem;font-weight:600;margin-bottom:1rem;animation:fadeIn .3s ease}
         .form-actions{display:flex;gap:.8rem;margin-top:1.5rem}
-        .btn-salvar{background:#E67E22;color:#fff;border:none;padding:.8rem 1.8rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:.5rem}
+        .btn-salvar{background:#E67E22;color:#fff;border:none;padding:.8rem 1.8rem;border-radius:8px;font-family:'Poppins',sans-serif;font-size:.88rem;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:.5rem}
         .btn-salvar:hover{background:#d35400}
         .btn-salvar:disabled{opacity:.6;cursor:not-allowed}
         .btn-salvar.salvo{background:#27ae60}
-        .btn-cancelar{background:transparent;color:#888;border:1.5px solid #eae5de;padding:.8rem 1.8rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer}
+        .btn-cancelar{background:transparent;color:#888;border:1.5px solid #eae5de;padding:.8rem 1.8rem;border-radius:8px;font-family:'Poppins',sans-serif;font-size:.88rem;font-weight:600;cursor:pointer}
         @media(max-width:600px){.form-grid{grid-template-columns:1fr}}
       `}</style>
 

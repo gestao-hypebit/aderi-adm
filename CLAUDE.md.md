@@ -10,7 +10,7 @@ SaaS de gestão de visitas em campo para a Aderi Agronegócios. Atende colaborad
 - **Ambiente do dev:** Windows, VS Code
 
 ## Design System
-- Fonte: Comfortaa
+- Fonte: Poppins (peso padrão 600 para destaque, 700 só em títulos)
 - Cores: `#162a1e` (verde), `#E67E22` (laranja), `#f0ede8` (fundo)
 - Ícones: SVG inline (sem biblioteca Lucide, sem emojis na UI)
 

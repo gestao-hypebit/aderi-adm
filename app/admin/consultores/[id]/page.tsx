@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import Tabela from '@/app/components/Tabela'
 import ConfirmDialog from '../../_ui/ConfirmDialog'
-import { calcRange } from '@/lib/dateUtils'
+import { calcRange, hojeISO } from '@/lib/dateUtils'
 
 type Perfil = { id: string; nome_completo: string | null; cargo: string | null; telefone: string | null; role: string; ativo: boolean | null; created_at: string | null }
 type Visita = {
@@ -57,7 +58,6 @@ export default function AdminConsultorDetalhe() {
   const [carregando, setCarregando] = useState(true)
   const [aba, setAba] = useState<'visitas' | 'clientes'>('visitas')
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'agendada' | 'realizada' | 'cancelada'>('todas')
-  const [mostrar, setMostrar] = useState(30)
   const [confirmarStatus, setConfirmarStatus] = useState(false)
   const [salvandoStatus, setSalvandoStatus] = useState(false)
   const [souEu, setSouEu] = useState(false)
@@ -85,7 +85,7 @@ export default function AdminConsultorDetalhe() {
     carregar()
   }, [id])
 
-  const hoje = new Date().toISOString().slice(0, 10)
+  const hoje = hojeISO()
   const { inicio: inicioMes, fim: fimMes } = calcRange('este-mes')
 
   const resumo = useMemo(() => {
@@ -126,7 +126,7 @@ export default function AdminConsultorDetalhe() {
 
   if (carregando) {
     return (
-      <div style={{ maxWidth: 1100 }}>
+      <div>
         <div className="ui-skeleton" style={{ height: 14, width: 160, marginBottom: '1rem' }} />
         <div className="ui-skeleton" style={{ height: 120, borderRadius: 16, marginBottom: '1.2rem' }} />
         <div className="ui-skeleton" style={{ height: 300, borderRadius: 16 }} />
@@ -152,29 +152,27 @@ export default function AdminConsultorDetalhe() {
   return (
     <>
       <style>{`
-        .cs-wrap{max-width:1100px}
+        .cs-wrap{width:100%}
         .cs-hero{padding:1.4rem 1.5rem;display:flex;gap:1.1rem;align-items:center;flex-wrap:wrap;margin-bottom:1.2rem}
-        .cs-avatar{width:64px;height:64px;border-radius:50%;background:#162a1e;color:#fff;font-size:1.6rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
+        .cs-avatar{width:64px;height:64px;border-radius:50%;background:#162a1e;color:#fff;font-size:1.6rem;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
         .cs-avatar-dot{position:absolute;right:2px;bottom:2px;width:14px;height:14px;border-radius:50%;border:3px solid #fff}
         .cs-titulo{flex:1;min-width:200px}
-        .cs-nome{font-size:1.35rem;font-weight:700;color:#162a1e;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+        .cs-nome{font-size:1.35rem;font-weight:600;color:#162a1e;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
         .cs-meta{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.4rem;font-size:.76rem;color:#8f978f}
         .cs-meta a{color:#5b6660;text-decoration:none;display:inline-flex;align-items:center;gap:.3rem}
         .cs-acoes{display:flex;gap:.5rem;flex-wrap:wrap}
         .cs-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;margin-bottom:1.2rem}
         .cs-kpi{padding:1rem 1.15rem}
-        .cs-kpi-label{font-size:.62rem;font-weight:700;color:#8f978f;text-transform:uppercase;letter-spacing:.06em}
-        .cs-kpi-num{font-size:1.3rem;font-weight:700;color:#162a1e;margin-top:.35rem}
+        .cs-kpi-label{font-size:.62rem;font-weight:600;color:#8f978f;text-transform:uppercase;letter-spacing:.06em}
+        .cs-kpi-num{font-size:1.3rem;font-weight:600;color:#162a1e;margin-top:.35rem}
         .cs-kpi-sub{font-size:.66rem;color:#8f978f;margin-top:.2rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .cs-tabs{display:flex;gap:.2rem;padding:0 1rem;border-bottom:1px solid #f2efea;overflow-x:auto}
-        .cs-tab{background:none;border:none;border-bottom:2px solid transparent;padding:.95rem .6rem .8rem;margin-bottom:-1px;font-family:'Comfortaa',sans-serif;font-size:.8rem;font-weight:700;color:#8f978f;cursor:pointer;display:flex;align-items:center;gap:.45rem;white-space:nowrap}
+        .cs-tab{background:none;border:none;border-bottom:2px solid transparent;padding:.95rem .6rem .8rem;margin-bottom:-1px;font-family:'Poppins',sans-serif;font-size:.8rem;font-weight:600;color:#8f978f;cursor:pointer;display:flex;align-items:center;gap:.45rem;white-space:nowrap}
         .cs-tab:hover{color:#162a1e}
         .cs-tab.ativo{color:#162a1e;border-bottom-color:#E67E22}
         .cs-tab .ui-count{font-size:.64rem;background:#f2efea;color:#5b6660;border-radius:999px;padding:.1rem .45rem}
         .cs-toolbar{padding:.85rem 1.4rem;display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap;border-bottom:1px solid #f2efea}
-        .cs-mais{display:block;width:100%;padding:.8rem;border:none;border-top:1px solid #f2efea;background:#faf8f5;font-family:'Comfortaa',sans-serif;font-size:.76rem;font-weight:700;color:#E67E22;cursor:pointer}
-        .cs-mais:hover{background:#fdf3e9}
-        .cs-inativo{display:flex;align-items:center;gap:.6rem;background:#fdeeec;border:1px solid #f6d3cf;color:#b03a2e;border-radius:12px;padding:.75rem 1rem;font-size:.78rem;font-weight:700;margin-bottom:1.2rem}
+        .cs-inativo{display:flex;align-items:center;gap:.6rem;background:#fdeeec;border:1px solid #f6d3cf;color:#b03a2e;border-radius:12px;padding:.75rem 1rem;font-size:.78rem;font-weight:600;margin-bottom:1.2rem}
         @media(max-width:1000px){.cs-kpis{grid-template-columns:repeat(3,1fr)}}
         @media(max-width:600px){.cs-kpis{grid-template-columns:1fr 1fr}.cs-acoes{width:100%}.cs-acoes .ui-btn{flex:1}}
       `}</style>
@@ -258,7 +256,7 @@ export default function AdminConsultorDetalhe() {
           <div className="ui-card cs-kpi">
             <div className="cs-kpi-label">KM no mês</div>
             <div className="cs-kpi-num">{kmMes.toLocaleString('pt-BR')}</div>
-            <div className="cs-kpi-sub"><Link href="/admin/relatorios/km" style={{ color: '#E67E22', textDecoration: 'none', fontWeight: 700 }}>Ver relatório →</Link></div>
+            <div className="cs-kpi-sub"><Link href={`/admin/relatorios/km?func=${id}`} style={{ color: '#E67E22', textDecoration: 'none', fontWeight: 600 }}>Ver lançamentos →</Link></div>
           </div>
         </div>
 
@@ -277,75 +275,67 @@ export default function AdminConsultorDetalhe() {
               <div className="cs-toolbar">
                 <div className="ui-segmented">
                   {(['todas', 'agendada', 'realizada', 'cancelada'] as const).map(s => (
-                    <button key={s} className={filtroStatus === s ? 'ativo' : ''} onClick={() => { setFiltroStatus(s); setMostrar(30) }}>
+                    <button key={s} className={filtroStatus === s ? 'ativo' : ''} onClick={() => setFiltroStatus(s)}>
                       {s === 'todas' ? 'Todas' : STATUS_LABEL[s] + 's'}
                     </button>
                   ))}
                 </div>
                 <Link href={`/admin/visitas?func=${perfil.id}`} className="ui-card-link">Abrir na lista de visitas →</Link>
               </div>
-              {visitasFiltradas.length === 0 ? (
-                <div className="ui-empty">
-                  <div className="ui-empty-icon"><IconClipboard /></div>
-                  <div className="ui-empty-title">Nenhuma visita</div>
-                  {!inativo && <Link href={`/admin/visitas/novo?funcionario=${perfil.id}`} className="ui-btn ui-btn-secondary ui-btn-sm"><IconPlus /> Agendar visita</Link>}
-                </div>
-              ) : (
-                <>
-                  {visitasFiltradas.slice(0, mostrar).map(v => {
-                    const c = umCliente(v)
-                    const d = new Date(v.data_visita + 'T12:00')
-                    const atrasada = v.status === 'agendada' && v.data_visita < hoje
-                    return (
-                      <Link key={v.id} href={`/admin/visitas/${v.id}`} className="ui-row">
-                        <div className="ui-date">
-                          <div className="ui-date-dia">{String(d.getDate()).padStart(2, '0')}</div>
-                          <div className="ui-date-mes">{d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')} {String(d.getFullYear()).slice(2)}</div>
-                        </div>
-                        <div className="ui-row-main">
-                          <div className="ui-row-title">{c?.nome ?? 'Cliente removido'}</div>
-                          <div className="ui-row-meta">
-                            {c?.nome_fazenda && <><span className="ui-fazenda">{c.nome_fazenda}</span><span className="ui-dot-sep" /></>}
-                            <span>{v.motivo_visita || 'Visita'}</span>
-                            {v.hora_visita && <><span className="ui-dot-sep" /><span>{v.hora_visita.slice(0, 5)}</span></>}
-                          </div>
-                        </div>
-                        {atrasada
-                          ? <span className="ui-badge ui-badge-cancelada">Atrasada</span>
-                          : <span className={`ui-badge ui-badge-${v.status}`}>{STATUS_LABEL[v.status] ?? v.status}</span>}
-                      </Link>
-                    )
-                  })}
-                  {visitasFiltradas.length > mostrar && (
-                    <button className="cs-mais" onClick={() => setMostrar(m => m + 30)}>
-                      Mostrar mais ({visitasFiltradas.length - mostrar} restantes)
-                    </button>
-                  )}
-                </>
-              )}
+              <Tabela
+                embutida
+                linhas={visitasFiltradas}
+                chave={v => v.id}
+                href={v => `/admin/visitas/${v.id}`}
+                porPagina={10}
+                reiniciar={filtroStatus}
+                rotulo="visitas"
+                destaque={v => v.status === 'agendada' && v.data_visita < hoje}
+                vazio={
+                  <div className="ui-empty">
+                    <div className="ui-empty-icon"><IconClipboard /></div>
+                    <div className="ui-empty-title">Nenhuma visita</div>
+                    {!inativo && <Link href={`/admin/visitas/novo?funcionario=${perfil.id}`} className="ui-btn ui-btn-secondary ui-btn-sm"><IconPlus /> Agendar visita</Link>}
+                  </div>
+                }
+                colunas={[
+                  { id: 'data', titulo: 'Data', largura: '110px', ordenar: (a, b) => a.data_visita.localeCompare(b.data_visita),
+                    celula: v => <><div className="ui-cel-num ui-cel-forte">{new Date(v.data_visita + 'T12:00').toLocaleDateString('pt-BR')}</div>{v.hora_visita && <div className="ui-cel-sub">{v.hora_visita.slice(0, 5)}</div>}</> },
+                  { id: 'cliente', titulo: 'Cliente', ordenar: (a, b) => (umCliente(a)?.nome ?? '').localeCompare(umCliente(b)?.nome ?? ''),
+                    celula: v => { const c = umCliente(v); return <div className="ui-cel-txt"><div className="ui-cel-titulo">{c?.nome ?? 'Cliente removido'}</div>{c?.nome_fazenda && <div className="ui-cel-sub laranja">{c.nome_fazenda}</div>}</div> } },
+                  { id: 'motivo', titulo: 'Motivo', ocultar: 'tablet', celula: v => v.motivo_visita || 'Visita' },
+                  { id: 'status', titulo: 'Status', largura: '110px', ordenar: (a, b) => a.status.localeCompare(b.status),
+                    celula: v => v.status === 'agendada' && v.data_visita < hoje
+                      ? <span className="ui-badge ui-badge-cancelada">Atrasada</span>
+                      : <span className={`ui-badge ui-badge-${v.status}`}>{STATUS_LABEL[v.status] ?? v.status}</span> },
+                ]}
+              />
             </>
-          ) : carteira.length === 0 ? (
-            <div className="ui-empty">
-              <div className="ui-empty-icon"><IconUsers /></div>
-              <div className="ui-empty-title">Nenhum cliente na carteira</div>
-              <div className="ui-empty-text">Clientes aparecem aqui quando este consultor cadastra ou visita um produtor.</div>
-            </div>
-          ) : carteira.map(c => (
-            <Link key={c.id} href={`/admin/clientes/${c.id}`} className="ui-row">
-              <div className="ui-avatar" style={{ borderRadius: 10, background: '#fdf3e9', color: '#E67E22' }}>{c.nome.charAt(0).toUpperCase()}</div>
-              <div className="ui-row-main">
-                <div className="ui-row-title">{c.nome}</div>
-                <div className="ui-row-meta">
-                  {c.nome_fazenda && <><span className="ui-fazenda">{c.nome_fazenda}</span><span className="ui-dot-sep" /></>}
-                  <span>{c.cidade || '—'}</span>
+          ) : (
+            <Tabela
+              embutida
+              linhas={carteira}
+              chave={c => c.id}
+              href={c => `/admin/clientes/${c.id}`}
+              porPagina={10}
+              rotulo="clientes"
+              vazio={
+                <div className="ui-empty">
+                  <div className="ui-empty-icon"><IconUsers /></div>
+                  <div className="ui-empty-title">Nenhum cliente na carteira</div>
+                  <div className="ui-empty-text">Clientes aparecem aqui quando este consultor cadastra ou visita um produtor.</div>
                 </div>
-              </div>
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: '.8rem', fontWeight: 700, color: '#162a1e' }}>{c.visitas} visita{c.visitas !== 1 ? 's' : ''}</div>
-                <div style={{ fontSize: '.66rem', color: '#8f978f', marginTop: '.15rem' }}>{c.ultima ? `última ${fmt(c.ultima)}` : 'sem visita realizada'}</div>
-              </div>
-            </Link>
-          ))}
+              }
+              colunas={[
+                { id: 'nome', titulo: 'Cliente', ordenar: (a, b) => a.nome.localeCompare(b.nome),
+                  celula: c => <div className="ui-cel"><div className="ui-cel-ini">{c.nome.charAt(0).toUpperCase()}</div><div className="ui-cel-txt"><div className="ui-cel-titulo">{c.nome}</div>{c.nome_fazenda && <div className="ui-cel-sub laranja">{c.nome_fazenda}</div>}</div></div> },
+                { id: 'cidade', titulo: 'Cidade', ocultar: 'celular', celula: c => c.cidade || <span className="ui-cel-mudo">—</span> },
+                { id: 'visitas', titulo: 'Visitas', alinhar: 'dir', ordenar: (a, b) => a.visitas - b.visitas, celula: c => <span className="ui-cel-num ui-cel-forte">{c.visitas}</span> },
+                { id: 'ultima', titulo: 'Última realizada', alinhar: 'dir', ocultar: 'celular', ordenar: (a, b) => (a.ultima ?? '').localeCompare(b.ultima ?? ''),
+                  celula: c => c.ultima ? <span className="ui-cel-num">{new Date(c.ultima + 'T12:00').toLocaleDateString('pt-BR')}</span> : <span className="ui-cel-mudo">—</span> },
+              ]}
+            />
+          )}
         </div>
       </div>
     </>

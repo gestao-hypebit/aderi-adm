@@ -95,8 +95,8 @@ export default function ClienteForm({ clienteId }: Props) {
         .cf-wrap{max-width:820px}
         .cf-secao{padding:1.35rem 1.5rem;border-bottom:1px solid #f2efea}
         .cf-secao-head{display:flex;align-items:center;gap:.7rem;margin-bottom:1.05rem}
-        .cf-passo{width:26px;height:26px;border-radius:50%;background:#fdf3e9;color:#E67E22;font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .cf-secao-titulo{font-size:.9rem;font-weight:700;color:#162a1e}
+        .cf-passo{width:26px;height:26px;border-radius:50%;background:#fdf3e9;color:#E67E22;font-size:.72rem;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .cf-secao-titulo{font-size:.9rem;font-weight:600;color:#162a1e}
         .cf-secao-desc{font-size:.7rem;color:#8f978f;margin-top:.1rem}
         .cf-grid-cidade{display:grid;grid-template-columns:1fr 110px;gap:0 1rem}
         .cf-actions{display:flex;gap:.6rem;justify-content:flex-end;padding:1rem 1.5rem;background:#faf8f5;border-radius:0 0 16px 16px}

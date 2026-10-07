@@ -19,8 +19,14 @@ const PAGINAS: Item[] = [
   { id: 'p-visitas', grupo: 'Páginas', titulo: 'Visitas', href: '/admin/visitas', icone: 'pagina' },
   { id: 'p-clientes', grupo: 'Páginas', titulo: 'Clientes', href: '/admin/clientes', icone: 'pagina' },
   { id: 'p-consultores', grupo: 'Páginas', titulo: 'Consultores', href: '/admin/consultores', icone: 'pagina' },
+  { id: 'p-cotacoes', grupo: 'Páginas', titulo: 'Cotações', href: '/admin/cotacoes', icone: 'pagina' },
+  { id: 'p-produtos', grupo: 'Páginas', titulo: 'Produtos', href: '/admin/produtos', icone: 'pagina' },
   { id: 'p-relatorios', grupo: 'Páginas', titulo: 'Relatórios', href: '/admin/relatorios', icone: 'pagina' },
-  { id: 'p-rel-km', grupo: 'Páginas', titulo: 'Relatório de KM / Combustível', href: '/admin/relatorios/km', icone: 'pagina' },
+  { id: 'p-rel-equipe', grupo: 'Relatórios', titulo: 'Desempenho da equipe', href: '/admin/relatorios/equipe', icone: 'pagina' },
+  { id: 'p-rel-visitas', grupo: 'Relatórios', titulo: 'Relatório de visitas', href: '/admin/relatorios/visitas', icone: 'pagina' },
+  { id: 'p-rel-carteira', grupo: 'Relatórios', titulo: 'Cobertura da carteira', href: '/admin/relatorios/carteira', icone: 'pagina' },
+  { id: 'p-rel-vendas', grupo: 'Relatórios', titulo: 'Cotações e vendas', href: '/admin/relatorios/vendas', icone: 'pagina' },
+  { id: 'p-rel-km', grupo: 'Relatórios', titulo: 'Relatório de KM e combustível', href: '/admin/relatorios/km', icone: 'pagina' },
 ]
 
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -114,21 +120,21 @@ export default function CommandPalette({ aberto, onFechar }: { aberto: boolean; 
         .cmd-overlay{position:fixed;inset:0;background:rgba(13,31,20,.45);backdrop-filter:blur(3px);z-index:2000;display:flex;justify-content:center;align-items:flex-start;padding:12vh 1rem 1rem}
         .cmd-box{width:100%;max-width:620px;background:#fff;border-radius:16px;box-shadow:0 30px 80px rgba(13,31,20,.35);overflow:hidden;display:flex;flex-direction:column;max-height:70vh}
         .cmd-input-wrap{display:flex;align-items:center;gap:.7rem;padding:1rem 1.2rem;border-bottom:1px solid #f2efea;color:#8f978f}
-        .cmd-input{flex:1;border:none;outline:none;font-family:'Comfortaa',sans-serif;font-size:.95rem;color:#162a1e;background:none}
+        .cmd-input{flex:1;border:none;outline:none;font-family:'Poppins',sans-serif;font-size:.95rem;color:#162a1e;background:none}
         .cmd-input::placeholder{color:#b8bdb6}
-        .cmd-esc{font-size:.62rem;font-weight:700;color:#8f978f;border:1px solid #eae5de;border-radius:6px;padding:.15rem .4rem}
+        .cmd-esc{font-size:.62rem;font-weight:600;color:#8f978f;border:1px solid #eae5de;border-radius:6px;padding:.15rem .4rem}
         .cmd-lista{overflow-y:auto;padding:.4rem}
-        .cmd-grupo{font-size:.6rem;font-weight:700;color:#8f978f;text-transform:uppercase;letter-spacing:.12em;padding:.75rem .8rem .35rem}
-        .cmd-item{display:flex;align-items:center;gap:.75rem;width:100%;border:none;background:none;text-align:left;padding:.6rem .8rem;border-radius:10px;cursor:pointer;font-family:'Comfortaa',sans-serif}
+        .cmd-grupo{font-size:.6rem;font-weight:600;color:#8f978f;text-transform:uppercase;letter-spacing:.12em;padding:.75rem .8rem .35rem}
+        .cmd-item{display:flex;align-items:center;gap:.75rem;width:100%;border:none;background:none;text-align:left;padding:.6rem .8rem;border-radius:10px;cursor:pointer;font-family:'Poppins',sans-serif}
         .cmd-item.ativo{background:#f7f5f1}
         .cmd-item.ativo .cmd-icone{background:#E67E22;color:#fff}
         .cmd-icone{width:32px;height:32px;border-radius:9px;background:#f7f5f1;color:#5b6660;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .1s}
-        .cmd-titulo{font-size:.82rem;font-weight:700;color:#162a1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .cmd-titulo{font-size:.82rem;font-weight:600;color:#162a1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .cmd-sub{font-size:.68rem;color:#8f978f;margin-top:.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .cmd-enter{margin-left:auto;font-size:.62rem;color:#8f978f;opacity:0}
         .cmd-item.ativo .cmd-enter{opacity:1}
         .cmd-vazio{padding:2rem;text-align:center;font-size:.8rem;color:#8f978f}
-        .cmd-rodape{display:flex;gap:1rem;padding:.6rem 1.2rem;border-top:1px solid #f2efea;background:#faf8f5;font-size:.64rem;color:#8f978f;font-weight:700}
+        .cmd-rodape{display:flex;gap:1rem;padding:.6rem 1.2rem;border-top:1px solid #f2efea;background:#faf8f5;font-size:.64rem;color:#8f978f;font-weight:600}
         @media(max-width:600px){.cmd-overlay{padding-top:1rem}.cmd-rodape{display:none}}
       `}</style>
       <div className="cmd-box" role="dialog" aria-modal="true" aria-label="Busca global">

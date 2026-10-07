@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { calcRange } from '@/lib/dateUtils'
+import { calcRange, hojeISO } from '@/lib/dateUtils'
+import ConsultoresLista from './ConsultoresLista'
 
 type Perfil = { id: string; nome_completo: string | null; cargo: string | null; role: string; ativo: boolean | null; created_at: string | null }
 
@@ -24,12 +25,11 @@ function IconUsers() {
   return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
 }
 
-const fmt = (d: string) => new Date(d + 'T12:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '').replace(' de ', ' ')
 
 export default async function AdminConsultoresPage() {
   const supabase = await createClient()
   const { inicio, fim } = calcRange('este-mes')
-  const hoje = new Date().toISOString().slice(0, 10)
+  const hoje = hojeISO()
 
   const [{ data: perfis }, { data: visitasMes }, { data: proximas }, { data: kms }, { data: recentes }, { data: atrasadas }] = await Promise.all([
     supabase.from('profiles').select('id, nome_completo, cargo, role, ativo, created_at').order('nome_completo'),
@@ -70,33 +70,11 @@ export default async function AdminConsultoresPage() {
   return (
     <>
       <style>{`
-        .co-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:1.1rem;margin-bottom:1.4rem}
-        .co-card{padding:1.3rem;display:flex;flex-direction:column;gap:1.05rem;position:relative}
-        .co-card-link{position:absolute;inset:0;border-radius:16px;z-index:0}
-        .co-card>*:not(.co-card-link){position:relative;z-index:1;pointer-events:none}
-        .co-card .co-acoes,.co-card .co-acoes *{pointer-events:auto}
-        .co-atrasada{display:inline-flex;align-items:center;gap:.3rem;font-size:.66rem;font-weight:700;color:#c0392b;background:#fdeeec;border-radius:999px;padding:.2rem .55rem;margin-top:.3rem}
         .co-inativo{display:flex;align-items:center;gap:.7rem;padding:.65rem .95rem .65rem .65rem;text-decoration:none;opacity:.75;transition:opacity .15s}
         .co-inativo:hover{opacity:1}
-        .co-head{display:flex;align-items:center;gap:.8rem}
-        .co-nome{font-size:.98rem;font-weight:700;color:#162a1e}
-        .co-cargo{font-size:.7rem;color:#8f978f;margin-top:.15rem}
-        .co-taxa{margin-left:auto;text-align:right}
-        .co-taxa-num{font-size:1.1rem;font-weight:700;color:#162a1e}
-        .co-taxa-label{font-size:.6rem;font-weight:700;color:#8f978f;text-transform:uppercase;letter-spacing:.06em}
-        .co-stats{display:grid;grid-template-columns:repeat(4,1fr);background:#faf8f5;border:1px solid #f2efea;border-radius:12px}
-        .co-stat{padding:.7rem .4rem;text-align:center;border-right:1px solid #f2efea}
-        .co-stat:last-child{border-right:none}
-        .co-stat-num{font-size:1rem;font-weight:700;color:#162a1e}
-        .co-stat-label{font-size:.58rem;font-weight:700;color:#8f978f;text-transform:uppercase;letter-spacing:.05em;margin-top:.2rem}
-        .co-linhas{display:flex;flex-direction:column;gap:.45rem}
-        .co-linha{display:flex;justify-content:space-between;gap:.6rem;font-size:.74rem;color:#8f978f}
-        .co-linha b{color:#162a1e;font-weight:700}
-        .co-acoes{display:flex;gap:.45rem;flex-wrap:wrap;margin-top:auto;padding-top:.2rem}
-        .co-acoes .ui-btn{flex:1}
         .co-admins{display:flex;gap:.6rem;flex-wrap:wrap}
         .co-admin{display:flex;align-items:center;gap:.6rem;padding:.65rem .95rem .65rem .65rem;text-decoration:none}
-        .co-admin-nome{font-size:.8rem;font-weight:700;color:#162a1e}
+        .co-admin-nome{font-size:.8rem;font-weight:600;color:#162a1e}
         .co-dica{font-size:.72rem;color:#8f978f;margin-top:.8rem;line-height:1.6}
       `}</style>
 
@@ -123,53 +101,14 @@ export default async function AdminConsultoresPage() {
           </div>
         </div>
       ) : (
-        <div className="co-grid">
-          {consultores.map(p => {
-            const r = resumo.get(p.id)
-            const nome = p.nome_completo || 'Sem nome'
-            const total = (r?.realizadas ?? 0) + (r?.agendadas ?? 0)
-            const taxa = total > 0 ? Math.round(((r?.realizadas ?? 0) / total) * 100) : 0
-            return (
-              <div key={p.id} className="ui-card ui-card-hover co-card">
-                <Link href={`/admin/consultores/${p.id}`} className="co-card-link" aria-label={`Abrir ficha de ${nome}`} />
-                <div className="co-head">
-                  <div className="ui-avatar ui-avatar-lg">{nome.charAt(0).toUpperCase()}</div>
-                  <div style={{ minWidth: 0 }}>
-                    <div className="co-nome">{nome}</div>
-                    <div className="co-cargo">{p.cargo || 'Consultor de campo'}</div>
-                    {(atrasadasPor.get(p.id) ?? 0) > 0 && <span className="co-atrasada">{atrasadasPor.get(p.id)} atrasada{atrasadasPor.get(p.id)! > 1 ? 's' : ''}</span>}
-                  </div>
-                  <div className="co-taxa">
-                    <div className="co-taxa-num" style={{ color: total === 0 ? '#b8bdb6' : taxa >= 70 ? '#27ae60' : '#E67E22' }}>{total === 0 ? '—' : `${taxa}%`}</div>
-                    <div className="co-taxa-label">Conclusão</div>
-                  </div>
-                </div>
-
-                <div className="ui-progress">
-                  <span style={{ width: `${taxa}%`, background: taxa >= 70 ? '#27ae60' : '#E67E22' }} />
-                </div>
-
-                <div className="co-stats">
-                  <div className="co-stat"><div className="co-stat-num">{r?.realizadas ?? 0}</div><div className="co-stat-label">Realizadas</div></div>
-                  <div className="co-stat"><div className="co-stat-num">{r?.agendadas ?? 0}</div><div className="co-stat-label">Agendadas</div></div>
-                  <div className="co-stat"><div className="co-stat-num">{r?.clientes.size ?? 0}</div><div className="co-stat-label">Clientes</div></div>
-                  <div className="co-stat"><div className="co-stat-num">{(r?.km ?? 0).toLocaleString('pt-BR')}</div><div className="co-stat-label">KM</div></div>
-                </div>
-
-                <div className="co-linhas">
-                  <div className="co-linha"><span>Próxima visita</span><b style={{ color: r?.proxima ? '#E67E22' : '#b8bdb6' }}>{r?.proxima ? fmt(r.proxima) : 'Nada agendado'}</b></div>
-                  <div className="co-linha"><span>Última atividade</span><b>{r?.ultimaAtividade ? fmt(r.ultimaAtividade) : '—'}</b></div>
-                </div>
-
-                <div className="co-acoes">
-                  <Link href={`/admin/agenda?func=${p.id}`} className="ui-btn ui-btn-secondary ui-btn-sm"><IconCalendar /> Agenda</Link>
-                  <Link href={`/admin/consultores/${p.id}`} className="ui-btn ui-btn-ghost ui-btn-sm">Ficha</Link>
-                  <Link href={`/admin/visitas/novo?funcionario=${p.id}`} className="ui-btn ui-btn-dark ui-btn-sm"><IconPlus /> Agendar</Link>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+        <ConsultoresLista linhas={consultores.map(p => {
+          const r = resumo.get(p.id)
+          return {
+            id: p.id, nome: p.nome_completo || 'Sem nome', cargo: p.cargo || 'Consultor de campo',
+            realizadas: r?.realizadas ?? 0, agendadas: r?.agendadas ?? 0, clientes: r?.clientes.size ?? 0, km: r?.km ?? 0,
+            atrasadas: atrasadasPor.get(p.id) ?? 0, proxima: r?.proxima ?? null, ultimaAtividade: r?.ultimaAtividade ?? null,
+          }
+        })} />
       )}
 
       {admins.length > 0 && (

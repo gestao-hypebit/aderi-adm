@@ -38,7 +38,7 @@ export default function ConfirmDialog({ aberto, titulo, children, confirmarTexto
             <IconAlert />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div id="confirm-titulo" style={{ fontSize: '1rem', fontWeight: 700, color: '#162a1e', lineHeight: 1.3 }}>{titulo}</div>
+            <div id="confirm-titulo" style={{ fontSize: '1rem', fontWeight: 600, color: '#162a1e', lineHeight: 1.3 }}>{titulo}</div>
             {children && <div style={{ fontSize: '.8rem', color: '#5b6660', lineHeight: 1.6, marginTop: '.45rem' }}>{children}</div>}
           </div>
         </div>

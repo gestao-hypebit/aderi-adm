@@ -66,23 +66,23 @@ export default function Combobox({ opcoes, valor, onChange, placeholder = 'Busca
   return (
     <div ref={wrapRef} style={{ position: 'relative' }}>
       <style>{`
-        .cb-trigger{width:100%;display:flex;align-items:center;gap:.6rem;text-align:left;padding:.62rem .9rem;border:1.5px solid #eae5de;border-radius:8px;background:#fff;font-family:'Comfortaa',sans-serif;font-size:.84rem;color:#162a1e;cursor:pointer;transition:border-color .15s,box-shadow .15s;min-height:44px}
+        .cb-trigger{width:100%;display:flex;align-items:center;gap:.6rem;text-align:left;padding:.62rem .9rem;border:1.5px solid #eae5de;border-radius:8px;background:#fff;font-family:'Poppins',sans-serif;font-size:.84rem;color:#162a1e;cursor:pointer;transition:border-color .15s,box-shadow .15s;min-height:44px}
         .cb-trigger:hover{border-color:#ddd6cc}
         .cb-trigger:focus-visible{outline:none;border-color:#E67E22;box-shadow:0 0 0 3px rgba(230,126,34,.12)}
         .cb-trigger-txt{flex:1;min-width:0}
-        .cb-trigger-label{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .cb-trigger-sub{font-size:.7rem;color:#E67E22;font-weight:700;margin-top:.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .cb-trigger-label{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .cb-trigger-sub{font-size:.7rem;color:#E67E22;font-weight:600;margin-top:.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .cb-placeholder{color:#b8bdb6}
         .cb-pop{position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid #eae5de;border-radius:12px;box-shadow:0 16px 40px rgba(22,42,30,.16);z-index:400;overflow:hidden}
-        .cb-search{width:100%;border:none;border-bottom:1px solid #f2efea;padding:.75rem .9rem .75rem 2.2rem;font-family:'Comfortaa',sans-serif;font-size:.82rem;color:#162a1e;outline:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238f978f' stroke-width='2.2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") no-repeat .8rem center}
+        .cb-search{width:100%;border:none;border-bottom:1px solid #f2efea;padding:.75rem .9rem .75rem 2.2rem;font-family:'Poppins',sans-serif;font-size:.82rem;color:#162a1e;outline:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238f978f' stroke-width='2.2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") no-repeat .8rem center}
         .cb-lista{max-height:260px;overflow-y:auto;padding:.3rem}
-        .cb-opt{display:block;width:100%;text-align:left;border:none;background:none;padding:.55rem .7rem;border-radius:8px;cursor:pointer;font-family:'Comfortaa',sans-serif}
+        .cb-opt{display:block;width:100%;text-align:left;border:none;background:none;padding:.55rem .7rem;border-radius:8px;cursor:pointer;font-family:'Poppins',sans-serif}
         .cb-opt.ativo{background:#f7f5f1}
         .cb-opt.sel .cb-opt-label{color:#E67E22}
-        .cb-opt-label{font-size:.8rem;font-weight:700;color:#162a1e}
+        .cb-opt-label{font-size:.8rem;font-weight:600;color:#162a1e}
         .cb-opt-sub{font-size:.68rem;color:#8f978f;margin-top:.1rem}
         .cb-vazio{padding:1rem;text-align:center;font-size:.76rem;color:#8f978f}
-        .cb-extra{display:block;width:100%;border:none;border-top:1px solid #f2efea;background:#faf8f5;padding:.7rem .9rem;text-align:left;font-family:'Comfortaa',sans-serif;font-size:.76rem;font-weight:700;color:#E67E22;cursor:pointer}
+        .cb-extra{display:block;width:100%;border:none;border-top:1px solid #f2efea;background:#faf8f5;padding:.7rem .9rem;text-align:left;font-family:'Poppins',sans-serif;font-size:.76rem;font-weight:600;color:#E67E22;cursor:pointer}
         .cb-extra:hover{background:#fdf3e9}
       `}</style>
 

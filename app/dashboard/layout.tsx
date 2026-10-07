@@ -20,11 +20,11 @@ function IconCalendar() {
 function IconCar() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 17h14M5 17a2 2 0 0 1-2-2v-2a2 2 0 0 1 .5-1.32L5.5 9a2 2 0 0 1 1.5-.68h10a2 2 0 0 1 1.5.68l2 2.68A2 2 0 0 1 21 13v2a2 2 0 0 1-2 2"/><circle cx="7.5" cy="17" r="1.5"/><circle cx="16.5" cy="17" r="1.5"/></svg>
 }
-function IconBarChart() {
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>
-}
 function IconLogout() {
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+}
+function IconDoc() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
 }
 function IconMenu() {
   return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -37,9 +37,9 @@ const links = [
   { href: '/dashboard', label: 'Início', Icon: IconHome },
   { href: '/dashboard/clientes', label: 'Clientes', Icon: IconUsers },
   { href: '/dashboard/visitas', label: 'Visitas', Icon: IconClipboard },
+  { href: '/dashboard/cotacoes', label: 'Cotações', Icon: IconDoc },
   { href: '/dashboard/agendamento', label: 'Agenda', Icon: IconCalendar },
   { href: '/dashboard/km', label: 'Controle de KM', Icon: IconCar },
-  { href: '/dashboard/relatorios', label: 'Relatórios', Icon: IconBarChart },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -78,9 +78,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'Comfortaa',sans-serif;background:#f0ede8}
+        body{font-family:'Poppins',sans-serif;background:#f0ede8}
         .layout{display:flex;min-height:100vh}
 
         .sidebar{width:240px;background:#162a1e;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;transition:transform .3s}
@@ -89,26 +89,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         .sidebar-logo span{font-weight:900;font-size:.95rem;color:#fff}
         .sidebar-logo span b{color:#E67E22}
         .sidebar-nav{flex:1;padding:1rem 0;overflow-y:auto}
-        .nav-label{font-size:.65rem;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:.1em;padding:.5rem 1.5rem;margin-top:.5rem}
-        .nav-link{display:flex;align-items:center;gap:.75rem;padding:.75rem 1.5rem;color:rgba(255,255,255,.6);text-decoration:none;font-size:.85rem;font-weight:700;transition:all .2s;border-left:3px solid transparent}
+        .nav-label{font-size:.65rem;font-weight:600;color:rgba(255,255,255,.3);letter-spacing:.1em;padding:.5rem 1.5rem;margin-top:.5rem}
+        .nav-link{display:flex;align-items:center;gap:.75rem;padding:.75rem 1.5rem;color:rgba(255,255,255,.6);text-decoration:none;font-size:.85rem;font-weight:600;transition:all .2s;border-left:3px solid transparent}
         .nav-link:hover{color:#fff;background:rgba(255,255,255,.05)}
         .nav-link.ativo{color:#fff;background:rgba(230,126,34,.12);border-left-color:#E67E22}
         .nav-link .icon{width:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
         .sidebar-footer{padding:1rem 1.5rem;border-top:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:.5rem}
-        .btn-sair{width:100%;padding:.65rem;background:transparent;border:1.5px solid rgba(255,255,255,.2);color:rgba(255,255,255,.6);border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:.5rem}
+        .btn-sair{width:100%;padding:.65rem;background:transparent;border:1.5px solid rgba(255,255,255,.2);color:rgba(255,255,255,.6);border-radius:8px;font-family:'Poppins',sans-serif;font-size:.78rem;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:.5rem}
         .btn-sair:hover{border-color:#E67E22;color:#E67E22}
-        .btn-admin{width:100%;padding:.65rem;background:rgba(230,126,34,.1);border:1.5px solid rgba(230,126,34,.25);color:#E67E22;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:.5rem;text-decoration:none}
+        .btn-admin{width:100%;padding:.65rem;background:rgba(230,126,34,.1);border:1.5px solid rgba(230,126,34,.25);color:#E67E22;border-radius:8px;font-family:'Poppins',sans-serif;font-size:.78rem;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:.5rem;text-decoration:none}
         .btn-admin:hover{background:rgba(230,126,34,.2);border-color:#E67E22}
 
         .main{margin-left:240px;flex:1;display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden}
         .topbar{background:#fff;padding:1rem 2rem;border-bottom:1px solid #eae5de;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;width:100%}
-        .topbar-titulo{font-weight:700;color:#162a1e}
+        .topbar-titulo{font-weight:600;color:#162a1e}
         .topbar-user{display:flex;align-items:center;gap:.75rem}
-        .user-nome{font-size:.82rem;font-weight:700;color:#555}
-        .user-role{font-size:.66rem;font-weight:700;padding:.28rem .65rem;border-radius:20px;letter-spacing:.03em;white-space:nowrap}
+        .user-nome{font-size:.82rem;font-weight:600;color:#555}
+        .user-role{font-size:.66rem;font-weight:600;padding:.28rem .65rem;border-radius:20px;letter-spacing:.03em;white-space:nowrap}
         .user-role.admin{background:rgba(230,126,34,.12);color:#c0651a;border:1px solid rgba(230,126,34,.3)}
         .user-role.colab{background:rgba(22,42,30,.08);color:#162a1e;border:1px solid rgba(22,42,30,.18)}
-        .user-avatar{width:34px;height:34px;border-radius:50%;background:#E67E22;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.85rem;flex-shrink:0}
+        .user-avatar{width:34px;height:34px;border-radius:50%;background:#E67E22;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:.85rem;flex-shrink:0}
         .content{padding:2rem;flex:1}
 
         .menu-toggle{display:none;background:none;border:none;cursor:pointer;color:#162a1e;line-height:0}

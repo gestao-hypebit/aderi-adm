@@ -26,7 +26,7 @@ export async function proxy(request: NextRequest) {
   const rotasPublicas = ['/login', '/cadastro', '/nova-senha']
 
   // Não logado tentando acessar área protegida
-  if (!user && path.startsWith('/dashboard')) {
+  if (!user && (path.startsWith('/dashboard') || path.startsWith('/imprimir'))) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
@@ -50,5 +50,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login', '/cadastro', '/nova-senha'],
+  matcher: ['/dashboard/:path*', '/imprimir/:path*', '/login', '/cadastro', '/nova-senha'],
 }

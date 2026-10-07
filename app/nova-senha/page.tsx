@@ -82,9 +82,9 @@ export default function NovaSenhaPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
-        .page{min-height:100vh;background:#ece9e3;display:flex;align-items:center;justify-content:center;padding:2rem;font-family:'Comfortaa',sans-serif}
+        .page{min-height:100vh;background:#ece9e3;display:flex;align-items:center;justify-content:center;padding:2rem;font-family:'Poppins',sans-serif}
         .card{display:flex;width:100%;max-width:860px;border-radius:20px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.13)}
         .left{flex:0 0 44%;position:relative;min-height:480px;overflow:hidden}
         .left-bg{position:absolute;inset:0;background:url('/imgLogin.jpg') center/cover no-repeat}
@@ -97,21 +97,21 @@ export default function NovaSenhaPage() {
         .left-p{color:rgba(255,255,255,.5);font-size:.78rem;line-height:1.65}
         .right{flex:1;background:#fff;padding:2.8rem 2.4rem;display:flex;align-items:center}
         .fw{width:100%}
-        .ft{font-weight:700;font-size:1.35rem;color:#1a1a1a;margin-bottom:.25rem}
+        .ft{font-weight:600;font-size:1.35rem;color:#1a1a1a;margin-bottom:.25rem}
         .fs{color:#aaa;font-size:.78rem;margin-bottom:1.7rem}
         .campo{margin-bottom:.9rem}
-        .campo label{display:block;font-size:.68rem;font-weight:700;color:#555;letter-spacing:.05em;margin-bottom:.4rem}
-        .campo input{width:100%;padding:.75rem 1rem;border:1.5px solid #eae5de;border-radius:8px;background:#fafaf8;font-family:'Comfortaa',sans-serif;font-size:.85rem;color:#1a1a1a;outline:none;transition:border-color .2s,box-shadow .2s}
+        .campo label{display:block;font-size:.68rem;font-weight:600;color:#555;letter-spacing:.05em;margin-bottom:.4rem}
+        .campo input{width:100%;padding:.75rem 1rem;border:1.5px solid #eae5de;border-radius:8px;background:#fafaf8;font-family:'Poppins',sans-serif;font-size:.85rem;color:#1a1a1a;outline:none;transition:border-color .2s,box-shadow .2s}
         .campo input:focus{border-color:#E67E22;box-shadow:0 0 0 3px rgba(230,126,34,.1);background:#fff}
         .campo input::placeholder{color:#c5bdb4}
         .err{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:.65rem 1rem;border-radius:8px;font-size:.8rem;margin-bottom:.8rem}
         .ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;padding:1rem;border-radius:8px;font-size:.85rem;line-height:1.7;text-align:center}
         .aviso-link{background:#fef3e2;border:1px solid #fde68a;color:#92400e;padding:1rem;border-radius:8px;font-size:.85rem;line-height:1.7}
         .carregando{color:#aaa;font-size:.85rem;text-align:center;padding:2rem 0}
-        .btn{width:100%;padding:.85rem;background:#E67E22;color:#fff;border:none;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;transition:background .2s;margin-top:.5rem}
+        .btn{width:100%;padding:.85rem;background:#E67E22;color:#fff;border:none;border-radius:8px;font-family:'Poppins',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer;transition:background .2s;margin-top:.5rem}
         .btn:hover{background:#d35400}
         .btn:disabled{opacity:.6;cursor:not-allowed}
-        .btn-sec{width:100%;padding:.85rem;background:transparent;color:#162a1e;border:1.5px solid #eae5de;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;margin-top:.6rem}
+        .btn-sec{width:100%;padding:.85rem;background:transparent;color:#162a1e;border:1.5px solid #eae5de;border-radius:8px;font-family:'Poppins',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer;margin-top:.6rem}
         @media(max-width:640px){.left{display:none}.card{max-width:420px}}
       `}</style>
 

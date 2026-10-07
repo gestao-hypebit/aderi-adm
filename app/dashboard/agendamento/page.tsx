@@ -1,5 +1,6 @@
 'use client'
 
+import { hojeISO } from '@/lib/dateUtils'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
@@ -126,7 +127,7 @@ export default function AgendamentoPage() {
   const visitasDoDia = diaSelecionado ? (visitasPorDia[diaSelecionado] || []) : []
   const dataParaNovaVisita = diaSelecionado
     ? `${ano}-${String(mes + 1).padStart(2, '0')}-${String(diaSelecionado).padStart(2, '0')}`
-    : new Date().toISOString().split('T')[0]
+    : hojeISO()
 
   const isHoje = (dia: number) =>
     dia === hoje.getDate() && mes === hoje.getMonth() && ano === hoje.getFullYear()
@@ -135,24 +136,24 @@ export default function AgendamentoPage() {
     <>
       <style>{`
         .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem}
-        .page-title{font-size:1.3rem;font-weight:700;color:#162a1e}
+        .page-title{font-size:1.3rem;font-weight:600;color:#162a1e}
         .page-sub{font-size:.8rem;color:#aaa;margin-top:.2rem}
-        .btn-nova{display:inline-flex;align-items:center;gap:.5rem;background:#E67E22;color:#fff;padding:.7rem 1.4rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.85rem;font-weight:700;border:none;cursor:pointer;transition:background .2s;text-decoration:none}
+        .btn-nova{display:inline-flex;align-items:center;gap:.5rem;background:#E67E22;color:#fff;padding:.7rem 1.4rem;border-radius:8px;font-family:'Poppins',sans-serif;font-size:.85rem;font-weight:600;border:none;cursor:pointer;transition:background .2s;text-decoration:none}
         .btn-nova:hover{background:#d35400}
         .cal-card{background:#fff;border-radius:16px;padding:1.5rem;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:1.2rem}
         .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem}
-        .cal-mes-ano{font-size:1.05rem;font-weight:700;color:#162a1e}
+        .cal-mes-ano{font-size:1.05rem;font-weight:600;color:#162a1e}
         .cal-btn{background:#f0ede8;border:none;border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:1rem;color:#162a1e;display:flex;align-items:center;justify-content:center;transition:background .2s}
         .cal-btn:hover{background:#e0dbd2}
         .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-        .cal-header-dia{text-align:center;font-size:.65rem;font-weight:700;color:#aaa;letter-spacing:.04em;padding:.3rem 0;text-transform:uppercase}
+        .cal-header-dia{text-align:center;font-size:.65rem;font-weight:600;color:#aaa;letter-spacing:.04em;padding:.3rem 0;text-transform:uppercase}
         .cal-cel{min-height:52px;border-radius:10px;padding:4px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center}
         .cal-cel:hover{background:#f0ede8}
         .cal-cel.vazia{cursor:default;pointer-events:none}
         .cal-cel.hoje .cal-num{background:#162a1e;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center}
         .cal-cel.selecionado{background:#fff8f3;border:1.5px solid #E67E22}
         .cal-cel.tem-visita{background:#fdfaf6}
-        .cal-num{font-size:.82rem;font-weight:700;color:#162a1e;width:26px;height:26px;display:flex;align-items:center;justify-content:center;margin-bottom:2px}
+        .cal-num{font-size:.82rem;font-weight:600;color:#162a1e;width:26px;height:26px;display:flex;align-items:center;justify-content:center;margin-bottom:2px}
         .cal-num.passado{color:#ccc}
         .cal-dots{display:flex;gap:2px;flex-wrap:wrap;justify-content:center;max-width:44px}
         .cal-dot{width:6px;height:6px;border-radius:50%}
@@ -161,23 +162,23 @@ export default function AgendamentoPage() {
         .legenda-dot{width:8px;height:8px;border-radius:50%}
         .dia-painel{background:#fff;border-radius:16px;padding:1.5rem;box-shadow:0 2px 12px rgba(0,0,0,.06)}
         .dia-titulo{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;flex-wrap:wrap;gap:.8rem}
-        .dia-titulo-texto{font-size:1rem;font-weight:700;color:#162a1e}
+        .dia-titulo-texto{font-size:1rem;font-weight:600;color:#162a1e}
         .dia-titulo-sub{font-size:.78rem;color:#aaa;margin-top:.15rem}
-        .btn-agendar{display:inline-flex;align-items:center;gap:.4rem;background:#162a1e;color:#fff;padding:.6rem 1.2rem;border-radius:8px;font-family:'Comfortaa',sans-serif;font-size:.78rem;font-weight:700;text-decoration:none;transition:background .2s}
+        .btn-agendar{display:inline-flex;align-items:center;gap:.4rem;background:#162a1e;color:#fff;padding:.6rem 1.2rem;border-radius:8px;font-family:'Poppins',sans-serif;font-size:.78rem;font-weight:600;text-decoration:none;transition:background .2s}
         .btn-agendar:hover{background:#0d1f14}
         .visita-item{display:flex;align-items:flex-start;gap:.8rem;padding:.9rem 1rem;border-radius:10px;border:1px solid #f0ede8;margin-bottom:.6rem;transition:border-color .2s;cursor:pointer;text-decoration:none}
         .visita-item:hover{border-color:#E67E22;background:#fff8f3}
         .visita-status-bar{width:3px;border-radius:2px;align-self:stretch;flex-shrink:0}
         .visita-info{flex:1;min-width:0}
-        .visita-cliente{font-size:.88rem;font-weight:700;color:#162a1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .visita-fazenda{display:flex;align-items:center;gap:.35rem;font-size:.75rem;color:#E67E22;font-weight:700;margin:.15rem 0}
+        .visita-cliente{font-size:.88rem;font-weight:600;color:#162a1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .visita-fazenda{display:flex;align-items:center;gap:.35rem;font-size:.75rem;color:#E67E22;font-weight:600;margin:.15rem 0}
         .visita-motivo{display:flex;align-items:center;gap:.35rem;font-size:.72rem;color:#888}
-        .visita-badge{display:inline-flex;align-items:center;gap:.3rem;font-size:.68rem;font-weight:700;padding:.2rem .5rem;border-radius:10px;color:#fff;margin-top:.3rem}
+        .visita-badge{display:inline-flex;align-items:center;gap:.3rem;font-size:.68rem;font-weight:600;padding:.2rem .5rem;border-radius:10px;color:#fff;margin-top:.3rem}
         .dia-vazio{text-align:center;padding:2.5rem 1rem;color:#bbb}
         .dia-vazio-icon{display:flex;justify-content:center;margin-bottom:.5rem}
         .dia-vazio-txt{font-size:.85rem}
         .resumo-bar{display:flex;gap:.8rem;margin-bottom:1rem;flex-wrap:wrap}
-        .resumo-chip{display:inline-flex;align-items:center;gap:.4rem;background:#f0ede8;border-radius:20px;padding:.3rem .8rem;font-size:.75rem;font-weight:700;color:#162a1e}
+        .resumo-chip{display:inline-flex;align-items:center;gap:.4rem;background:#f0ede8;border-radius:20px;padding:.3rem .8rem;font-size:.75rem;font-weight:600;color:#162a1e}
         @media(max-width:600px){.cal-cel{min-height:44px}.cal-num{font-size:.75rem}}
       `}</style>
 

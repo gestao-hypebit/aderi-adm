@@ -1,5 +1,6 @@
 'use client'
 
+import { hojeISO } from '@/lib/dateUtils'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -133,7 +134,7 @@ export default function AdminAgendaPage() {
   const visitasDoDia = diaSelecionado ? (visitasPorDia[diaSelecionado] || []) : []
   const dataParaNovaVisita = diaSelecionado
     ? `${ano}-${String(mes + 1).padStart(2, '0')}-${String(diaSelecionado).padStart(2, '0')}`
-    : new Date().toISOString().split('T')[0]
+    : hojeISO()
   const colabParam = funcionarioId ? `&funcionario=${funcionarioId}` : ''
   const isHoje = (dia: number) =>
     dia === hoje.getDate() && mes === hoje.getMonth() && ano === hoje.getFullYear()
@@ -153,7 +154,7 @@ export default function AdminAgendaPage() {
     <>
       <style>{`
         .ag-colabs{display:flex;gap:.45rem;flex-wrap:wrap;margin-bottom:1.3rem}
-        .ag-colab{display:inline-flex;align-items:center;gap:.5rem;background:#fff;border:1.5px solid #eae5de;border-radius:999px;padding:.3rem .85rem .3rem .3rem;font-family:'Comfortaa',sans-serif;font-size:.74rem;font-weight:700;color:#5b6660;cursor:pointer;transition:all .15s}
+        .ag-colab{display:inline-flex;align-items:center;gap:.5rem;background:#fff;border:1.5px solid #eae5de;border-radius:999px;padding:.3rem .85rem .3rem .3rem;font-family:'Poppins',sans-serif;font-size:.74rem;font-weight:600;color:#5b6660;cursor:pointer;transition:all .15s}
         .ag-colab:hover{border-color:#cfc8bd;color:#162a1e}
         .ag-colab.ativo{background:#162a1e;border-color:#162a1e;color:#fff}
         .ag-colab.ativo .ui-avatar{background:#E67E22}
@@ -161,44 +162,44 @@ export default function AdminAgendaPage() {
         .ag-layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:1.2rem;align-items:start}
         .ag-cal{padding:1.3rem 1.4rem 1.2rem}
         .ag-nav{display:flex;align-items:center;gap:.6rem;margin-bottom:1.1rem}
-        .ag-mes{font-size:1.1rem;font-weight:700;color:#162a1e;margin-right:auto}
-        .ag-mes-resumo{font-size:.7rem;color:#8f978f;font-weight:700;margin-top:.2rem}
+        .ag-mes{font-size:1.1rem;font-weight:600;color:#162a1e;margin-right:auto}
+        .ag-mes-resumo{font-size:.7rem;color:#8f978f;font-weight:600;margin-top:.2rem}
         .ag-nav-btn{background:#fff;border:1.5px solid #eae5de;border-radius:9px;width:34px;height:34px;cursor:pointer;color:#162a1e;display:flex;align-items:center;justify-content:center;transition:all .15s}
         .ag-nav-btn:hover{border-color:#E67E22;color:#E67E22}
         .ag-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
-        .ag-dow{text-align:center;font-size:.62rem;font-weight:700;color:#8f978f;letter-spacing:.08em;padding:.3rem 0 .45rem;text-transform:uppercase}
-        .ag-cel{min-height:78px;border-radius:11px;padding:.45rem .5rem;cursor:pointer;transition:background .15s,border-color .15s;border:1.5px solid transparent;background:#faf8f5;display:flex;flex-direction:column;gap:.35rem;text-align:left;font-family:'Comfortaa',sans-serif}
+        .ag-dow{text-align:center;font-size:.62rem;font-weight:600;color:#8f978f;letter-spacing:.08em;padding:.3rem 0 .45rem;text-transform:uppercase}
+        .ag-cel{min-height:78px;border-radius:11px;padding:.45rem .5rem;cursor:pointer;transition:background .15s,border-color .15s;border:1.5px solid transparent;background:#faf8f5;display:flex;flex-direction:column;gap:.35rem;text-align:left;font-family:'Poppins',sans-serif}
         .ag-cel:hover{background:#f3efe9}
         .ag-cel.vazia{background:transparent;cursor:default;pointer-events:none}
         .ag-cel.fim-semana{background:#f7f5f1}
         .ag-cel.selecionado{background:#fff;border-color:#E67E22;box-shadow:0 4px 14px rgba(230,126,34,.15)}
-        .ag-num{font-size:.78rem;font-weight:700;color:#162a1e;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+        .ag-num{font-size:.78rem;font-weight:600;color:#162a1e;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%}
         .ag-num.passado{color:#b8bdb6}
         .ag-cel.hoje .ag-num{background:#162a1e;color:#fff}
         .ag-pills{display:flex;flex-direction:column;gap:3px;min-width:0}
-        .ag-pill{display:flex;align-items:center;gap:.3rem;font-size:.6rem;font-weight:700;border-radius:5px;padding:.15rem .35rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .ag-pill{display:flex;align-items:center;gap:.3rem;font-size:.6rem;font-weight:600;border-radius:5px;padding:.15rem .35rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .ag-pill-agendada{background:#fdf3e9;color:#b5651d}
         .ag-pill-realizada{background:#eaf7ef;color:#1e8a4c}
         .ag-pill-cancelada{background:#fdeeec;color:#c0392b;text-decoration:line-through}
-        .ag-mais{font-size:.6rem;font-weight:700;color:#8f978f;padding-left:.35rem}
+        .ag-mais{font-size:.6rem;font-weight:600;color:#8f978f;padding-left:.35rem}
         .ag-legenda{display:flex;gap:1rem;margin-top:1rem;flex-wrap:wrap}
         .ag-lista{display:flex;flex-direction:column;gap:.2rem}
         .ag-lista-dia{display:flex;gap:1rem;padding:.7rem 0;border-bottom:1px solid #f2efea}
         .ag-lista-dia:last-child{border-bottom:none}
-        .ag-lista-data{width:52px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:.15rem;background:none;border:none;cursor:pointer;font-family:'Comfortaa',sans-serif;padding-top:.3rem}
-        .ag-lista-num{font-size:1.25rem;font-weight:700;color:#162a1e;line-height:1}
-        .ag-lista-dow{font-size:.6rem;font-weight:700;color:#8f978f;text-transform:uppercase;letter-spacing:.08em}
+        .ag-lista-data{width:52px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:.15rem;background:none;border:none;cursor:pointer;font-family:'Poppins',sans-serif;padding-top:.3rem}
+        .ag-lista-num{font-size:1.25rem;font-weight:600;color:#162a1e;line-height:1}
+        .ag-lista-dow{font-size:.6rem;font-weight:600;color:#8f978f;text-transform:uppercase;letter-spacing:.08em}
         .ag-lista-dia.hoje .ag-lista-num{color:#E67E22}
         .ag-lista-itens{flex:1;min-width:0;display:flex;flex-direction:column;gap:.3rem}
         .ag-lista-item{display:flex;align-items:center;gap:.75rem;padding:.6rem .75rem;border-radius:10px;text-decoration:none;transition:background .15s}
         .ag-lista-item:hover{background:#faf8f5}
-        .ag-legenda-item{display:flex;align-items:center;gap:.4rem;font-size:.68rem;color:#8f978f;font-weight:700}
+        .ag-legenda-item{display:flex;align-items:center;gap:.4rem;font-size:.68rem;color:#8f978f;font-weight:600}
         .ag-legenda-dot{width:8px;height:8px;border-radius:50%}
 
         .ag-dia{position:sticky;top:80px;overflow:hidden}
         .ag-dia-head{padding:1.2rem 1.3rem 1rem;border-bottom:1px solid #f2efea}
-        .ag-dia-semana{font-size:.66rem;font-weight:700;color:#E67E22;text-transform:uppercase;letter-spacing:.1em}
-        .ag-dia-titulo{font-size:1.05rem;font-weight:700;color:#162a1e;margin-top:.25rem}
+        .ag-dia-semana{font-size:.66rem;font-weight:600;color:#E67E22;text-transform:uppercase;letter-spacing:.1em}
+        .ag-dia-titulo{font-size:1.05rem;font-weight:600;color:#162a1e;margin-top:.25rem}
         .ag-dia-sub{font-size:.72rem;color:#8f978f;margin-top:.2rem}
         .ag-dia-head .ui-btn{margin-top:.9rem;width:100%}
         .ag-dia-lista{padding:.6rem;max-height:calc(100vh - 300px);overflow-y:auto}
@@ -206,8 +207,8 @@ export default function AdminAgendaPage() {
         .ag-item:hover{background:#faf8f5}
         .ag-item-bar{width:3px;border-radius:3px;align-self:stretch;flex-shrink:0}
         .ag-item-info{flex:1;min-width:0}
-        .ag-item-cliente{font-size:.84rem;font-weight:700;color:#162a1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .ag-item-fazenda{display:flex;align-items:center;gap:.3rem;font-size:.7rem;color:#E67E22;font-weight:700;margin-top:.15rem}
+        .ag-item-cliente{font-size:.84rem;font-weight:600;color:#162a1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .ag-item-fazenda{display:flex;align-items:center;gap:.3rem;font-size:.7rem;color:#E67E22;font-weight:600;margin-top:.15rem}
         .ag-item-meta{display:flex;align-items:center;gap:.4rem;font-size:.7rem;color:#8f978f;margin-top:.35rem;flex-wrap:wrap}
         .ag-item-foot{margin-top:.45rem}
 

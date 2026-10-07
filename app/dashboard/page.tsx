@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { ATALHO_PADRAO, FIM_SEMPRE, INICIO_SEMPRE, calcRange, descreverPeriodo, ehDesdeInicio, hojeISO, somarDias } from '@/lib/dateUtils'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -13,22 +14,16 @@ export default async function DashboardHome({ searchParams }: { searchParams: Se
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const hoje = new Date().toISOString().split('T')[0]
+  const hoje = hojeISO()
 
-  // Período filtrado (padrão: mês atual)
-  const hojeDate = new Date()
-  const inicioMesPadrao = new Date(hojeDate.getFullYear(), hojeDate.getMonth(), 1).toISOString().slice(0, 10)
-  const fimMesPadrao = new Date(hojeDate.getFullYear(), hojeDate.getMonth() + 1, 0).toISOString().slice(0, 10)
-  const inicio = params.inicio ?? inicioMesPadrao
-  const fim = params.fim ?? fimMesPadrao
+  // Período filtrado (padrão: desde o início)
+  const padrao = calcRange(ATALHO_PADRAO)
+  const inicio = params.inicio ?? padrao.inicio
+  const fim = params.fim ?? padrao.fim
 
   // Períodos fixos (não dependem do filtro)
-  const seteMesesAtras = new Date()
-  seteMesesAtras.setMonth(seteMesesAtras.getMonth() - 6)
-  const inicioHistorico = seteMesesAtras.toISOString().split('T')[0]
-  const dezDiasAtras = new Date()
-  dezDiasAtras.setDate(dezDiasAtras.getDate() - 10)
-  const dezDiasAtrasStr = dezDiasAtras.toISOString().split('T')[0]
+  const inicioHistorico = somarDias(hoje, -183)
+  const dezDiasAtrasStr = somarDias(hoje, -10)
 
   const [
     { count: totalClientes },
@@ -111,7 +106,9 @@ export default async function DashboardHome({ searchParams }: { searchParams: Se
     : `${lancamentosCompletos.length} dia${lancamentosCompletos.length !== 1 ? 's' : ''} registrado${lancamentosCompletos.length !== 1 ? 's' : ''}`
 
   // Label do período para os cards
-  const periodoLabel = inicio === fim
+  const periodoLabel = ehDesdeInicio(inicio, fim) || inicio === INICIO_SEMPRE || fim === FIM_SEMPRE
+    ? descreverPeriodo(inicio, fim)
+    : inicio === fim
     ? new Date(inicio + 'T12:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })
     : inicio.slice(0, 7) === fim.slice(0, 7)
     ? new Date(inicio + 'T12:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
@@ -121,48 +118,48 @@ export default async function DashboardHome({ searchParams }: { searchParams: Se
     <>
       <style>{`
         .home-saudacao{margin-bottom:1rem}
-        .home-saudacao h1{font-size:1.4rem;font-weight:700;color:#162a1e}
+        .home-saudacao h1{font-size:1.4rem;font-weight:600;color:#162a1e}
         .home-saudacao p{color:#aaa;font-size:.82rem;margin-top:.2rem}
         .cards-resumo{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1rem;margin-bottom:1.2rem}
         .resumo-card{background:#fff;border-radius:12px;padding:1.2rem;box-shadow:0 2px 8px rgba(0,0,0,.05);border-top:3px solid;position:relative;overflow:hidden;text-decoration:none;display:block;transition:transform .15s}
         .resumo-card.clickable:hover{transform:translateY(-2px)}
         .resumo-num{font-size:2rem;font-weight:900;color:#162a1e;line-height:1}
-        .resumo-label{font-size:.72rem;color:#aaa;font-weight:700;margin-top:.3rem}
+        .resumo-label{font-size:.72rem;color:#aaa;font-weight:600;margin-top:.3rem}
         .resumo-icon{margin-bottom:.5rem;height:20px;display:flex;align-items:center}
         .resumo-sub{font-size:.7rem;color:#aaa;margin-top:.4rem}
-        .resumo-sub.destaque{font-weight:700}
+        .resumo-sub.destaque{font-weight:600}
         .acoes-rapidas{display:flex;gap:.7rem;margin-bottom:1.2rem;flex-wrap:wrap}
-        .btn-acao-home{display:inline-flex;align-items:center;gap:.4rem;padding:.65rem 1.2rem;border-radius:8px;text-decoration:none;font-size:.82rem;font-weight:700;transition:background .2s}
+        .btn-acao-home{display:inline-flex;align-items:center;gap:.4rem;padding:.65rem 1.2rem;border-radius:8px;text-decoration:none;font-size:.82rem;font-weight:600;transition:background .2s}
         .alerta-section{margin-bottom:1.2rem}
-        .alerta-titulo{font-size:.82rem;font-weight:700;color:#162a1e;margin-bottom:.6rem;display:flex;align-items:center;gap:.4rem}
+        .alerta-titulo{font-size:.82rem;font-weight:600;color:#162a1e;margin-bottom:.6rem;display:flex;align-items:center;gap:.4rem}
         .alerta-item{background:#fff8f0;border:1.5px solid #fde8c8;border-radius:10px;padding:.7rem 1rem;margin-bottom:.5rem;display:flex;align-items:center;justify-content:space-between;text-decoration:none;transition:border-color .2s}
         .alerta-item:hover{border-color:#E67E22}
-        .alerta-nome{font-size:.82rem;font-weight:700;color:#162a1e}
-        .alerta-fazenda{font-size:.72rem;color:#E67E22;font-weight:700}
-        .alerta-badge{background:#E67E22;color:#fff;font-size:.68rem;font-weight:700;padding:.2rem .6rem;border-radius:20px;white-space:nowrap}
+        .alerta-nome{font-size:.82rem;font-weight:600;color:#162a1e}
+        .alerta-fazenda{font-size:.72rem;color:#E67E22;font-weight:600}
+        .alerta-badge{background:#E67E22;color:#fff;font-size:.68rem;font-weight:600;padding:.2rem .6rem;border-radius:20px;white-space:nowrap}
         .grid-main{display:grid;grid-template-columns:2fr 1fr;gap:1rem;margin-bottom:1rem}
         .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
         .secao-card{background:#fff;border-radius:12px;padding:1.2rem 1.4rem;box-shadow:0 2px 8px rgba(0,0,0,.05)}
-        .secao-titulo{font-size:.82rem;font-weight:700;color:#162a1e;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between}
-        .secao-titulo a{font-size:.72rem;color:#E67E22;text-decoration:none;font-weight:700}
+        .secao-titulo{font-size:.82rem;font-weight:600;color:#162a1e;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between}
+        .secao-titulo a{font-size:.72rem;color:#E67E22;text-decoration:none;font-weight:600}
         .visita-row{display:flex;align-items:center;gap:.8rem;padding:.55rem 0;border-bottom:1px solid #f5f3ef;text-decoration:none}
         .visita-row:last-child{border-bottom:none}
         .visita-data-mini{background:#f0ede8;border-radius:6px;padding:.25rem .5rem;text-align:center;min-width:36px}
         .dia-mini{font-size:.88rem;font-weight:900;color:#162a1e;line-height:1}
-        .mes-mini{font-size:.58rem;font-weight:700;color:#aaa;text-transform:uppercase}
+        .mes-mini{font-size:.58rem;font-weight:600;color:#aaa;text-transform:uppercase}
         .visita-info-mini{flex:1;min-width:0}
-        .visita-nome-mini{font-size:.82rem;font-weight:700;color:#162a1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .visita-fazenda-mini{font-size:.7rem;color:#E67E22;font-weight:700}
+        .visita-nome-mini{font-size:.82rem;font-weight:600;color:#162a1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .visita-fazenda-mini{font-size:.7rem;color:#E67E22;font-weight:600}
         .status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
         .vazio-mini{text-align:center;padding:1.2rem;color:#aaa;font-size:.8rem}
         .taxa-wrap{text-align:center;padding:1rem 0}
         .taxa-num{font-size:2.5rem;font-weight:900;color:#27ae60}
-        .taxa-label{font-size:.75rem;color:#aaa;font-weight:700}
+        .taxa-label{font-size:.75rem;color:#aaa;font-weight:600}
         .barra-status{margin-top:.8rem}
         .barra-row{display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem;font-size:.75rem}
         .barra-bg{flex:1;height:6px;border-radius:3px;background:#f0ede8;overflow:hidden}
         .barra-fill{height:100%;border-radius:3px;transition:width .5s}
-        .barra-val{font-weight:700;color:#162a1e;min-width:20px;text-align:right}
+        .barra-val{font-weight:600;color:#162a1e;min-width:20px;text-align:right}
         @media(max-width:768px){.grid-main{grid-template-columns:1fr}.grid-2{grid-template-columns:1fr}}
       `}</style>
 
@@ -238,7 +235,7 @@ export default async function DashboardHome({ searchParams }: { searchParams: Se
       <div className="acoes-rapidas">
         <Link href="/dashboard/visitas/novo" className="btn-acao-home" style={{background:'#E67E22',color:'#fff'}}>Nova Visita</Link>
         <Link href="/dashboard/clientes/novo" className="btn-acao-home" style={{background:'#162a1e',color:'#fff'}}>Novo Cliente</Link>
-        <Link href="/dashboard/relatorios" className="btn-acao-home" style={{background:'#fff',color:'#162a1e',border:'1.5px solid #eae5de'}}>Relatórios</Link>
+        <Link href="/dashboard/cotacoes/nova" className="btn-acao-home" style={{background:'#fff',color:'#162a1e',border:'1.5px solid #eae5de'}}>Nova Cotação</Link>
       </div>
 
       {/* Alerta clientes sem visita */}
@@ -257,7 +254,7 @@ export default async function DashboardHome({ searchParams }: { searchParams: Se
             </Link>
           ))}
           {alertaClientes.length > 4 && (
-            <Link href="/dashboard/clientes" style={{fontSize:'.78rem',color:'#E67E22',fontWeight:700,textDecoration:'none'}}>
+            <Link href="/dashboard/clientes" style={{fontSize:'.78rem',color:'#E67E22',fontWeight:600,textDecoration:'none'}}>
               Ver mais {alertaClientes.length - 4} clientes →
             </Link>
           )}

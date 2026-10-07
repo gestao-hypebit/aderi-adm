@@ -1,0 +1,147 @@
+// Cálculos da cotação — espelho da aba COTAÇÃO da planilha "001.xlsx".
+// Letras entre colchetes indicam a coluna correspondente na planilha.
+
+export type ParametrosCotacao = {
+  ptax: number          // [D14] valor PTAX
+  juros_mes: number     // [L15] financeiro mês (ex.: 0,022 = 2,2%)
+  aliquota_icms: number // 5% fixo nas fórmulas de ICMS
+  aliquota_ir: number   // [AA15] I.R./CSLL sobre o resultado
+}
+
+export type ItemCotacao = {
+  id?: string
+  produto_id: string | null
+  produto_nome: string
+  fornecedor: string | null
+  quantidade: number    // [C]
+  unidade: string | null // [D]
+  preco_tabela: number  // [E]
+  desconto: number      // [F]
+  frete: number         // [I] por unidade
+  data_inicial: string | null // [K]
+  data_final: string | null   // [L]
+  margem: number        // [M] fração (0,05 = 5%)
+  comissao: number      // [N] fração
+  preco_cliente: number // [R]
+  vencimento: string | null   // [T] (padrão: data final)
+}
+
+export const PARAMETROS_PADRAO: ParametrosCotacao = { ptax: 1, juros_mes: 0.022, aliquota_icms: 0.05, aliquota_ir: 0.3 }
+
+export function itemVazio(): ItemCotacao {
+  return {
+    produto_id: null, produto_nome: '', fornecedor: null, quantidade: 0, unidade: 'TON',
+    preco_tabela: 0, desconto: 0, frete: 0, data_inicial: null, data_final: null,
+    margem: 0, comissao: 0, preco_cliente: 0, vencimento: null,
+  }
+}
+
+function dias(inicio: string | null, fim: string | null) {
+  if (!inicio || !fim) return 0
+  return Math.round((new Date(fim + 'T12:00').getTime() - new Date(inicio + 'T12:00').getTime()) / 86400000)
+}
+
+const div = (a: number, b: number) => (b ? a / b : 0)
+
+export function calcularItem(it: ItemCotacao, p: ParametrosCotacao) {
+  const q = it.quantidade || 0
+  const R = it.preco_cliente || 0
+  const markup = (it.margem || 0) + (it.comissao || 0)
+
+  const precoLiquido = ((it.preco_tabela || 0) - (it.desconto || 0)) * (p.ptax || 0)          // [H]
+  const frete = it.frete || 0                                                                 // [I]
+  // [J] base de financiamento. A planilha tem duas versões (linha 17 divide, as demais
+  // multiplicam); usamos a divisão, mesma lógica do preço final [Q].
+  const baseFinanc = div(precoLiquido + frete, 1 - markup)
+  const prazoDias = dias(it.data_inicial, it.data_final)                                      // [L-K]
+  const financiamento = baseFinanc * prazoDias * ((p.juros_mes || 0) / 30)                    // [O]
+  const baseCusto = precoLiquido + frete + financiamento                                      // [P]
+  const precoSugerido = div(baseCusto, 1 - markup)                                            // [Q]
+  const total = q * R                                                                         // [S]
+
+  // por unidade
+  const resultadoUnit = R - precoLiquido - frete                                              // [Y]
+  // [Z] a planilha usa o preço de tabela [E]; usamos o preço líquido [H], como no total [AG],
+  // para não distorcer quando há desconto ou PTAX diferente de 1.
+  const icmsUnit = R * p.aliquota_icms - precoLiquido * p.aliquota_icms
+  const irUnit = resultadoUnit * p.aliquota_ir                                                // [AA]
+  const impostoUnit = icmsUnit + irUnit                                                       // [AB]
+
+  const margemBruta = div(R - precoLiquido - frete - financiamento - R * (it.comissao || 0), R)            // [U]
+  const margemLiquida = div(R - precoLiquido - frete - financiamento - impostoUnit - R * (it.comissao || 0), R) // [V]
+  const diferenca = R - precoSugerido                                                         // [W]
+
+  // totais (quantidade × unidade) — colunas AF..AK e aba RESULT.
+  const resultadoTotal = total - (precoLiquido + frete) * q                                   // [AF]
+  const icmsTotal = total * p.aliquota_icms - precoLiquido * q * p.aliquota_icms              // [AG]
+  const irTotal = resultadoTotal * p.aliquota_ir                                              // [AH]
+  const impostoTotal = icmsTotal + irTotal                                                    // [AI]
+
+  const compraTotal = precoLiquido * q
+  const freteTotal = frete * q
+  const financTotal = financiamento * q
+  const comissaoTotal = total * (it.comissao || 0)
+  const custoTotal = compraTotal + freteTotal + financTotal + comissaoTotal + impostoTotal
+  const resultadoLiquido = total - custoTotal
+
+  return {
+    precoLiquido, baseFinanc, prazoDias, financiamento, baseCusto, precoSugerido, total,
+    resultadoUnit, icmsUnit, irUnit, impostoUnit, margemBruta, margemLiquida, diferenca,
+    resultadoTotal, icmsTotal, irTotal, impostoTotal,
+    pctImpostoResultado: div(impostoTotal, resultadoTotal), pctImpostoVenda: div(impostoTotal, total),
+    compraTotal, freteTotal, financTotal, comissaoTotal, custoTotal, resultadoLiquido,
+    pctResultado: div(resultadoLiquido, total),
+  }
+}
+
+export type CalculoItem = ReturnType<typeof calcularItem>
+
+export function calcularTotais(itens: ItemCotacao[], p: ParametrosCotacao) {
+  const calc = itens.map(i => calcularItem(i, p))
+  const soma = (f: (c: CalculoItem) => number) => calc.reduce((s, c) => s + f(c), 0)
+  const venda = soma(c => c.total)
+  const resultado = soma(c => c.resultadoLiquido)
+  return {
+    calc,
+    quantidade: itens.reduce((s, i) => s + (i.quantidade || 0), 0),
+    venda,
+    compra: soma(c => c.compraTotal),
+    frete: soma(c => c.freteTotal),
+    financiamento: soma(c => c.financTotal),
+    comissao: soma(c => c.comissaoTotal),
+    imposto: soma(c => c.impostoTotal),
+    custo: soma(c => c.custoTotal),
+    resultado,
+    pctResultado: div(resultado, venda),
+  }
+}
+
+export const STATUS_COTACAO: Record<string, { label: string; badge: string }> = {
+  rascunho: { label: 'Rascunho', badge: 'ui-badge-neutro' },
+  enviada: { label: 'Enviada', badge: 'ui-badge-agendada' },
+  aprovada: { label: 'Aprovada', badge: 'ui-badge-realizada' },
+  perdida: { label: 'Perdida', badge: 'ui-badge-cancelada' },
+}
+
+export const brl = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+export const num = (n: number, casas = 2) => n.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas })
+export const pct = (n: number, casas = 1) => `${(n * 100).toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas })}%`
+export const dataCurta = (d: string | null) => (d ? new Date(d + 'T12:00').toLocaleDateString('pt-BR') : '—')
+
+// Supabase devolve numeric como string: normaliza as linhas do banco
+type LinhaBanco = Record<string, unknown>
+const n = (v: unknown) => Number(v ?? 0) || 0
+const s = (v: unknown) => (v == null ? null : String(v))
+
+export function itemDoBanco(r: LinhaBanco): ItemCotacao {
+  return {
+    id: s(r.id) ?? undefined, produto_id: s(r.produto_id), produto_nome: s(r.produto_nome) ?? '', fornecedor: s(r.fornecedor),
+    quantidade: n(r.quantidade), unidade: s(r.unidade), preco_tabela: n(r.preco_tabela), desconto: n(r.desconto), frete: n(r.frete),
+    data_inicial: s(r.data_inicial), data_final: s(r.data_final), margem: n(r.margem), comissao: n(r.comissao),
+    preco_cliente: n(r.preco_cliente), vencimento: s(r.vencimento),
+  }
+}
+
+export function parametrosDoBanco(r: LinhaBanco): ParametrosCotacao {
+  return { ptax: n(r.ptax), juros_mes: n(r.juros_mes), aliquota_icms: n(r.aliquota_icms), aliquota_ir: n(r.aliquota_ir) }
+}

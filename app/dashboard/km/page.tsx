@@ -1,7 +1,10 @@
 'use client'
 
+import { hojeISO } from '@/lib/dateUtils'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import LancamentosKm from '@/app/components/LancamentosKm'
+import ConfirmDialog from '@/app/admin/_ui/ConfirmDialog'
 
 const VERDE = '#162a1e'
 const LARANJA = '#E67E22'
@@ -54,9 +57,17 @@ export default function ControleKmPage() {
   const [kmAbastecimento, setKmAbastecimento] = useState('')
   const [savingAbastecimento, setSavingAbastecimento] = useState(false)
 
+  const [versao, setVersao] = useState(0)
+  const [uid, setUid] = useState('')
+  const [excluirDia, setExcluirDia] = useState<{ tabela: 'km_diario' | 'abastecimentos'; id: string; texto: string } | null>(null)
+  const [excluindo, setExcluindo] = useState(false)
+
   const [diasComKm, setDiasComKm] = useState<Record<string, { km: boolean; abastecimento: boolean; pendente: boolean }>>({})
 
-  const hojeStr = new Date().toISOString().slice(0, 10)
+  const hojeStr = hojeISO()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const inicioMes = `${mesAtual.getFullYear()}-${pad(mesAtual.getMonth() + 1)}-01`
+  const fimMes = `${mesAtual.getFullYear()}-${pad(mesAtual.getMonth() + 1)}-${pad(new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1, 0).getDate())}`
 
   useEffect(() => {
     carregarMes()
@@ -64,25 +75,29 @@ export default function ControleKmPage() {
 
   useEffect(() => {
     selecionarDia(hojeStr)
+    supabase.auth.getUser().then(({ data }) => setUid(data.user?.id ?? ''))
   }, [])
 
-  async function carregarMes() {
-    const ano = mesAtual.getFullYear()
-    const mes = mesAtual.getMonth()
-    const inicio = new Date(ano, mes, 1).toISOString().slice(0, 10)
-    const fim = new Date(ano, mes + 1, 0).toISOString().slice(0, 10)
+  async function meuId() {
+    const { data } = await supabase.auth.getUser()
+    return data.user?.id ?? ''
+  }
 
+  async function carregarMes() {
+    const uid = await meuId()
     const { data: kms } = await supabase
       .from('km_diario')
       .select('data, km_inicial, km_final')
-      .gte('data', inicio)
-      .lte('data', fim)
+      .eq('funcionario_id', uid)
+      .gte('data', inicioMes)
+      .lte('data', fimMes)
 
     const { data: abastecimentos } = await supabase
       .from('abastecimentos')
       .select('data')
-      .gte('data', inicio)
-      .lte('data', fim)
+      .eq('funcionario_id', uid)
+      .gte('data', inicioMes)
+      .lte('data', fimMes)
 
     const mapa: Record<string, { km: boolean; abastecimento: boolean; pendente: boolean }> = {}
 
@@ -97,6 +112,7 @@ export default function ControleKmPage() {
     })
 
     setDiasComKm(mapa)
+    setVersao(v => v + 1)
   }
 
   async function selecionarDia(dataStr: string) {
@@ -104,15 +120,18 @@ export default function ControleKmPage() {
     setLoadingDia(true)
     setView('dia')
 
+    const uid = await meuId()
     const { data: km } = await supabase
       .from('km_diario')
       .select('*')
+      .eq('funcionario_id', uid)
       .eq('data', dataStr)
       .maybeSingle()
 
     const { data: abastecimentos } = await supabase
       .from('abastecimentos')
       .select('*')
+      .eq('funcionario_id', uid)
       .eq('data', dataStr)
       .order('created_at', { ascending: true })
 
@@ -198,6 +217,17 @@ export default function ControleKmPage() {
     setKmAbastecimento('')
     await selecionarDia(diaSelecionado)
     setView('dia')
+    carregarMes()
+  }
+
+  async function confirmarExclusaoDia() {
+    if (!excluirDia) return
+    setExcluindo(true)
+    const { error, count } = await supabase.from(excluirDia.tabela).delete({ count: 'exact' }).eq('id', excluirDia.id)
+    setExcluindo(false)
+    setExcluirDia(null)
+    if (error || count === 0) { alert('Não foi possível excluir o lançamento.'); return }
+    if (diaSelecionado) await selecionarDia(diaSelecionado)
     carregarMes()
   }
 
@@ -319,6 +349,11 @@ export default function ControleKmPage() {
                   <button className="action-btn laranja" onClick={() => setView('km')}>
                     {kmDoDia?.km_inicial === null ? 'Lançar KM' : 'Editar KM'}
                   </button>
+                  {kmDoDia?.id && (
+                    <button className="excluir-btn" onClick={() => setExcluirDia({ tabela: 'km_diario', id: kmDoDia.id!, texto: `O KM deste dia (${kmDoDia.km_inicial ?? '—'} → ${kmDoDia.km_final ?? 'pendente'}) será apagado.` })}>
+                      Excluir KM do dia
+                    </button>
+                  )}
                 </div>
 
                 <div className="info-card">
@@ -333,7 +368,13 @@ export default function ControleKmPage() {
                             <span className="abastecimento-litros">{a.litros}L</span>
                             <span className="abastecimento-valor">R$ {a.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                           </div>
-                          <div className="abastecimento-km">KM {a.km}</div>
+                          <div className="abastecimento-acoes">
+                            <span className="abastecimento-km">KM {a.km}</span>
+                            <button className="lixeira" title="Excluir abastecimento" aria-label="Excluir abastecimento"
+                              onClick={() => setExcluirDia({ tabela: 'abastecimentos', id: a.id, texto: `O abastecimento de ${a.litros} L (R$ ${a.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}) será apagado.` })}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -392,21 +433,30 @@ export default function ControleKmPage() {
         </div>
       )}
 
+      <div className="lancamentos">
+        <div className="lancamentos-tit">Meus lançamentos · {mesAtual.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</div>
+        {uid && <LancamentosKm inicio={inicioMes} fim={fimMes} funcionarioId={uid} versao={versao} onMudou={() => { carregarMes(); if (diaSelecionado) selecionarDia(diaSelecionado) }} />}
+      </div>
+
+      <ConfirmDialog aberto={!!excluirDia} titulo="Excluir lançamento?" confirmarTexto="Excluir" perigo carregando={excluindo} onConfirmar={confirmarExclusaoDia} onCancelar={() => setExcluirDia(null)}>
+        {excluirDia?.texto} Essa ação não pode ser desfeita.
+      </ConfirmDialog>
+
       <style jsx>{`
         .page-header { margin-bottom: 1.5rem; }
-        .page-header h1 { font-size: 1.5rem; font-weight: 700; color: ${VERDE}; display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+        .page-header h1 { font-size: 1.5rem; font-weight: 600; color: ${VERDE}; display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
         .subtitle { color: #999; font-size: 0.9rem; }
 
         .calendar-card, .bottom-panel { background: #fff; border-radius: 16px; padding: 1.25rem 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
         .bottom-panel { margin-top: 1.5rem; }
 
         .calendar-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-        .calendar-nav h2 { font-size: 1.1rem; font-weight: 700; color: ${VERDE}; }
+        .calendar-nav h2 { font-size: 1.1rem; font-weight: 600; color: ${VERDE}; }
         .nav-btn { background: none; border: none; font-size: 1.5rem; color: ${VERDE}; cursor: pointer; padding: 4px 12px; border-radius: 6px; }
         .nav-btn:hover { background: #f0ede8; }
 
         .weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
-        .weekday { text-align: center; font-size: 0.7rem; font-weight: 700; color: #aaa; letter-spacing: 0.05em; padding: 4px 0; }
+        .weekday { text-align: center; font-size: 0.7rem; font-weight: 600; color: #aaa; letter-spacing: 0.05em; padding: 4px 0; }
 
         .days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
         .day {
@@ -429,7 +479,7 @@ export default function ControleKmPage() {
         .day.empty { cursor: default; }
         .day:not(.empty):hover { background: #f5f3ef; }
         .day.tem-registro { background: #fdf6ed; border-color: #f5e6cf; }
-        .day.hoje .day-number { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: ${VERDE}; color: #fff; font-weight: 700; }
+        .day.hoje .day-number { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: ${VERDE}; color: #fff; font-weight: 600; }
         .day.selecionado { border-color: ${LARANJA}; background: #fdf1e3; }
 
         .day-dots { display: flex; gap: 3px; height: 6px; }
@@ -443,30 +493,30 @@ export default function ControleKmPage() {
         .legend span { display: flex; align-items: center; gap: 6px; }
 
         .bottom-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
-        .bottom-header h3 { font-size: 1.05rem; font-weight: 700; color: ${VERDE}; }
-        .voltar-btn { background: none; border: none; color: ${LARANJA}; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
+        .bottom-header h3 { font-size: 1.05rem; font-weight: 600; color: ${VERDE}; }
+        .voltar-btn { background: none; border: none; color: ${LARANJA}; font-weight: 600; font-size: 0.85rem; cursor: pointer; }
 
         .cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         @media (max-width: 700px) { .cards-grid { grid-template-columns: 1fr; } }
 
         .info-card { background: #f9f7f4; border-radius: 12px; padding: 1.25rem; }
         .info-card.full { grid-column: 1 / -1; }
-        .info-card-title { display: flex; align-items: center; gap: 8px; font-weight: 700; color: ${VERDE}; margin-bottom: 8px; font-size: 0.95rem; }
+        .info-card-title { display: flex; align-items: center; gap: 8px; font-weight: 600; color: ${VERDE}; margin-bottom: 8px; font-size: 0.95rem; }
         .info-card-value { color: #333; font-size: 0.95rem; margin-bottom: 4px; }
         .muted { color: #aaa; }
-        .highlight { color: ${LARANJA}; font-weight: 700; }
+        .highlight { color: ${LARANJA}; font-weight: 600; }
 
-        .field-label { display: block; font-size: 0.75rem; font-weight: 700; color: #999; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+        .field-label { display: block; font-size: 0.75rem; font-weight: 600; color: #999; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
         .field-row { display: flex; gap: 8px; }
         input { flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #e5e0d8; font-family: inherit; font-size: 0.95rem; background: #fff; }
         .full-input { width: 100%; margin-bottom: 1rem; }
         input:focus { outline: none; border-color: ${LARANJA}; }
 
-        .save-btn { background: ${VERDE}; color: #fff; border: none; border-radius: 8px; padding: 10px 18px; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .save-btn { background: ${VERDE}; color: #fff; border: none; border-radius: 8px; padding: 10px 18px; font-weight: 600; cursor: pointer; font-family: inherit; }
         .save-btn:disabled { opacity: 0.6; }
         .save-btn.full { width: 100%; margin-top: 4px; }
 
-        .action-btn { width: 100%; border: none; border-radius: 8px; padding: 10px 16px; font-weight: 700; color: #fff; cursor: pointer; margin-top: 12px; font-family: inherit; }
+        .action-btn { width: 100%; border: none; border-radius: 8px; padding: 10px 16px; font-weight: 600; color: #fff; cursor: pointer; margin-top: 12px; font-family: inherit; }
         .action-btn.laranja { background: ${LARANJA}; }
         .action-btn.verde { background: ${VERDE}; }
 
@@ -481,11 +531,19 @@ export default function ControleKmPage() {
           padding: 8px 12px;
         }
         .abastecimento-main { display: flex; align-items: center; gap: 10px; }
-        .abastecimento-litros { font-weight: 700; color: ${VERDE}; font-size: 0.9rem; }
-        .abastecimento-valor { color: ${LARANJA}; font-weight: 700; font-size: 0.9rem; }
+        .abastecimento-litros { font-weight: 600; color: ${VERDE}; font-size: 0.9rem; }
+        .abastecimento-valor { color: ${LARANJA}; font-weight: 600; font-size: 0.9rem; }
         .abastecimento-km { color: #aaa; font-size: 0.8rem; font-weight: 600; }
 
         .hint { font-size: 0.75rem; color: #aaa; margin-top: 8px; }
+        .excluir-btn { width: 100%; border: 1px solid #f6d3cf; background: #fff; color: #c0392b; border-radius: 8px; padding: 8px 16px; font-weight: 600; cursor: pointer; margin-top: 8px; font-family: inherit; font-size: .8rem; }
+        .excluir-btn:hover { background: #fdeeec; }
+        .abastecimento-acoes { display: flex; align-items: center; gap: 8px; }
+        .lixeira { border: none; background: none; color: #b8bdb6; cursor: pointer; padding: 4px; border-radius: 6px; display: flex; }
+        .lixeira:hover { background: #fdeeec; color: #c0392b; }
+        .lancamentos { margin-top: 1.5rem; }
+        .lancamentos-tit { font-size: 1rem; font-weight: 600; color: ${VERDE}; margin-bottom: .8rem; }
+        .lancamentos-tit::first-letter { text-transform: uppercase; }
       `}</style>
     </div>
   )

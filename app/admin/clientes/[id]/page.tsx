@@ -1,9 +1,11 @@
 'use client'
 
+import { hojeISO } from '@/lib/dateUtils'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Tabela from '@/app/components/Tabela'
 import ConfirmDialog from '../../_ui/ConfirmDialog'
 
 type Cliente = {
@@ -42,9 +44,6 @@ function IconPlus() {
 }
 function IconEdit() {
   return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-}
-function IconFile() {
-  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
 }
 function IconSprout({ color = 'currentColor' }: { color?: string }) {
   return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M7 20h10"/><path d="M10 20c0-4 .5-8 2-10"/><path d="M14 20c0-4-.5-8-2-10"/><path d="M5 5c1.5 0 3 1 3.5 3C7 8 5 7.5 4 6c-.5-1 0-1 1-1z"/><path d="M19 8c-1.5 0-3 .5-4 2 1.5 1 3 1 4 0 1-.5 1-1.5 0-2z"/></svg>
@@ -113,7 +112,7 @@ export default function AdminClienteDetalhe() {
 
   if (carregando) {
     return (
-      <div style={{ maxWidth: 1080 }}>
+      <div>
         <div className="ui-skeleton" style={{ height: 14, width: 160, marginBottom: '1rem' }} />
         <div className="ui-skeleton" style={{ height: 120, borderRadius: 16, marginBottom: '1.2rem' }} />
         <div className="ui-skeleton" style={{ height: 260, borderRadius: 16 }} />
@@ -133,7 +132,7 @@ export default function AdminClienteDetalhe() {
     )
   }
 
-  const hoje = new Date().toISOString().slice(0, 10)
+  const hoje = hojeISO()
   const realizadas = visitas.filter(v => v.status === 'realizada').length
   const proxima = [...visitas].reverse().find(v => v.status === 'agendada' && v.data_visita >= hoje)
   const ultima = visitas.find(v => v.status === 'realizada')
@@ -161,32 +160,32 @@ export default function AdminClienteDetalhe() {
   return (
     <>
       <style>{`
-        .cd-wrap{max-width:1080px}
+        .cd-wrap{width:100%}
         .cd-hero{padding:1.4rem 1.5rem;display:flex;gap:1.1rem;align-items:flex-start;flex-wrap:wrap;margin-bottom:1.2rem}
-        .cd-inicial{width:60px;height:60px;border-radius:16px;background:#162a1e;color:#fff;font-size:1.5rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .cd-inicial{width:60px;height:60px;border-radius:16px;background:#162a1e;color:#fff;font-size:1.5rem;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0}
         .cd-titulo{flex:1;min-width:220px}
-        .cd-nome{font-size:1.35rem;font-weight:700;color:#162a1e;line-height:1.25}
+        .cd-nome{font-size:1.35rem;font-weight:600;color:#162a1e;line-height:1.25}
         .cd-meta{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.45rem;font-size:.78rem;color:#8f978f}
         .cd-meta span{display:inline-flex;align-items:center;gap:.3rem}
-        .cd-meta .cd-fazenda{color:#E67E22;font-weight:700}
+        .cd-meta .cd-fazenda{color:#E67E22;font-weight:600}
         .cd-acoes{display:flex;gap:.5rem;flex-wrap:wrap}
         .cd-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.2rem}
         .cd-kpi{padding:1rem 1.2rem}
-        .cd-kpi-label{font-size:.64rem;font-weight:700;color:#8f978f;text-transform:uppercase;letter-spacing:.06em}
-        .cd-kpi-num{font-size:1.25rem;font-weight:700;color:#162a1e;margin-top:.35rem;letter-spacing:-.01em}
+        .cd-kpi-label{font-size:.64rem;font-weight:600;color:#8f978f;text-transform:uppercase;letter-spacing:.06em}
+        .cd-kpi-num{font-size:1.25rem;font-weight:600;color:#162a1e;margin-top:.35rem;letter-spacing:-.01em}
         .cd-kpi-sub{font-size:.68rem;color:#8f978f;margin-top:.2rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .cd-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:1.2rem;align-items:start}
         .cd-info{padding:.4rem 1.3rem .6rem}
         .cd-info-item{display:flex;gap:.75rem;align-items:flex-start;padding:.75rem 0;border-bottom:1px solid #f2efea}
         .cd-info-item:last-child{border-bottom:none}
         .cd-info-icon{width:32px;height:32px;border-radius:9px;background:#f7f5f1;color:#5b6660;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .cd-info-label{font-size:.62rem;font-weight:700;color:#8f978f;text-transform:uppercase;letter-spacing:.06em}
-        .cd-info-valor{font-size:.82rem;font-weight:700;color:#162a1e;margin-top:.2rem;word-break:break-word}
+        .cd-info-label{font-size:.62rem;font-weight:600;color:#8f978f;text-transform:uppercase;letter-spacing:.06em}
+        .cd-info-valor{font-size:.82rem;font-weight:600;color:#162a1e;margin-top:.2rem;word-break:break-word}
         .cd-info-valor.vazio{color:#b8bdb6;font-weight:400;font-style:italic}
         .cd-obs{padding:1rem 1.3rem 1.2rem;border-top:1px solid #f2efea;font-size:.8rem;color:#3d4a42;line-height:1.7;white-space:pre-wrap}
         .cd-equipe{padding:1rem 1.3rem 1.2rem;border-top:1px solid #f2efea}
         .cd-equipe-item{display:flex;justify-content:space-between;align-items:center;gap:.6rem;font-size:.76rem;color:#8f978f;padding:.4rem 0}
-        .cd-equipe-item a{color:#162a1e;font-weight:700;text-decoration:none}
+        .cd-equipe-item a{color:#162a1e;font-weight:600;text-decoration:none}
         .cd-equipe-item a:hover{color:#E67E22}
         @media(max-width:960px){.cd-grid{grid-template-columns:1fr}.cd-kpis{grid-template-columns:1fr 1fr}}
         @media(max-width:600px){.cd-acoes{width:100%}.cd-acoes .ui-btn{flex:1}}
@@ -226,7 +225,6 @@ export default function AdminClienteDetalhe() {
           </div>
           <div className="cd-acoes">
             <Link href={`/admin/clientes/${cliente.id}/editar`} className="ui-btn ui-btn-ghost ui-btn-sm"><IconEdit /> Editar</Link>
-            <Link href={`/admin/relatorios/clientes/${cliente.id}`} className="ui-btn ui-btn-secondary ui-btn-sm"><IconFile /> Ficha em PDF</Link>
             <button className="ui-btn ui-btn-danger ui-btn-sm" onClick={() => setConfirmarExclusao(true)} aria-label="Excluir cliente" title="Excluir cliente"><IconTrash /></button>
             <Link href={`/admin/visitas/novo?cliente=${cliente.id}`} className="ui-btn ui-btn-primary ui-btn-sm"><IconPlus /> Agendar visita</Link>
           </div>
@@ -259,32 +257,33 @@ export default function AdminClienteDetalhe() {
           <div className="ui-card" style={{ overflow: 'hidden' }}>
             <div className="ui-card-header">
               <div className="ui-card-title">Histórico de visitas</div>
-              <span style={{ fontSize: '.7rem', color: '#8f978f', fontWeight: 700 }}>{visitas.length} no total</span>
+              <span style={{ fontSize: '.7rem', color: '#8f978f', fontWeight: 600 }}>{visitas.length} no total</span>
             </div>
-            {visitas.length === 0 ? (
-              <div className="ui-empty">
-                <div className="ui-empty-icon"><IconClipboard /></div>
-                <div className="ui-empty-title">Nenhuma visita ainda</div>
-                <div className="ui-empty-text">Agende a primeira visita para este produtor.</div>
-                <Link href={`/admin/visitas/novo?cliente=${cliente.id}`} className="ui-btn ui-btn-secondary ui-btn-sm"><IconPlus /> Agendar visita</Link>
-              </div>
-            ) : visitas.map(v => {
-              const d = new Date(v.data_visita + 'T12:00')
-              const motivo = v.motivo_visita === 'Outros' ? `Outros — ${v.motivo_outro || ''}` : v.motivo_visita
-              return (
-                <Link key={v.id} href={`/admin/visitas/${v.id}`} className="ui-row">
-                  <div className="ui-date">
-                    <div className="ui-date-dia">{String(d.getDate()).padStart(2, '0')}</div>
-                    <div className="ui-date-mes">{d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')} {String(d.getFullYear()).slice(2)}</div>
-                  </div>
-                  <div className="ui-row-main">
-                    <div className="ui-row-title">{motivo || 'Visita'}</div>
-                    <div className="ui-row-meta">{nomeFunc(v)}</div>
-                  </div>
-                  <span className={`ui-badge ui-badge-${v.status}`}>{STATUS_LABEL[v.status] ?? v.status}</span>
-                </Link>
-              )
-            })}
+            <Tabela
+              embutida
+              linhas={visitas}
+              chave={v => v.id}
+              href={v => `/admin/visitas/${v.id}`}
+              porPagina={10}
+              rotulo="visitas"
+              vazio={
+                <div className="ui-empty">
+                  <div className="ui-empty-icon"><IconClipboard /></div>
+                  <div className="ui-empty-title">Nenhuma visita ainda</div>
+                  <div className="ui-empty-text">Agende a primeira visita para este produtor.</div>
+                  <Link href={`/admin/visitas/novo?cliente=${cliente.id}`} className="ui-btn ui-btn-secondary ui-btn-sm"><IconPlus /> Agendar visita</Link>
+                </div>
+              }
+              colunas={[
+                { id: 'data', titulo: 'Data', largura: '110px', ordenar: (a, b) => a.data_visita.localeCompare(b.data_visita),
+                  celula: v => <span className="ui-cel-num ui-cel-forte">{new Date(v.data_visita + 'T12:00').toLocaleDateString('pt-BR')}</span> },
+                { id: 'motivo', titulo: 'Motivo',
+                  celula: v => <span className="ui-cel-titulo" style={{ fontWeight: 500 }}>{(v.motivo_visita === 'Outros' ? `Outros — ${v.motivo_outro || ''}` : v.motivo_visita) || 'Visita'}</span> },
+                { id: 'consultor', titulo: 'Consultor', ocultar: 'celular', ordenar: (a, b) => nomeFunc(a).localeCompare(nomeFunc(b)), celula: v => nomeFunc(v) },
+                { id: 'status', titulo: 'Status', largura: '110px', ordenar: (a, b) => a.status.localeCompare(b.status),
+                  celula: v => <span className={`ui-badge ui-badge-${v.status}`}>{STATUS_LABEL[v.status] ?? v.status}</span> },
+              ]}
+            />
           </div>
 
           <div className="ui-card">
