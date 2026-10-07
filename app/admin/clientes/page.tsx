@@ -20,6 +20,7 @@ type Cliente = {
   hectares: number | null
   created_at: string | null
   criado_por: string | null
+  responsavel_id: string | null
   email: string | null
   cpf_cnpj: string | null
 }
@@ -104,13 +105,13 @@ function AdminClientesConteudo() {
       const [{ data: clis }, { data: visitas }, { data: colabs }] = await Promise.all([
         supabase
           .from('clientes')
-          .select('id, nome, nome_fazenda, cidade, estado, telefone, cultura_principal, hectares, created_at, criado_por, email, cpf_cnpj')
+          .select('id, nome, nome_fazenda, cidade, estado, telefone, cultura_principal, hectares, created_at, criado_por, responsavel_id, email, cpf_cnpj')
           .order('nome'),
         supabase
           .from('visitas')
           .select('cliente_id, funcionario_id, data_visita, status, funcionario:profiles(nome_completo)')
           .order('data_visita', { ascending: false }),
-        supabase.from('profiles').select('id, nome_completo').eq('role', 'colaborador').order('nome_completo'),
+        supabase.from('profiles').select('id, nome_completo').order('nome_completo'),
       ])
       setConsultores(colabs ?? [])
 
@@ -148,7 +149,7 @@ function AdminClientesConteudo() {
         c.nome.toLowerCase().includes(termo) ||
         (c.nome_fazenda ?? '').toLowerCase().includes(termo) ||
         (c.cidade ?? '').toLowerCase().includes(termo)) &&
-      (!filtroConsultor || c.criado_por === filtroConsultor || stats.get(c.id)?.consultores.has(filtroConsultor))
+      (!filtroConsultor || c.responsavel_id === filtroConsultor || c.criado_por === filtroConsultor || stats.get(c.id)?.consultores.has(filtroConsultor))
     )
     if (ordem === 'recentes') {
       return [...filtrados].sort((a, b) => (stats.get(b.id)?.ultima ?? '').localeCompare(stats.get(a.id)?.ultima ?? ''))
@@ -161,15 +162,16 @@ function AdminClientesConteudo() {
     return filtrados
   }, [clientes, stats, busca, ordem, filtroConsultor])
 
+  const nomeConsultor = useMemo(() => new Map(consultores.map(c => [c.id, c.nome_completo ?? ''])), [consultores])
   const cardsPag = usePaginacao(lista, 24, `${busca}|${filtroConsultor}|${ordem}`)
 
   function exportar() {
     baixarCsv(
       `clientes-aderi-${hojeISO()}`,
-      ['Nome', 'Fazenda', 'CPF/CNPJ', 'Telefone', 'E-mail', 'Cidade', 'UF', 'Cultura', 'Hectares', 'Visitas', 'Realizadas', 'Última visita', 'Último consultor', 'Próxima visita'],
+      ['Nome', 'Fazenda', 'Responsável', 'CPF/CNPJ', 'Telefone', 'E-mail', 'Cidade', 'UF', 'Cultura', 'Hectares', 'Visitas', 'Realizadas', 'Última visita', 'Último consultor', 'Próxima visita'],
       lista.map(c => {
         const st = stats.get(c.id)
-        return [c.nome, c.nome_fazenda, c.cpf_cnpj, c.telefone, c.email, c.cidade, c.estado, c.cultura_principal,
+        return [c.nome, c.nome_fazenda, nomeConsultor.get(c.responsavel_id ?? '') ?? '', c.cpf_cnpj, c.telefone, c.email, c.cidade, c.estado, c.cultura_principal,
           c.hectares, st?.total ?? 0, st?.realizadas ?? 0, dataBR(st?.ultima), st?.ultimoConsultor, dataBR(st?.proxima)]
       })
     )
@@ -296,6 +298,8 @@ function AdminClientesConteudo() {
                   {c.cultura_principal && <div className="ui-cel-sub">{c.cultura_principal}{c.hectares ? ` · ${c.hectares.toLocaleString('pt-BR')} ha` : ''}</div>}
                 </div>
               ) },
+            { id: 'resp', titulo: 'Responsável', ocultar: 'tablet', ordenar: (a, b) => (nomeConsultor.get(a.responsavel_id ?? '') ?? '').localeCompare(nomeConsultor.get(b.responsavel_id ?? '') ?? ''),
+              celula: c => c.responsavel_id && nomeConsultor.get(c.responsavel_id) ? <span>{nomeConsultor.get(c.responsavel_id)}</span> : <span className="ui-cel-mudo">Sem responsável</span> },
             { id: 'contato', titulo: 'Telefone', ocultar: 'tablet', celula: c => <span className="ui-cel-num">{c.telefone || <span className="ui-cel-mudo">—</span>}</span> },
             { id: 'ultima', titulo: 'Última visita', ocultar: 'celular', ordenar: (a, b) => (stats.get(a.id)?.ultima ?? '').localeCompare(stats.get(b.id)?.ultima ?? ''),
               celula: c => <UltimaVisita s={stats.get(c.id)} /> },

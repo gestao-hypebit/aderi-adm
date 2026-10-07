@@ -57,6 +57,11 @@ export default function AdminConsultorDetalhe() {
   const [kmMes, setKmMes] = useState(0)
   const [carregando, setCarregando] = useState(true)
   const [aba, setAba] = useState<'visitas' | 'clientes'>('visitas')
+  const [transferir, setTransferir] = useState(false)
+  const [destino, setDestino] = useState('')
+  const [outros, setOutros] = useState<{ id: string; nome_completo: string | null }[]>([])
+  const [transferindo, setTransferindo] = useState(false)
+  const [msgTransferencia, setMsgTransferencia] = useState('')
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'agendada' | 'realizada' | 'cancelada'>('todas')
   const [confirmarStatus, setConfirmarStatus] = useState(false)
   const [salvandoStatus, setSalvandoStatus] = useState(false)
@@ -72,7 +77,7 @@ export default function AdminConsultorDetalhe() {
           .select('id, data_visita, hora_visita, status, motivo_visita, cliente:clientes(id, nome, nome_fazenda, cidade)')
           .eq('funcionario_id', id)
           .order('data_visita', { ascending: false }),
-        supabase.from('clientes').select('id, nome, nome_fazenda, cidade').eq('criado_por', id).order('nome'),
+        supabase.from('clientes').select('id, nome, nome_fazenda, cidade').or(`responsavel_id.eq.${id},criado_por.eq.${id}`).order('nome'),
         supabase.from('km_diario').select('km_inicial, km_final').eq('funcionario_id', id).gte('data', inicio).lte('data', fim),
       ])
       setSouEu(user?.id === id)
@@ -113,6 +118,26 @@ export default function AdminConsultorDetalhe() {
   }, [criados, visitas])
 
   const visitasFiltradas = filtroStatus === 'todas' ? visitas : visitas.filter(v => v.status === filtroStatus)
+
+  async function abrirTransferencia() {
+    const { data } = await supabase.from('profiles').select('id, nome_completo').eq('ativo', true).neq('id', id).order('nome_completo')
+    setOutros(data ?? [])
+    setDestino('')
+    setMsgTransferencia('')
+    setTransferir(true)
+  }
+
+  // Passa todos os clientes em que este consultor é o responsável para outro consultor
+  async function confirmarTransferencia() {
+    if (!destino) return
+    setTransferindo(true)
+    const { data, error } = await supabase.from('clientes').update({ responsavel_id: destino }).eq('responsavel_id', id).select('id')
+    setTransferindo(false)
+    if (error) { setMsgTransferencia('Não foi possível transferir a carteira.'); return }
+    setTransferir(false)
+    setMsgTransferencia(`${data?.length ?? 0} cliente(s) transferido(s) para ${outros.find(o => o.id === destino)?.nome_completo ?? 'o novo responsável'}.`)
+    setCriados(c => c.filter(x => !data?.some(d => d.id === x.id)))
+  }
 
   async function alternarAtivo() {
     if (!perfil) return
@@ -227,10 +252,30 @@ export default function AdminConsultorDetalhe() {
                 <IconPower /> {inativo ? 'Reativar' : 'Desativar'}
               </button>
             )}
+            <button className="ui-btn ui-btn-ghost ui-btn-sm" onClick={abrirTransferencia} title="Passar os clientes deste consultor para outro">Transferir carteira</button>
             <Link href={`/admin/agenda?func=${perfil.id}`} className="ui-btn ui-btn-secondary ui-btn-sm"><IconCalendar /> Agenda</Link>
             {!inativo && <Link href={`/admin/visitas/novo?funcionario=${perfil.id}`} className="ui-btn ui-btn-primary ui-btn-sm"><IconPlus /> Agendar visita</Link>}
           </div>
         </div>
+
+        {msgTransferencia && <div className="ui-alert ui-alert-ok">{msgTransferencia}</div>}
+        {transferir && (
+          <div className="ui-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setTransferir(false) }}>
+            <div className="ui-modal" style={{ maxWidth: 460 }}>
+              <div className="ui-title" style={{ fontSize: '1.1rem', marginBottom: '.4rem' }}>Transferir carteira</div>
+              <div className="ui-sub" style={{ marginBottom: '1rem' }}>Os clientes em que <b>{perfil.nome_completo}</b> é o responsável passam para outro consultor. O histórico de visitas não muda.</div>
+              <label className="ui-label">Novo responsável</label>
+              <select className="ui-select" value={destino} onChange={e => setDestino(e.target.value)}>
+                <option value="">Selecione...</option>
+                {outros.map(o => <option key={o.id} value={o.id}>{o.nome_completo}</option>)}
+              </select>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '.6rem', marginTop: '1.2rem' }}>
+                <button className="ui-btn ui-btn-ghost" onClick={() => setTransferir(false)}>Cancelar</button>
+                <button className="ui-btn ui-btn-primary" onClick={confirmarTransferencia} disabled={!destino || transferindo}>{transferindo ? 'Transferindo...' : 'Transferir clientes'}</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="cs-kpis">
           <div className="ui-card cs-kpi">

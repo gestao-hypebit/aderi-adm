@@ -1,5 +1,10 @@
+import { Suspense } from 'react'
 import CotacaoEditor from '@/app/components/cotacoes/CotacaoEditor'
 
 export default function NovaCotacaoPage() {
-  return <CotacaoEditor base="/dashboard/cotacoes" />
+  return (
+    <Suspense fallback={null}>
+      <CotacaoEditor base="/dashboard/cotacoes" />
+    </Suspense>
+  )
 }

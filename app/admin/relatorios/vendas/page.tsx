@@ -16,6 +16,7 @@ type Cotacao = {
   criado_por: string
   cliente_id: string | null
   cliente_nome: string | null
+  motivo_perda: string | null
   autor: { nome_completo: string | null } | { nome_completo: string | null }[] | null
   venda: number
   resultado: number
@@ -31,7 +32,7 @@ export default function RelatorioVendas() {
 
   useEffect(() => {
     createClient().from('cotacoes')
-      .select('id, numero, status, created_at, criado_por, cliente_id, cliente_nome, ptax, juros_mes, aliquota_icms, aliquota_ir, autor:profiles(nome_completo), itens:cotacao_itens(*)')
+      .select('id, numero, status, created_at, criado_por, cliente_id, cliente_nome, motivo_perda, ptax, juros_mes, aliquota_icms, aliquota_ir, autor:profiles!cotacoes_criado_por_fkey(nome_completo), itens:cotacao_itens(*)')
       .gte('created_at', filtros.dataInicio).lte('created_at', filtros.dataFim + 'T23:59:59')
       .match(filtros.funcionarioId ? { criado_por: filtros.funcionarioId } : {})
       .order('created_at', { ascending: false })
@@ -41,7 +42,7 @@ export default function RelatorioVendas() {
           const itens = ((c.itens ?? []) as Record<string, unknown>[]).map(itemDoBanco).map(i => ({ ...i, calc: calcularItem(i, p) }))
           return {
             id: c.id, numero: c.numero, status: c.status, created_at: c.created_at, criado_por: c.criado_por,
-            cliente_id: c.cliente_id, cliente_nome: c.cliente_nome, autor: c.autor, itens,
+            cliente_id: c.cliente_id, cliente_nome: c.cliente_nome, motivo_perda: c.motivo_perda, autor: c.autor, itens,
             venda: itens.reduce((s, i) => s + i.calc.total, 0),
             resultado: itens.reduce((s, i) => s + i.calc.resultadoLiquido, 0),
           }
@@ -86,7 +87,18 @@ export default function RelatorioVendas() {
       porCliente.set(k, x)
     })
 
+    // motivo principal = texto antes do " — " (o detalhe livre vem depois)
+    const porMotivo = new Map<string, { motivo: string; qtd: number; valor: number }>()
+    perdidas.forEach(c => {
+      const m = (c.motivo_perda ?? 'Não informado').split(' — ')[0]
+      const x = porMotivo.get(m) ?? { motivo: m, qtd: 0, valor: 0 }
+      x.qtd++; x.valor += c.venda
+      porMotivo.set(m, x)
+    })
+
     return {
+      motivos: [...porMotivo.values()].sort((a, b) => b.qtd - a.qtd),
+      valorPerdido: perdidas.reduce((s, c) => s + c.venda, 0),
       total: cotacoes.length, cotado: cotacoes.reduce((s, c) => s + c.venda, 0),
       aprovadas: aprovadas.length, vendido, resultado,
       conversao: div(aprovadas.length, aprovadas.length + perdidas.length),
@@ -104,9 +116,9 @@ export default function RelatorioVendas() {
   const maxCli = Math.max(1, ...r.clientes.map(c => c.valor))
 
   function exportar() {
-    baixarCsv(`relatorio-cotacoes-${hojeISO()}`, ['Número', 'Data', 'Cliente', 'Consultor', 'Status', 'Total (R$)', 'Resultado (R$)', 'Margem líquida (%)'],
+    baixarCsv(`relatorio-cotacoes-${hojeISO()}`, ['Número', 'Data', 'Cliente', 'Consultor', 'Status', 'Total (R$)', 'Resultado (R$)', 'Margem líquida (%)', 'Motivo da perda'],
       cotacoes.map(c => [c.numero, dataBR(c.created_at), c.cliente_nome, um(c.autor)?.nome_completo, STATUS_COTACAO[c.status]?.label ?? c.status,
-        c.venda.toFixed(2).replace('.', ','), c.resultado.toFixed(2).replace('.', ','), c.venda ? ((c.resultado / c.venda) * 100).toFixed(2).replace('.', ',') : '']))
+        c.venda.toFixed(2).replace('.', ','), c.resultado.toFixed(2).replace('.', ','), c.venda ? ((c.resultado / c.venda) * 100).toFixed(2).replace('.', ',') : '', c.motivo_perda ?? '']))
   }
 
   return (
@@ -158,6 +170,16 @@ export default function RelatorioVendas() {
             { id: 'vend', titulo: 'Vendido', alinhar: 'dir', ordenar: (a, b) => a.vendido - b.vendido, celula: c => <span className="ui-cel-num ui-cel-forte">{brl(c.vendido)}</span> },
             { id: 'res', titulo: 'Resultado', alinhar: 'dir', ocultar: 'tablet', ordenar: (a, b) => a.resultado - b.resultado,
               celula: c => <><div className="ui-cel-num" style={{ color: c.resultado < 0 ? '#c0392b' : '#1e8a4c', fontWeight: 600 }}>{brl(c.resultado)}</div><div className="ui-cel-sub">{pctTxt(div(c.resultado, c.vendido), 1)}</div></> },
+          ]} />
+      </Secao>
+
+      <Secao titulo="Motivos de perda" sub={`${brl(r.valorPerdido)} em cotações perdidas no período`}>
+        <Tabela linhas={r.motivos} chave={m => m.motivo} carregando={carregando} paginar={false}
+          vazio={<div className="ui-empty"><div className="ui-empty-title">Nenhuma cotação perdida no período</div></div>}
+          colunas={[
+            { id: 'motivo', titulo: 'Motivo', ordenar: (a, b) => a.motivo.localeCompare(b.motivo), celula: m => <span className="ui-cel-titulo">{m.motivo}</span> },
+            { id: 'qtd', titulo: 'Cotações', ordenar: (a, b) => a.qtd - b.qtd, celula: m => <Barra valor={m.qtd} max={Math.max(1, ...r.motivos.map(x => x.qtd))} cor="#c0392b" texto={num(m.qtd)} /> },
+            { id: 'valor', titulo: 'Valor perdido', alinhar: 'dir', ordenar: (a, b) => a.valor - b.valor, celula: m => <span className="ui-cel-num ui-cel-forte">{brl(m.valor)}</span> },
           ]} />
       </Secao>
 

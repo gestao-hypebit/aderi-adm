@@ -1,5 +1,5 @@
-import ClienteForm from '../ClienteForm'
+import ClienteForm from '@/app/components/clientes/ClienteForm'
 
 export default function AdminNovoClientePage() {
-  return <ClienteForm />
+  return <ClienteForm base="/admin/clientes" admin />
 }

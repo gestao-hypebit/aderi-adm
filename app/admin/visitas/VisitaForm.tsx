@@ -17,6 +17,7 @@ const MOTIVOS = [
   'Amostra de solo',
   'Amostra de folha',
   'Acompanhamento de entrega de produto',
+  'Retorno',
   'Outros',
 ]
 

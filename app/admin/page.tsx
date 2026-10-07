@@ -102,6 +102,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
     { data: realizadasPorCliente },
     { data: cotacoes },
     { data: cotacoesAnt },
+    { data: aprovacoes },
   ] = await Promise.all([
     supabase.from('profiles').select('nome_completo').eq('id', user?.id ?? '').single(),
     supabase.from('profiles').select('id, nome_completo').eq('role', 'colaborador').eq('ativo', true).order('nome_completo'),
@@ -117,6 +118,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
     supabase.from('visitas').select('cliente_id, data_visita').eq('status', 'realizada').order('data_visita', { ascending: false }),
     supabase.from('cotacoes').select('status, criado_por, ptax, juros_mes, aliquota_icms, aliquota_ir, itens:cotacao_itens(*)').gte('created_at', inicio).lte('created_at', fim + 'T23:59:59').match(porAutor),
     supabase.from('cotacoes').select('status, ptax, juros_mes, aliquota_icms, aliquota_ir, itens:cotacao_itens(*)').eq('status', 'aprovada').gte('created_at', antIni).lte('created_at', antFim + 'T23:59:59').match(porAutor),
+    supabase.from('cotacoes').select('id, numero, cliente_nome, autor:profiles!cotacoes_criado_por_fkey(nome_completo)').eq('aprovacao_status', 'pendente').order('updated_at', { ascending: false }).limit(5).match(porAutor),
   ])
 
   const colab = colaboradores ?? []
@@ -178,7 +180,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
     .filter(c => !c.ultima || c.ultima < limite60)
     .sort((a, b) => (a.ultima ?? '').localeCompare(b.ultima ?? ''))
   const parados = equipe.filter(c => c.agendadas > 0 && c.realizadas === 0)
-  const qtdAtencao = (totalAtrasadas ?? 0) + esquecidos.length + parados.length
+  const pendentesAprovacao = (aprovacoes ?? []) as { id: string; numero: string; cliente_nome: string | null; autor: Rel<{ nome_completo: string | null }> }[]
+  const qtdAtencao = (totalAtrasadas ?? 0) + esquecidos.length + parados.length + pendentesAprovacao.length
 
   // ── histórico 6 meses ──
   const meses: Record<string, { realizadas: number; agendadas: number }> = {}
@@ -349,6 +352,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
           <div className="pn-card-h">
             <span className="pn-card-t" style={qtdAtencao ? { color: '#c0392b' } : undefined}><IconAlert /> Precisa de atenção</span>
           </div>
+          {pendentesAprovacao.length > 0 && (
+            <div className="pn-at-sec">
+              <div className="pn-at-h"><span className="pn-at-n a">{pendentesAprovacao.length}</span>Preços aguardando sua aprovação<Link href="/admin/cotacoes">Cotações</Link></div>
+              {pendentesAprovacao.map(c => (
+                <Link key={c.id} href={`/admin/cotacoes/${c.id}`} className="pn-at-li"><span>Nº {c.numero} · {c.cliente_nome ?? '—'}</span><span>{um(c.autor)?.nome_completo ?? ''}</span></Link>
+              ))}
+            </div>
+          )}
           <div className="pn-at-sec">
             <div className="pn-at-h"><span className={`pn-at-n ${(totalAtrasadas ?? 0) ? 'r' : 'z'}`}>{totalAtrasadas ?? 0}</span>Visitas atrasadas<Link href="/admin/visitas?status=atrasada">Resolver</Link></div>
             {atrasadasLista.length ? atrasadasLista.map(v => (

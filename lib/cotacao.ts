@@ -145,3 +145,27 @@ export function itemDoBanco(r: LinhaBanco): ItemCotacao {
 export function parametrosDoBanco(r: LinhaBanco): ParametrosCotacao {
   return { ptax: n(r.ptax), juros_mes: n(r.juros_mes), aliquota_icms: n(r.aliquota_icms), aliquota_ir: n(r.aliquota_ir) }
 }
+
+// ── Margem mínima ─────────────────────────────────────────
+// Preço de venda que zera a diferença para a margem líquida mínima.
+// Da fórmula [V]: R·(1 − icms − ir − comissão − mín) = H + I + O − H·icms − (H + I)·ir
+export function precoMinimo(it: ItemCotacao, p: ParametrosCotacao, margemMinima: number) {
+  const c = calcularItem(it, p)
+  const divisor = 1 - p.aliquota_icms - p.aliquota_ir - (it.comissao || 0) - margemMinima
+  if (divisor <= 0) return null
+  const custo = c.precoLiquido + (it.frete || 0) + c.financiamento - c.precoLiquido * p.aliquota_icms - (c.precoLiquido + (it.frete || 0)) * p.aliquota_ir
+  return Math.max(0, custo / divisor)
+}
+
+export const abaixoDoMinimo = (it: ItemCotacao, p: ParametrosCotacao, margemMinima: number) =>
+  (it.preco_cliente || 0) > 0 && calcularItem(it, p).margemLiquida < margemMinima - 0.000001
+
+export function menorMargem(itens: ItemCotacao[], p: ParametrosCotacao) {
+  const m = itens.filter(i => (i.preco_cliente || 0) > 0).map(i => calcularItem(i, p).margemLiquida)
+  return m.length ? Math.min(...m) : null
+}
+
+export const MOTIVOS_PERDA = ['Preço', 'Prazo / condição de pagamento', 'Concorrente', 'Desistiu da compra', 'Produto indisponível', 'Prazo de entrega', 'Outro']
+
+export const PEDIDO_STATUS: Record<string, string> = { aguardando: 'Aguardando faturamento', faturado: 'Faturado', entregue: 'Entregue', cancelado: 'Cancelado' }
+export const PAGAMENTO_STATUS: Record<string, string> = { em_aberto: 'Em aberto', parcial: 'Pago parcialmente', pago: 'Pago' }
