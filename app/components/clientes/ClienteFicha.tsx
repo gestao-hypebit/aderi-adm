@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { hojeISO } from '@/lib/dateUtils'
-import { linkPontoGoogle } from '@/lib/geo'
+import { linkPontoGoogle, linkRotaGoogle } from '@/lib/geo'
 import { STATUS_COTACAO, calcularTotais, itemDoBanco, parametrosDoBanco, brl } from '@/lib/cotacao'
 import ConfirmDialog from '@/app/admin/_ui/ConfirmDialog'
 import { Paginacao, usePaginacao } from '@/app/components/Tabela'
@@ -177,8 +177,26 @@ export default function ClienteFicha({ clienteId, base, admin }: { clienteId: st
   const temPonto = cliente.latitude != null && cliente.longitude != null
   const linkMapa = temPonto ? linkPontoGoogle({ lat: cliente.latitude!, lng: cliente.longitude! }) : ''
 
+  // Mensagem pronta para o motorista: o link abre o Google Maps já em modo navegação até a sede
+  const linkRota = temPonto ? linkRotaGoogle([{ lat: cliente.latitude!, lng: cliente.longitude! }]) ?? '' : ''
+  const textoMotorista = [
+    `Entrega/visita: ${cliente.nome_fazenda || cliente.nome}`,
+    cliente.nome_fazenda ? `Produtor: ${cliente.nome}` : '',
+    local ? `Cidade: ${local}` : '',
+    cliente.telefone ? `Contato: ${cliente.telefone}` : '',
+    `Rota até a sede (abre no GPS): ${linkRota}`,
+  ].filter(Boolean).join('\n')
+
+  async function enviarMotorista() {
+    if (navigator.share) {
+      try { await navigator.share({ text: textoMotorista }); return } catch (e) { if ((e as Error).name === 'AbortError') return }
+    }
+    // sem número: o WhatsApp pede para escolher a conversa do motorista
+    window.open(`https://wa.me/?text=${encodeURIComponent(textoMotorista)}`, '_blank')
+  }
+
   async function copiarLocalizacao() {
-    try { await navigator.clipboard.writeText(linkMapa) } catch { window.prompt('Copie o link da localização:', linkMapa); return }
+    try { await navigator.clipboard.writeText(textoMotorista) } catch { window.prompt('Copie a rota:', linkRota); return }
     setLinkCopiado(true)
     setTimeout(() => setLinkCopiado(false), 2000)
   }
@@ -193,7 +211,8 @@ export default function ClienteFicha({ clienteId, base, admin }: { clienteId: st
       <span className="cf-loc">
         <a href={linkMapa} target="_blank" rel="noreferrer" className="cf-link">{[local, `${cliente.latitude!.toFixed(5)}, ${cliente.longitude!.toFixed(5)}`].filter(Boolean).join(' · ')}</a>
         <span className="cf-loc-acoes">
-          <button type="button" className="cf-zap cf-btn" onClick={copiarLocalizacao}><Icone d={I.copiar} size={11} /> {linkCopiado ? 'Link copiado!' : 'Copiar link'}</button>
+          <button type="button" className="cf-zap cf-btn" onClick={enviarMotorista}><Icone d={I.zap} size={11} /> Enviar ao motorista</button>
+          <button type="button" className="cf-zap cf-btn" onClick={copiarLocalizacao}><Icone d={I.copiar} size={11} /> {linkCopiado ? 'Rota copiada!' : 'Copiar rota'}</button>
           <a href={linkMapa} target="_blank" rel="noreferrer" className="cf-zap"><Icone d={I.pin} size={11} /> Abrir no mapa</a>
         </span>
       </span>
@@ -394,7 +413,7 @@ export default function ClienteFicha({ clienteId, base, admin }: { clienteId: st
           <div className="ui-card" style={{ overflow: 'hidden' }}>
             <div className="ui-card-header">
               <div className="ui-card-title">Localização</div>
-              {temPonto && <a href={linkPontoGoogle({ lat: cliente.latitude!, lng: cliente.longitude! })} target="_blank" rel="noreferrer" className="ui-card-link">Abrir no Google Maps</a>}
+              {temPonto && <button type="button" onClick={enviarMotorista} className="ui-btn ui-btn-success ui-btn-sm"><Icone d={I.zap} size={13} /> Enviar rota ao motorista</button>}
             </div>
             {temPonto ? (
               <div style={{ padding: '0 1rem 1rem' }}>
