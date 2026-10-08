@@ -195,10 +195,6 @@ function NovaVisitaForm() {
             <label>RECOMENDAÇÕES</label>
             <textarea value={form.recomendacoes} onChange={e => atualizar('recomendacoes', e.target.value)} placeholder="Recomendações para o produtor..." style={{minHeight:'80px'}}/>
           </div>
-          <div className="campo">
-            <label>PRÓXIMO CONTATO</label>
-            <input type="date" value={form.proximo_contato} onChange={e => atualizar('proximo_contato', e.target.value)}/>
-          </div>
 
           {erro && <div className="err"><IconAlert /> {erro}</div>}
           {salvo && <div className="sucesso"><IconCheck color="#166534" /> Visita salva com sucesso! Redirecionando...</div>}
