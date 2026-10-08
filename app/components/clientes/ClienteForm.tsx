@@ -48,7 +48,7 @@ export default function ClienteForm({ clienteId, base, admin }: Props) {
 
   useEffect(() => {
     if (admin) {
-      supabase.from('profiles').select('id, nome_completo').eq('ativo', true).order('nome_completo').then(({ data }) => setConsultores(data ?? []))
+      supabase.from('profiles').select('id, nome_completo').eq('role', 'colaborador').eq('ativo', true).order('nome_completo').then(({ data }) => setConsultores(data ?? []))
     }
     if (!clienteId) return
     supabase.from('clientes').select('*').eq('id', clienteId).single().then(({ data }) => {
