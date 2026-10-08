@@ -78,33 +78,42 @@ const fmtData = (d: string) => new Date(d).toLocaleDateString('pt-BR', { day: '2
 // A mesma negociação passa por fases, e cada fase tem sua página no menu:
 // Cotações (montagem e aprovação) → Orçamentos (com o cliente) → Pedidos (cliente aprovou).
 export type Fase = 'cotacoes' | 'aprovacoes' | 'orcamentos'
-type ConfigFase = { titulo: string; sub: string; etapas: Etapa[]; extras: Etapa[]; filas: string[]; vazio: string }
+type LinhaFase = { status: string; aprovacao_status: string | null; enviada_em: string | null }
+type ConfigFase = {
+  titulo: string; sub: string; filas: string[]; vazio: string; rotuloHistorico: string
+  ativa: (l: LinhaFase) => boolean        // em andamento nesta fase
+  passou: (l: LinhaFase) => boolean       // já passou por esta fase (histórico)
+}
 const FASES: Record<Fase, ConfigFase> = {
   cotacoes: {
-    titulo: 'Cotações', sub: 'Montagem e aprovação pela gestão. Quando a gestão aprova, a cotação passa para Orçamentos.',
-    etapas: ['elaboracao', 'aguardando'], extras: ['perdida'], filas: ['x-aprovacao', 'x-reprovada'],
+    titulo: 'Cotações', sub: 'Toda negociação começa aqui. Quando a gestão aprova, ela segue para Orçamentos e continua no histórico.',
+    filas: ['x-aprovacao', 'x-reprovada'], rotuloHistorico: 'viraram orçamento, pedido ou foram perdidas',
     vazio: 'Nenhuma cotação em andamento. Crie uma nova: depois da aprovação da gestão ela vira orçamento.',
+    ativa: l => ['elaboracao', 'aguardando'].includes(etapaDe(l)),
+    passou: () => true,
   },
   aprovacoes: {
-    titulo: 'Aprovações', sub: 'Cotações esperando a gestão aprovar. Abra, confira preços e margens e aprove ou reprove.',
-    etapas: ['aguardando'], extras: [], filas: [],
+    titulo: 'Aprovações', sub: 'Cotações esperando a gestão aprovar. No histórico ficam todas as que a gestão já aprovou ou reprovou.',
+    filas: [], rotuloHistorico: 'já aprovadas ou reprovadas pela gestão',
     vazio: 'Nada aguardando aprovação.',
+    ativa: l => etapaDe(l) === 'aguardando',
+    passou: l => !!l.aprovacao_status || ['aprovada', 'enviada', 'efetivada'].includes(l.status),
   },
   orcamentos: {
-    titulo: 'Orçamentos', sub: 'Aprovados pela gestão: para enviar ao cliente e já enviados, esperando resposta. Quando o cliente aprova, vira pedido.',
-    etapas: ['aprovada', 'enviada'], extras: ['efetivada', 'perdida'], filas: ['x-enviar', 'x-followup'],
+    titulo: 'Orçamentos', sub: 'Aprovados pela gestão: para enviar ao cliente e já enviados. No histórico ficam os que viraram pedido ou foram recusados.',
+    filas: ['x-enviar', 'x-followup'], rotuloHistorico: 'cliente aprovou (pedido) ou recusou',
     vazio: 'Nenhum orçamento em aberto. As cotações aparecem aqui depois que a gestão aprova.',
+    ativa: l => ['aprovada', 'enviada'].includes(etapaDe(l)),
+    passou: l => ['aprovada', 'enviada', 'efetivada'].includes(l.status) || (l.status === 'perdida' && !!l.enviada_em),
   },
 }
+type Recorte = 'andamento' | 'historico' | 'todas'
 const ROTULO_FILA: Record<string, (admin: boolean) => string> = {
   'x-aprovacao': admin => (admin ? 'Aguardando sua aprovação' : 'Na gestão para aprovar'),
   'x-reprovada': () => 'Reprovadas pela gestão',
   'x-enviar': () => 'Aprovados: falta enviar',
   'x-followup': () => 'Sem resposta / validade vencendo',
 }
-
-// Perdida conta na fase em que parou: antes de enviar (Cotações) ou depois (Orçamentos)
-function faseDaPerdida(l: { enviada_em: string | null }): Fase { return l.enviada_em ? 'orcamentos' : 'cotacoes' }
 
 export default function CotacoesLista({ base, fase = 'cotacoes' }: { base: string; fase?: Fase }) {
   const cfgFase = FASES[fase]
@@ -114,6 +123,7 @@ export default function CotacoesLista({ base, fase = 'cotacoes' }: { base: strin
   const [carregando, setCarregando] = useState(true)
   const [busca, setBusca] = useState('')
   const [status, setStatus] = useState('')
+  const [recorte, setRecorte] = useState<Recorte>('andamento')
   const [consultor, setConsultor] = useState('')
   const [periodo, setPeriodo] = useState(() => calcRange(ATALHO_PADRAO))
   const [visao, setVisao] = useVisao(`cotacoes-${base}`)
@@ -165,36 +175,36 @@ export default function CotacoesLista({ base, fase = 'cotacoes' }: { base: strin
     return f === 'x-aprovacao' ? x.aprovacao : f === 'x-reprovada' ? l.status === 'rascunho' && l.aprovacao_status === 'reprovada'
       : f === 'x-enviar' ? x.enviar : f === 'x-followup' ? x.followup : etapaDe(l) === f
   }
-  // período (data de criação), consultor e fase valem para a lista e as contagens
-  const daFase = (l: Linha) => {
-    const et = etapaDe(l)
-    if (et === 'perdida') return cfgFase.extras.includes('perdida') && faseDaPerdida(l) === fase
-    return cfgFase.etapas.includes(et) || cfgFase.extras.includes(et)
-  }
+  // período (data de criação), consultor e fase valem para a lista e as contagens.
+  // Nada some: o que já saiu da fase continua no histórico dela.
   const doPeriodo = useMemo(() => linhas.filter(l => {
     const d = l.created_at.slice(0, 10)
-    return d >= periodo.inicio && d <= periodo.fim && (!consultor || l.criado_por === consultor) && daFase(l)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [linhas, periodo, consultor, fase])
-  // sem filtro de etapa, mostra só o que está em andamento nesta fase (fechadas e perdidas ficam no filtro)
-  const ativa = (l: Linha) => cfgFase.etapas.includes(etapaDe(l))
+    return d >= periodo.inicio && d <= periodo.fim && (!consultor || l.criado_por === consultor) && (cfgFase.ativa(l) || cfgFase.passou(l))
+  }), [linhas, periodo, consultor, cfgFase])
+  const ativa = (l: Linha) => cfgFase.ativa(l)
+  const noRecorte = (l: Linha) => recorte === 'todas' || (recorte === 'andamento' ? ativa(l) : !ativa(l))
+  const doRecorte = doPeriodo.filter(noRecorte)
   const contarFila = (f: string) => doPeriodo.filter(l => naFila(l, f)).length
 
   const lista = useMemo(() => {
     const t = busca.trim().toLowerCase()
     return doPeriodo.filter(l =>
-      (status ? naFila(l, status) : ativa(l)) &&
+      noRecorte(l) && (!status || naFila(l, status)) &&
       (!t || l.numero.includes(t) || (l.cliente_nome ?? '').toLowerCase().includes(t) || (l.empresa_rural ?? '').toLowerCase().includes(t) || (l.cidade ?? '').toLowerCase().includes(t))
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doPeriodo, busca, status, situacao])
+  }, [doPeriodo, busca, status, situacao, recorte])
 
-  const chaveFiltro = `${busca}|${status}|${consultor}|${periodo.inicio}|${periodo.fim}`
+  const chaveFiltro = `${busca}|${status}|${recorte}|${consultor}|${periodo.inicio}|${periodo.fim}`
   const cards = usePaginacao(lista, 24, chaveFiltro)
-  const contagem = (e: string) => doPeriodo.filter(l => etapaDe(l) === e).length
+  const contagem = (e: string) => doRecorte.filter(l => etapaDe(l) === e).length
+  const etapasNoRecorte = (Object.keys(ETAPAS) as Etapa[]).filter(e => contagem(e) > 0)
   const totalEfetivado = doPeriodo.filter(l => l.status === 'efetivada').reduce((s, l) => s + l.venda, 0)
   const filas: [string, string][] = cfgFase.filas.map(f => [f, ROTULO_FILA[f](admin)])
   const emAndamento = doPeriodo.filter(ativa)
+  const historico = doPeriodo.filter(l => !ativa(l))
+  // a fila "precisa de ação" sempre olha o que está em andamento
+  const escolherFila = (k: string) => { setRecorte('andamento'); setStatus(status === k ? '' : k) }
 
   async function excluirCotacao(id: string) {
     setErro('')
@@ -214,6 +224,8 @@ export default function CotacoesLista({ base, fase = 'cotacoes' }: { base: strin
     <>
       <style>{`
         .cq-toolbar{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem}
+        .cq-recorte{display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;margin-bottom:.8rem}
+        .cq-recorte-dica{font-size:.72rem;color:#8f978f}
         .cq-busca{width:280px !important}
         .cq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:1rem}
         .cq-card{padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:.75rem;text-decoration:none;color:#162a1e}
@@ -247,6 +259,15 @@ export default function CotacoesLista({ base, fase = 'cotacoes' }: { base: strin
       {erro && <div className="ui-alert ui-alert-erro">{erro}</div>}
       <PeriodoSeletor inicio={periodo.inicio} fim={periodo.fim} onChange={(inicio, fim) => setPeriodo({ inicio, fim })} />
 
+      <div className="cq-recorte">
+        <div className="ui-segmented" role="tablist" aria-label="Recorte">
+          <button role="tab" aria-selected={recorte === 'andamento'} className={recorte === 'andamento' ? 'ativo' : ''} onClick={() => { setRecorte('andamento'); setStatus('') }}>Em andamento <span className="ui-count">{carregando ? '·' : emAndamento.length}</span></button>
+          <button role="tab" aria-selected={recorte === 'historico'} className={recorte === 'historico' ? 'ativo' : ''} onClick={() => { setRecorte('historico'); setStatus('') }}>Histórico <span className="ui-count">{carregando ? '·' : historico.length}</span></button>
+          <button role="tab" aria-selected={recorte === 'todas'} className={recorte === 'todas' ? 'ativo' : ''} onClick={() => { setRecorte('todas'); setStatus('') }}>Todas <span className="ui-count">{carregando ? '·' : doPeriodo.length}</span></button>
+        </div>
+        {recorte === 'historico' && <span className="cq-recorte-dica">{cfgFase.rotuloHistorico}</span>}
+      </div>
+
       <div className="cq-toolbar">
         <input className="ui-input cq-busca" placeholder="Buscar nº, cliente, fazenda ou cidade..." value={busca} onChange={e => setBusca(e.target.value)} />
         {admin && consultores.length > 1 && (
@@ -256,15 +277,15 @@ export default function CotacoesLista({ base, fase = 'cotacoes' }: { base: strin
           </select>
         )}
         <select className="ui-select ui-select-sm" style={{ marginLeft: 'auto', width: 'auto' }} value={status.startsWith('x-') ? '' : status} onChange={e => setStatus(e.target.value)} aria-label="Filtrar por etapa">
-          <option value="">Em andamento ({emAndamento.length})</option>
-          {[...cfgFase.etapas, ...cfgFase.extras].map(k => <option key={k} value={k}>{ETAPAS[k].label} ({contagem(k)})</option>)}
+          <option value="">Todas as etapas ({doRecorte.length})</option>
+          {etapasNoRecorte.map(k => <option key={k} value={k}>{ETAPAS[k].label} ({contagem(k)})</option>)}
         </select>
         <SeletorVisao visao={visao} onChange={setVisao} />
       </div>
       {filas.length > 0 && <div className="cq-filas">
         <span className="cq-filas-l">Precisa de ação:</span>
         {filas.map(([k, label]) => (
-          <button key={k} className={`cq-fila ${status === k ? 'ativo' : ''}`} onClick={() => setStatus(status === k ? '' : k)}>
+          <button key={k} className={`cq-fila ${status === k ? 'ativo' : ''}`} onClick={() => escolherFila(k)}>
             {label} <span className="ui-count">{carregando ? '·' : contarFila(k)}</span>
           </button>
         ))}
@@ -340,8 +361,8 @@ export default function CotacoesLista({ base, fase = 'cotacoes' }: { base: strin
           vazio={
             <div className="ui-empty">
               <div className="ui-empty-icon"><IconDoc /></div>
-              <div className="ui-empty-title">{busca || status ? 'Nada encontrado' : `Nada em ${cfgFase.titulo.toLowerCase()}`}</div>
-              <div className="ui-empty-text">{busca || status ? 'Ajuste a busca, o período ou os filtros.' : cfgFase.vazio}</div>
+              <div className="ui-empty-title">{busca || status ? 'Nada encontrado' : recorte === 'historico' ? 'Histórico vazio' : `Nada em ${cfgFase.titulo.toLowerCase()}`}</div>
+              <div className="ui-empty-text">{busca || status ? 'Ajuste a busca, o período ou os filtros.' : recorte === 'historico' ? `Aqui aparecem as que ${cfgFase.rotuloHistorico}.` : cfgFase.vazio}</div>
               {fase === 'cotacoes' && !busca && !status && <Link href={`${base}/nova`} className="ui-btn ui-btn-secondary ui-btn-sm"><IconPlus /> Nova cotação</Link>}
             </div>
           }
