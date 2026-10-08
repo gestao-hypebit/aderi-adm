@@ -83,6 +83,7 @@ export default function VisitaDetalhe({ visitaId, base, admin }: { visitaId: str
 
   const [modalAberto, setModalAberto] = useState(false)
   const [observacaoModal, setObservacaoModal] = useState('')
+  const [kmModal, setKmModal] = useState('')
   const [fotosModal, setFotosModal] = useState<FotoPreview[]>([])
   const [retorno, setRetorno] = useState<number | 'data'>(0)
   const [retornoData, setRetornoData] = useState('')
@@ -164,6 +165,7 @@ export default function VisitaDetalhe({ visitaId, base, admin }: { visitaId: str
       setFotosModal([])
       setRetorno(0)
       setRetornoData('')
+      setKmModal(visita.km_rodado != null ? String(visita.km_rodado) : '')
       setModalAberto(true)
       return
     }
@@ -178,7 +180,8 @@ export default function VisitaDetalhe({ visitaId, base, admin }: { visitaId: str
     setSalvandoObs(true)
     setErro('')
     const dataRetorno = retorno === 'data' ? retornoData : retorno > 0 ? somarDias(hojeISO(), retorno) : ''
-    const campos: Partial<Visita> = { status: 'realizada', observacao_finalizacao: observacaoModal || null, ...(dataRetorno ? { proximo_contato: dataRetorno } : {}) }
+    const km = parseFloat(kmModal.replace(',', '.'))
+    const campos: Partial<Visita> = { status: 'realizada', observacao_finalizacao: observacaoModal || null, ...(dataRetorno ? { proximo_contato: dataRetorno } : {}), ...(!isNaN(km) && km >= 0 ? { km_rodado: km } : {}) }
     const { error } = await supabase.from('visitas').update(campos).eq('id', visitaId)
     if (error) { setErro('Não foi possível finalizar a visita.'); setSalvandoObs(false); return }
     atualizarLocal(campos)
@@ -361,6 +364,9 @@ export default function VisitaDetalhe({ visitaId, base, admin }: { visitaId: str
             <div className="vd-modal-s">Registre como foi a visita. Observação, fotos e retorno são opcionais.</div>
             <label className="ui-label">Observação</label>
             <textarea className="ui-textarea" placeholder="Ex.: Produtor demonstrou interesse nos produtos..." value={observacaoModal} onChange={e => setObservacaoModal(e.target.value)} autoFocus />
+
+            <label className="ui-label" style={{ marginTop: '1rem' }}>KM rodado até o cliente</label>
+            <input className="ui-input" type="number" min="0" step="0.1" inputMode="decimal" placeholder="Ex.: 142,5" style={{ maxWidth: 200 }} value={kmModal} onChange={e => setKmModal(e.target.value)} />
 
             <div className="vd-modal-l"><Ic d={D.cal} size={13} /> Agendar retorno</div>
             <div className="vd-chips">

@@ -300,7 +300,8 @@ export default function VisitaForm({ visitaId }: { visitaId?: string }) {
             )}
           </div>
 
-          <div className="nv-secao">
+          {/* status só na edição: visita nova sempre nasce agendada */}
+          {editando && <div className="nv-secao">
             <div className="nv-secao-head">
               <div className="nv-passo">3</div>
               <div>
@@ -326,14 +327,14 @@ export default function VisitaForm({ visitaId }: { visitaId?: string }) {
                 )
               })}
             </div>
-          </div>
+          </div>}
 
           <div className="nv-secao" style={{ borderBottom: 'none' }}>
             <div className="nv-secao-head">
-              <div className="nv-passo">4</div>
+              <div className="nv-passo">{editando ? 4 : 3}</div>
               <div>
                 <div className="nv-secao-titulo">Detalhes <span style={{ fontWeight: 400, color: '#8f978f', fontSize: '.74rem' }}>(opcional)</span></div>
-                <div className="nv-secao-desc">Anotações, recomendações e deslocamento</div>
+                <div className="nv-secao-desc">{editando ? 'Anotações, recomendações e deslocamento' : 'Anotações e recomendações'}</div>
               </div>
             </div>
             <div className="ui-field">
@@ -344,15 +345,17 @@ export default function VisitaForm({ visitaId }: { visitaId?: string }) {
               <label className="ui-label">Recomendações</label>
               <textarea className="ui-textarea" style={{ minHeight: 80 }} value={form.recomendacoes} onChange={e => atualizar('recomendacoes', e.target.value)} placeholder="Recomendações para o produtor..."/>
             </div>
-            <div className="ui-grid-2">
+            <div className={editando ? 'ui-grid-2' : ''}>
               <div className="ui-field">
                 <label className="ui-label">Próximo contato</label>
                 <input className="ui-input" type="date" value={form.proximo_contato} onChange={e => atualizar('proximo_contato', e.target.value)}/>
               </div>
-              <div className="ui-field">
-                <label className="ui-label">KM rodado</label>
-                <input className="ui-input" type="number" min="0" step="0.1" placeholder="Ex: 142,5" value={form.km_rodado} onChange={e => atualizar('km_rodado', e.target.value)}/>
-              </div>
+              {editando && (
+                <div className="ui-field">
+                  <label className="ui-label">KM rodado</label>
+                  <input className="ui-input" type="number" min="0" step="0.1" placeholder="Ex: 142,5" value={form.km_rodado} onChange={e => atualizar('km_rodado', e.target.value)}/>
+                </div>
+              )}
             </div>
             {erro && <div className="ui-alert ui-alert-erro" style={{ marginBottom: 0 }}><IconAlert /> {erro}</div>}
           </div>
