@@ -13,6 +13,7 @@ type Cliente = {
   estado: string | null
   nome_fazenda: string | null
   cultura_principal: string | null
+  hectares: number | null
   telefone: string | null
   created_at: string
 }
@@ -31,6 +32,7 @@ function IconUsers() {
 }
 
 const local = (c: Cliente) => [c.cidade, c.estado].filter(Boolean).join('/')
+const area = (c: Cliente) => (c.hectares ? `${Number(c.hectares).toLocaleString('pt-BR')} ha` : '')
 
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([])
@@ -40,7 +42,7 @@ export default function ClientesPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    supabase.from('clientes').select('id, nome, cidade, estado, nome_fazenda, cultura_principal, telefone, created_at').order('nome').then(({ data }) => {
+    supabase.from('clientes').select('id, nome, cidade, estado, nome_fazenda, cultura_principal, hectares, telefone, created_at').order('nome').then(({ data }) => {
       setClientes(data || [])
       setCarregando(false)
     })
@@ -54,6 +56,7 @@ export default function ClientesPage() {
   }, [clientes, busca])
 
   const cards = usePaginacao(filtrados, 24, busca)
+  const totalHa = clientes.reduce((s, c) => s + (Number(c.hectares) || 0), 0)
 
   const vazio = (
     <div className="ui-empty">
@@ -78,7 +81,7 @@ export default function ClientesPage() {
       <div className="ui-page-header">
         <div>
           <div className="ui-title">Clientes</div>
-          <div className="ui-sub">{carregando ? 'Carregando...' : `${clientes.length} produtor${clientes.length !== 1 ? 'es' : ''} na sua carteira`}</div>
+          <div className="ui-sub">{carregando ? 'Carregando...' : `${clientes.length} produtor${clientes.length !== 1 ? 'es' : ''} na sua carteira${totalHa ? ` · ${totalHa.toLocaleString('pt-BR')} hectares` : ''}`}</div>
         </div>
         <div className="ui-header-actions">
           <Link href="/dashboard/clientes/novo" className="ui-btn ui-btn-primary"><IconPlus /> Novo cliente</Link>
@@ -106,7 +109,7 @@ export default function ClientesPage() {
                   <div className="dc-tags">
                     {local(c) && <span className="ui-cel" style={{ gap: '.35rem' }}><IconPin />{local(c)}</span>}
                     {c.telefone && <span className="ui-cel" style={{ gap: '.35rem' }}><IconPhone />{c.telefone}</span>}
-                    {c.cultura_principal && <span className="ui-cel-sub">{c.cultura_principal}</span>}
+                    {(c.cultura_principal || area(c)) && <span className="ui-cel-sub">{[c.cultura_principal, area(c)].filter(Boolean).join(' · ')}</span>}
                   </div>
                 </Link>
               ))}
@@ -138,6 +141,8 @@ export default function ClientesPage() {
               celula: c => local(c) || <span className="ui-cel-mudo">—</span> },
             { id: 'cultura', titulo: 'Cultura', ocultar: 'tablet', ordenar: (a, b) => (a.cultura_principal ?? '').localeCompare(b.cultura_principal ?? ''),
               celula: c => c.cultura_principal || <span className="ui-cel-mudo">—</span> },
+            { id: 'area', titulo: 'Área', alinhar: 'dir', ordenar: (a, b) => (Number(a.hectares) || 0) - (Number(b.hectares) || 0),
+              celula: c => area(c) ? <span className="ui-cel-num">{area(c)}</span> : <span className="ui-cel-mudo">—</span> },
             { id: 'tel', titulo: 'Telefone', ocultar: 'tablet', celula: c => <span className="ui-cel-num">{c.telefone || <span className="ui-cel-mudo">—</span>}</span> },
           ]}
         />

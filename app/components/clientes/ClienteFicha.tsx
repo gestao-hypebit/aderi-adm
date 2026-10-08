@@ -51,6 +51,7 @@ const I = {
   pin: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
   visita: '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/>',
   cot: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>',
+  copiar: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
   zap: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
 }
 
@@ -73,6 +74,7 @@ export default function ClienteFicha({ clienteId, base, admin }: { clienteId: st
   const [contatoForm, setContatoForm] = useState<Partial<Contato> | null>(null)
   const [salvandoContato, setSalvandoContato] = useState(false)
   const [excluirContato, setExcluirContato] = useState<Contato | null>(null)
+  const [linkCopiado, setLinkCopiado] = useState(false)
 
   async function carregarContatos() {
     const { data } = await supabase.from('cliente_contatos').select('*').eq('cliente_id', clienteId).order('principal', { ascending: false }).order('nome')
@@ -169,10 +171,17 @@ export default function ClienteFicha({ clienteId, base, admin }: { clienteId: st
   const ultima = realizadas[0]
   const proxima = [...visitas].reverse().find(v => v.status === 'agendada' && v.data_visita >= hoje)
   const diasSem = ultima ? Math.round((Date.parse(hoje) - Date.parse(ultima.data_visita)) / 86400000) : null
-  const vendido = cotacoes.filter(c => c.status === 'aprovada').reduce((s, c) => s + c.venda, 0)
+  const vendido = cotacoes.filter(c => c.status === 'efetivada').reduce((s, c) => s + c.venda, 0)
   const responsavel = um(cliente.responsavel)
   const local = [cliente.cidade, cliente.estado].filter(Boolean).join('/')
   const temPonto = cliente.latitude != null && cliente.longitude != null
+  const linkMapa = temPonto ? linkPontoGoogle({ lat: cliente.latitude!, lng: cliente.longitude! }) : ''
+
+  async function copiarLocalizacao() {
+    try { await navigator.clipboard.writeText(linkMapa) } catch { window.prompt('Copie o link da localização:', linkMapa); return }
+    setLinkCopiado(true)
+    setTimeout(() => setLinkCopiado(false), 2000)
+  }
 
   const dados: { icone: string; label: string; valor: React.ReactNode }[] = [
     { icone: I.tel, label: 'Telefone', valor: cliente.telefone ? <span>{cliente.telefone} <a href={zapLink(cliente.telefone)} target="_blank" rel="noreferrer" className="cf-zap">WhatsApp</a></span> : null },
@@ -180,6 +189,15 @@ export default function ClienteFicha({ clienteId, base, admin }: { clienteId: st
     { icone: I.doc, label: 'CPF / CNPJ', valor: cliente.cpf_cnpj },
     { icone: I.doc, label: 'Inscrição do produtor', valor: cliente.inscricao_produtor },
     { icone: I.area, label: 'Área', valor: cliente.hectares ? `${cliente.hectares.toLocaleString('pt-BR')} hectares` : null },
+    { icone: I.pin, label: 'Localização', valor: temPonto ? (
+      <span className="cf-loc">
+        <a href={linkMapa} target="_blank" rel="noreferrer" className="cf-link">{[local, `${cliente.latitude!.toFixed(5)}, ${cliente.longitude!.toFixed(5)}`].filter(Boolean).join(' · ')}</a>
+        <span className="cf-loc-acoes">
+          <button type="button" className="cf-zap cf-btn" onClick={copiarLocalizacao}><Icone d={I.copiar} size={11} /> {linkCopiado ? 'Link copiado!' : 'Copiar link'}</button>
+          <a href={linkMapa} target="_blank" rel="noreferrer" className="cf-zap"><Icone d={I.pin} size={11} /> Abrir no mapa</a>
+        </span>
+      </span>
+    ) : null },
     { icone: I.user, label: 'Consultor responsável', valor: responsavel ? (admin ? <Link href={`/admin/consultores/${responsavel.id}`} className="cf-link">{responsavel.nome_completo}</Link> : responsavel.nome_completo) : null },
   ]
 
@@ -209,6 +227,10 @@ export default function ClienteFicha({ clienteId, base, admin }: { clienteId: st
         .cf-v.vazio{color:#b8bdb6;font-weight:400;font-style:italic}
         .cf-zap{font-size:.68rem;color:#1e8a4c;background:#eaf7ef;border-radius:999px;padding:.12rem .5rem;margin-left:.3rem;text-decoration:none}
         .cf-link{color:#162a1e;text-decoration:none;border-bottom:1px dashed #cfc8bd}
+        .cf-loc{display:flex;flex-direction:column;gap:.35rem}
+        .cf-loc-acoes{display:flex;gap:.3rem;flex-wrap:wrap}
+        .cf-loc-acoes .cf-zap{margin-left:0;display:inline-flex;align-items:center;gap:.25rem}
+        .cf-btn{border:none;cursor:pointer;font-family:inherit;font-weight:600}
         .cf-tl{list-style:none;margin:0;padding:.3rem 1.3rem .4rem}
         .cf-ev{display:flex;gap:.85rem;padding:.75rem 0;position:relative;text-decoration:none}
         .cf-ev:not(:last-child)::after{content:'';position:absolute;left:15px;top:44px;bottom:-6px;width:2px;background:#f2efea}
@@ -296,7 +318,7 @@ export default function ClienteFicha({ clienteId, base, admin }: { clienteId: st
         <div className="ui-card cf-kpi"><div className="cf-kpi-l">Visitas realizadas</div><div className="cf-kpi-n">{realizadas.length}</div><div className="cf-kpi-s">de {visitas.length} registradas</div></div>
         <div className="ui-card cf-kpi"><div className="cf-kpi-l">Última visita</div><div className="cf-kpi-n" style={{ color: diasSem != null && diasSem > 60 ? '#c0651a' : undefined }}>{ultima ? fmt(ultima.data_visita) : '—'}</div><div className="cf-kpi-s">{diasSem != null ? `há ${diasSem} dia${diasSem !== 1 ? 's' : ''}` : 'Nenhuma realizada'}</div></div>
         <div className="ui-card cf-kpi"><div className="cf-kpi-l">Próxima visita</div><div className="cf-kpi-n" style={{ color: proxima ? '#E67E22' : undefined }}>{proxima ? fmt(proxima.data_visita) : '—'}</div><div className="cf-kpi-s">{proxima ? um(proxima.funcionario)?.nome_completo : 'Nada agendado'}</div></div>
-        <div className="ui-card cf-kpi"><div className="cf-kpi-l">Compras aprovadas</div><div className="cf-kpi-n">{brl(vendido)}</div><div className="cf-kpi-s">{cotacoes.length} cotaç{cotacoes.length === 1 ? 'ão' : 'ões'} no total</div></div>
+        <div className="ui-card cf-kpi"><div className="cf-kpi-l">Compras efetivadas</div><div className="cf-kpi-n">{brl(vendido)}</div><div className="cf-kpi-s">{cotacoes.length} cotaç{cotacoes.length === 1 ? 'ão' : 'ões'} no total</div></div>
       </div>
 
       <div className="cf-grid">

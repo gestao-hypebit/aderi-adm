@@ -53,7 +53,7 @@ export default function EquipeTabela({ linhas }: { linhas: LinhaEquipe[] }) {
         { id: 'kml', titulo: 'km/L', alinhar: 'dir', ocultar: 'tablet', ordenar: (a, b) => (a.litros ? a.km / a.litros : 0) - (b.litros ? b.km / b.litros : 0),
           celula: c => c.litros > 0 ? <span className="ui-cel-num">{(c.km / c.litros).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</span> : <span className="ui-cel-mudo">—</span> },
         { id: 'comb', titulo: 'Combustível', alinhar: 'dir', ocultar: 'tablet', ordenar: (a, b) => a.gasto - b.gasto, celula: c => <span className="ui-cel-num">{moeda(c.gasto)}</span> },
-        { id: 'venda', titulo: 'Vendas aprovadas', alinhar: 'dir', ordenar: (a, b) => a.vendido - b.vendido,
+        { id: 'venda', titulo: 'Vendas efetivadas', alinhar: 'dir', ordenar: (a, b) => a.vendido - b.vendido,
           celula: c => c.vendido ? <span className="ui-cel-num ui-cel-forte">{moeda(c.vendido)}</span> : <span className="ui-cel-mudo">—</span> },
         { id: 'acoes', titulo: '', alinhar: 'dir', ocultar: 'celular',
           celula: c => (

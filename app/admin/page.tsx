@@ -13,7 +13,6 @@ type VisitaLista = { id: string; data_visita: string; hora_visita?: string | nul
 
 const MESES_ABREV = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 const STATUS_LABEL: Record<string, string> = { agendada: 'Agendada', realizada: 'Realizada', cancelada: 'Cancelada', atrasada: 'Atrasada' }
-const COR_FUNIL: Record<string, string> = { rascunho: '#b8bdb6', enviada: '#E67E22', aprovada: '#1a7f4b', perdida: '#c0392b' }
 
 const um = <T,>(r: Rel<T>) => (Array.isArray(r) ? r[0] ?? null : r)
 const moeda = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -117,7 +116,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
     supabase.from('visitas').select(camposVisita, { count: 'exact' }).eq('status', 'agendada').lt('data_visita', hoje).order('data_visita').limit(3).match(porFunc),
     supabase.from('visitas').select('cliente_id, data_visita').eq('status', 'realizada').order('data_visita', { ascending: false }),
     supabase.from('cotacoes').select('status, criado_por, ptax, juros_mes, aliquota_icms, aliquota_ir, itens:cotacao_itens(*)').gte('created_at', inicio).lte('created_at', fim + 'T23:59:59').match(porAutor),
-    supabase.from('cotacoes').select('status, ptax, juros_mes, aliquota_icms, aliquota_ir, itens:cotacao_itens(*)').eq('status', 'aprovada').gte('created_at', antIni).lte('created_at', antFim + 'T23:59:59').match(porAutor),
+    supabase.from('cotacoes').select('status, ptax, juros_mes, aliquota_icms, aliquota_ir, itens:cotacao_itens(*)').eq('status', 'efetivada').gte('created_at', antIni).lte('created_at', antFim + 'T23:59:59').match(porAutor),
     supabase.from('cotacoes').select('id, numero, cliente_nome, autor:profiles!cotacoes_criado_por_fkey(nome_completo)').eq('aprovacao_status', 'pendente').order('updated_at', { ascending: false }).limit(5).match(porAutor),
   ])
 
@@ -150,12 +149,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
   ;(cotacoes ?? []).forEach(c => {
     const v = valorCot(c)
     const f = funil.find(x => x.status === c.status); if (f) { f.qtd++; f.valor += v }
-    if (c.status === 'aprovada') { const m = porColab.get(c.criado_por); if (m) m.vendido += v }
+    if (c.status === 'efetivada') { const m = porColab.get(c.criado_por); if (m) m.vendido += v }
   })
-  const aprovado = funil.find(f => f.status === 'aprovada')!
-  const decididas = aprovado.qtd + (funil.find(f => f.status === 'perdida')?.qtd ?? 0)
-  const conversao = decididas ? Math.round((aprovado.qtd / decididas) * 100) : null
-  const aprovadoAnt = (cotacoesAnt ?? []).reduce((s, c) => s + valorCot(c), 0)
+  const efetivado = funil.find(f => f.status === 'efetivada')!
+  const decididas = efetivado.qtd + (funil.find(f => f.status === 'perdida')?.qtd ?? 0)
+  const conversao = decididas ? Math.round((efetivado.qtd / decididas) * 100) : null
+  const efetivadoAnt = (cotacoesAnt ?? []).reduce((s, c) => s + valorCot(c), 0)
   const maiorFunil = Math.max(...funil.map(f => f.valor), 1)
   const totalCotacoes = funil.reduce((s, f) => s + f.qtd, 0)
 
@@ -318,9 +317,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
           <div className="pn-kpi-s">{moeda(totalGasto)} em combustível{totalKm > 0 ? ` · ${(totalGasto / totalKm).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/km` : ''}</div>
         </Link>
         <Link href="/admin/cotacoes" className="ui-card ui-card-hover pn-kpi">
-          <div className="pn-kpi-top"><span className="pn-kpi-l">Vendas aprovadas</span><span className="pn-kpi-ico" style={{ background: '#eaf7ef', color: '#1a7f4b' }}><IconDoc /></span></div>
-          <div className="pn-kpi-n" title={moeda(aprovado.valor)}>{compacto(aprovado.valor)}</div>
-          <Delta atual={aprovado.valor} anterior={aprovadoAnt} total={tudo} />
+          <div className="pn-kpi-top"><span className="pn-kpi-l">Vendas efetivadas</span><span className="pn-kpi-ico" style={{ background: '#eaf7ef', color: '#1a7f4b' }}><IconDoc /></span></div>
+          <div className="pn-kpi-n" title={moeda(efetivado.valor)}>{compacto(efetivado.valor)}</div>
+          <Delta atual={efetivado.valor} anterior={efetivadoAnt} total={tudo} />
         </Link>
       </div>
 
@@ -394,14 +393,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
                 {funil.map(f => (
                   <div key={f.status}>
                     <div className="pn-funil-l">
-                      <span><i className="pn-dot" style={{ background: COR_FUNIL[f.status] }} />{STATUS_COTACAO[f.status].label} <small>· {f.qtd}</small></span>
+                      <span><i className="pn-dot" style={{ background: STATUS_COTACAO[f.status].cor }} />{STATUS_COTACAO[f.status].label} <small>· {f.qtd}</small></span>
                       <b>{compacto(f.valor)}</b>
                     </div>
-                    <div className="pn-funil-bar"><span style={{ width: `${(f.valor / maiorFunil) * 100}%`, background: COR_FUNIL[f.status] }} /></div>
+                    <div className="pn-funil-bar"><span style={{ width: `${(f.valor / maiorFunil) * 100}%`, background: STATUS_COTACAO[f.status].cor }} /></div>
                   </div>
                 ))}
               </div>
-              <div className="pn-conv"><span>Conversão (aprovadas ÷ decididas)</span><b>{conversao == null ? '—' : `${conversao}%`}</b></div>
+              <div className="pn-conv"><span>Conversão (efetivadas ÷ decididas)</span><b>{conversao == null ? '—' : `${conversao}%`}</b></div>
             </>
           )}
         </div>

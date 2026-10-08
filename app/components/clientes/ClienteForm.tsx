@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { obterPosicao, linkPontoGoogle } from '@/lib/geo'
+import { obterPosicao, linkPontoGoogle, pontoDeTexto } from '@/lib/geo'
 
 const Mapa = dynamic(() => import('@/app/components/Mapa'), { ssr: false, loading: () => <div className="ui-skeleton" style={{ height: 260, borderRadius: 12 }} /> })
 
@@ -45,6 +45,7 @@ export default function ClienteForm({ clienteId, base, admin }: Props) {
   const [duplicados, setDuplicados] = useState<Duplicado[]>([])
   const [localizando, setLocalizando] = useState(false)
   const [mostrarMapa, setMostrarMapa] = useState(false)
+  const [linkColado, setLinkColado] = useState('')
 
   useEffect(() => {
     if (admin) {
@@ -91,6 +92,16 @@ export default function ClienteForm({ clienteId, base, admin }: Props) {
     }
     setLocalizando(false)
   }
+
+  // link do Google Maps colado (ex.: enviado pelo produtor no WhatsApp) já marca o ponto no mapa
+  function colarLink(texto: string) {
+    setLinkColado(texto)
+    const p = pontoDeTexto(texto)
+    if (!p) return
+    setForm(f => ({ ...f, latitude: p.lat.toFixed(6), longitude: p.lng.toFixed(6) }))
+    setMostrarMapa(true)
+  }
+  const linkInvalido = !!linkColado.trim() && !pontoDeTexto(linkColado)
 
   const lat = parseFloat(form.latitude.replace(',', '.'))
   const lng = parseFloat(form.longitude.replace(',', '.'))
@@ -248,6 +259,10 @@ export default function ClienteForm({ clienteId, base, admin }: Props) {
             </div>
 
             <label className="ui-label">Localização da sede</label>
+            <div className="ui-field" style={{ marginBottom: '.6rem' }}>
+              <input className="ui-input" value={linkColado} onChange={e => colarLink(e.target.value)} placeholder="Cole aqui o link do Google Maps ou as coordenadas (-20.4652, -45.9583)" aria-label="Link da localização" />
+              {linkInvalido && <div className="ui-hint" style={{ color: '#c0651a' }}>Não achei as coordenadas nesse link. Abra o link no Google Maps, toque no ponto e copie as coordenadas (links curtos maps.app.goo.gl não trazem o ponto).</div>}
+            </div>
             <div className="cf-loc">
               <div className="ui-field"><input className="ui-input" value={form.latitude} onChange={e => atualizar('latitude', e.target.value)} placeholder="Latitude (ex.: -20.4652)" aria-label="Latitude" /></div>
               <div className="ui-field"><input className="ui-input" value={form.longitude} onChange={e => atualizar('longitude', e.target.value)} placeholder="Longitude (ex.: -45.9583)" aria-label="Longitude" /></div>

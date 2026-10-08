@@ -6,8 +6,10 @@ import { createClient } from '@/lib/supabase/client'
 import { SeletorVisao, useVisao } from '@/app/components/AlternarVisao'
 import Tabela, { Paginacao, usePaginacao } from '@/app/components/Tabela'
 import { STATUS_COTACAO, PEDIDO_STATUS, calcularTotais, itemDoBanco, parametrosDoBanco, brl, pct } from '@/lib/cotacao'
-import { hojeISO } from '@/lib/dateUtils'
+import { ATALHO_PADRAO, calcRange, descreverPeriodo, hojeISO } from '@/lib/dateUtils'
+import PeriodoSeletor from '@/app/components/PeriodoSeletor'
 import NumInput from './NumInput'
+import FunilCotacoes from './FunilCotacoes'
 
 type Linha = {
   id: string
@@ -28,6 +30,7 @@ type Linha = {
   validade: string | null
   pedido_status: string | null
   pagamento_status: string | null
+  motivo_perda: string | null
 }
 
 type Alerta = { txt: string; cls: string }
@@ -35,7 +38,7 @@ type Config = { margem_minima: number; validade_cotacao_dias: number; dias_follo
 const diasEntre = (de: string, ate: string) => Math.round((Date.parse(ate.slice(0, 10)) - Date.parse(de.slice(0, 10))) / 86400000)
 
 // Situações que pedem ação: aprovação de preço, follow-up, validade e pedidos em andamento
-function alertasDe(l: Linha, cfg: Config): { alertas: Alerta[]; aprovacao: boolean; followup: boolean; pedido: boolean } {
+function alertasDe(l: Linha, cfg: Config, admin: boolean): { alertas: Alerta[]; aprovacao: boolean; followup: boolean; pedido: boolean } {
   const hoje = hojeISO()
   const alertas: Alerta[] = []
   const aprovacao = l.aprovacao_status === 'pendente'
@@ -46,13 +49,14 @@ function alertasDe(l: Linha, cfg: Config): { alertas: Alerta[]; aprovacao: boole
     const d = diasEntre(l.enviada_em, hoje)
     if (d >= cfg.dias_followup) { followup = true; alertas.push({ txt: `Enviada há ${d} dias`, cls: 'ui-badge-agendada' }) }
   }
-  if (l.validade && (l.status === 'rascunho' || l.status === 'enviada')) {
+  if (l.validade && (l.status === 'rascunho' || l.status === 'aprovada' || l.status === 'enviada')) {
     const d = diasEntre(hoje, l.validade)
     if (d < 0) { followup = true; alertas.push({ txt: 'Validade vencida', cls: 'ui-badge-cancelada' }) }
     else if (d <= 2) { followup = true; alertas.push({ txt: d === 0 ? 'Vence hoje' : `Vence em ${d} dia${d > 1 ? 's' : ''}`, cls: 'ui-badge-agendada' }) }
   }
-  const pedido = l.status === 'aprovada' && (l.pedido_status !== 'entregue' && l.pedido_status !== 'cancelado' || l.pagamento_status !== 'pago')
-  if (l.status === 'aprovada' && l.pedido_status) alertas.push({ txt: `Pedido: ${PEDIDO_STATUS[l.pedido_status]}${l.pagamento_status === 'pago' ? ' · pago' : ''}`, cls: l.pedido_status === 'entregue' && l.pagamento_status === 'pago' ? 'ui-badge-realizada' : 'ui-badge-neutro' })
+  // pedidos são acompanhados só pela gestão
+  const pedido = admin && l.status === 'efetivada' && (l.pedido_status !== 'entregue' && l.pedido_status !== 'cancelado' || l.pagamento_status !== 'pago')
+  if (admin && l.status === 'efetivada' && l.pedido_status) alertas.push({ txt: `Pedido: ${PEDIDO_STATUS[l.pedido_status]}${l.pagamento_status === 'pago' ? ' · pago' : ''}`, cls: l.pedido_status === 'entregue' && l.pagamento_status === 'pago' ? 'ui-badge-realizada' : 'ui-badge-neutro' })
   return { alertas, aprovacao, followup, pedido }
 }
 
@@ -79,6 +83,7 @@ export default function CotacoesLista({ base }: { base: string }) {
   const [busca, setBusca] = useState('')
   const [status, setStatus] = useState('')
   const [consultor, setConsultor] = useState('')
+  const [periodo, setPeriodo] = useState(() => calcRange(ATALHO_PADRAO))
   const [visao, setVisao] = useVisao(`cotacoes-${base}`)
   const [config, setConfig] = useState<Config>({ margem_minima: 0, validade_cotacao_dias: 7, dias_followup: 3 })
   const [configAberta, setConfigAberta] = useState(false)
@@ -92,7 +97,7 @@ export default function CotacoesLista({ base }: { base: string }) {
         supabase.from('profiles').select('role').eq('id', user?.id ?? '').single(),
         supabase
           .from('cotacoes')
-          .select('id, numero, status, cliente_nome, empresa_rural, cidade, created_at, criado_por, ptax, juros_mes, aliquota_icms, aliquota_ir, aprovacao_status, enviada_em, validade, pedido_status, pagamento_status, autor:profiles!cotacoes_criado_por_fkey(nome_completo), itens:cotacao_itens(*)')
+          .select('id, numero, status, cliente_nome, empresa_rural, cidade, created_at, criado_por, ptax, juros_mes, aliquota_icms, aliquota_ir, aprovacao_status, enviada_em, validade, pedido_status, pagamento_status, motivo_perda, autor:profiles!cotacoes_criado_por_fkey(nome_completo), itens:cotacao_itens(*)')
           .order('created_at', { ascending: false }),
         supabase.from('configuracoes').select('margem_minima, validade_cotacao_dias, dias_followup').eq('id', 1).maybeSingle(),
       ])
@@ -107,7 +112,7 @@ export default function CotacoesLista({ base }: { base: string }) {
           created_at: c.created_at, criado_por: c.criado_por, autor: a?.nome_completo ?? '—', qtdItens: itens.length,
           venda: t.venda, resultado: t.resultado, pctResultado: t.pctResultado,
           aprovacao_status: c.aprovacao_status, enviada_em: c.enviada_em, validade: c.validade,
-          pedido_status: c.pedido_status, pagamento_status: c.pagamento_status,
+          pedido_status: c.pedido_status, pagamento_status: c.pagamento_status, motivo_perda: c.motivo_perda,
         }
       }))
       setCarregando(false)
@@ -121,27 +126,35 @@ export default function CotacoesLista({ base }: { base: string }) {
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]))
   }, [linhas])
 
-  const situacao = useMemo(() => new Map(linhas.map(l => [l.id, alertasDe(l, config)])), [linhas, config])
+  const situacao = useMemo(() => new Map(linhas.map(l => [l.id, alertasDe(l, config, admin)])), [linhas, config, admin])
   const naFila = (l: Linha, f: string) => {
     const x = situacao.get(l.id)!
     return f === 'x-aprovacao' ? x.aprovacao : f === 'x-followup' ? x.followup : f === 'x-pedidos' ? x.pedido : l.status === f
   }
-  const contarFila = (f: string) => linhas.filter(l => naFila(l, f)).length
+  // período (data de criação) e consultor valem para a lista, as contagens e o funil
+  const doPeriodo = useMemo(() => linhas.filter(l => {
+    const d = l.created_at.slice(0, 10)
+    return d >= periodo.inicio && d <= periodo.fim && (!consultor || l.criado_por === consultor)
+  }), [linhas, periodo, consultor])
+  const contarFila = (f: string) => doPeriodo.filter(l => naFila(l, f)).length
 
   const lista = useMemo(() => {
     const t = busca.trim().toLowerCase()
-    return linhas.filter(l =>
+    return doPeriodo.filter(l =>
       (!status || naFila(l, status)) &&
-      (!consultor || l.criado_por === consultor) &&
       (!t || l.numero.includes(t) || (l.cliente_nome ?? '').toLowerCase().includes(t) || (l.empresa_rural ?? '').toLowerCase().includes(t) || (l.cidade ?? '').toLowerCase().includes(t))
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linhas, busca, status, consultor, situacao])
+  }, [doPeriodo, busca, status, situacao])
 
-  const cards = usePaginacao(lista, 24, `${busca}|${status}|${consultor}`)
-  const contagem = (s: string) => linhas.filter(l => l.status === s).length
-  const totalAprovado = linhas.filter(l => l.status === 'aprovada').reduce((s, l) => s + l.venda, 0)
-  const filas: [string, string][] = [['x-aprovacao', admin ? 'Aprovar preço' : 'Aguardando aprovação'], ['x-followup', 'Follow-up / validade'], ['x-pedidos', 'Pedidos em andamento']]
+  const chaveFiltro = `${busca}|${status}|${consultor}|${periodo.inicio}|${periodo.fim}`
+  const cards = usePaginacao(lista, 24, chaveFiltro)
+  const contagem = (s: string) => doPeriodo.filter(l => l.status === s).length
+  const totalEfetivado = doPeriodo.filter(l => l.status === 'efetivada').reduce((s, l) => s + l.venda, 0)
+  const filas: [string, string][] = [
+    ['x-aprovacao', admin ? 'Aprovar preço' : 'Aguardando aprovação'], ['x-followup', 'Follow-up / validade'],
+    ...(admin ? [['x-pedidos', 'Pedidos em andamento'] as [string, string]] : []),
+  ]
 
   async function salvarConfig() {
     setSalvandoConfig(true)
@@ -174,7 +187,7 @@ export default function CotacoesLista({ base }: { base: string }) {
         <div>
           <div className="ui-title">Cotações</div>
           <div className="ui-sub">
-            {carregando ? 'Carregando...' : `${linhas.length} cotaç${linhas.length !== 1 ? 'ões' : 'ão'} · ${contagem('aprovada')} aprovada${contagem('aprovada') !== 1 ? 's' : ''} (${brl(totalAprovado)}). Cada cotação gera o orçamento, o pedido e o resultado.`}
+            {carregando ? 'Carregando...' : `${doPeriodo.length} cotaç${doPeriodo.length !== 1 ? 'ões' : 'ão'} · ${contagem('efetivada')} efetivada${contagem('efetivada') !== 1 ? 's' : ''} (${brl(totalEfetivado)}). Aprovada = liberada pela gestão; efetivada = o cliente fechou.`}
           </div>
         </div>
         <div className="ui-header-actions">
@@ -183,6 +196,9 @@ export default function CotacoesLista({ base }: { base: string }) {
           <Link href={`${base}/nova`} className="ui-btn ui-btn-primary"><IconPlus /> Nova cotação</Link>
         </div>
       </div>
+
+      <PeriodoSeletor inicio={periodo.inicio} fim={periodo.fim} onChange={(inicio, fim) => setPeriodo({ inicio, fim })} />
+      {!carregando && <FunilCotacoes cotacoes={doPeriodo} periodo={descreverPeriodo(periodo.inicio, periodo.fim)} onStatus={setStatus} />}
 
       <div className="cq-toolbar">
         <input className="ui-input cq-busca" placeholder="Buscar nº, cliente, fazenda ou cidade..." value={busca} onChange={e => setBusca(e.target.value)} />
@@ -264,13 +280,13 @@ export default function CotacoesLista({ base }: { base: string }) {
           chave={l => l.id}
           href={l => `${base}/${l.id}`}
           carregando={carregando}
-          reiniciar={`${busca}|${status}|${consultor}`}
+          reiniciar={chaveFiltro}
           rotulo="cotações"
           vazio={
             <div className="ui-empty">
               <div className="ui-empty-icon"><IconDoc /></div>
               <div className="ui-empty-title">{linhas.length === 0 ? 'Nenhuma cotação ainda' : 'Nenhuma cotação encontrada'}</div>
-              <div className="ui-empty-text">{linhas.length === 0 ? 'Crie a primeira cotação: o orçamento, o pedido e o resultado saem dela automaticamente.' : 'Ajuste a busca ou os filtros.'}</div>
+              <div className="ui-empty-text">{linhas.length === 0 ? 'Crie a primeira cotação: o orçamento, o pedido e o resultado saem dela automaticamente.' : 'Ajuste a busca, o período ou os filtros.'}</div>
               {linhas.length === 0 && <Link href={`${base}/nova`} className="ui-btn ui-btn-secondary ui-btn-sm"><IconPlus /> Nova cotação</Link>}
             </div>
           }

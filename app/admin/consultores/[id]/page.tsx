@@ -6,7 +6,10 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Tabela from '@/app/components/Tabela'
 import ConfirmDialog from '../../_ui/ConfirmDialog'
-import { calcRange, hojeISO } from '@/lib/dateUtils'
+import { ATALHO_PADRAO, calcRange, descreverPeriodo, hojeISO } from '@/lib/dateUtils'
+import { STATUS_COTACAO, calcularTotais, itemDoBanco, parametrosDoBanco, brl } from '@/lib/cotacao'
+import FunilCotacoes from '@/app/components/cotacoes/FunilCotacoes'
+import PeriodoSeletor from '@/app/components/PeriodoSeletor'
 
 type Perfil = { id: string; nome_completo: string | null; cargo: string | null; telefone: string | null; role: string; ativo: boolean | null; created_at: string | null }
 type Visita = {
@@ -15,9 +18,14 @@ type Visita = {
   hora_visita: string | null
   status: string
   motivo_visita: string | null
-  cliente: { id: string; nome: string; nome_fazenda: string | null; cidade: string | null } | { id: string; nome: string; nome_fazenda: string | null; cidade: string | null }[] | null
+  cliente: ClienteCriado | ClienteCriado[] | null
 }
-type ClienteCriado = { id: string; nome: string; nome_fazenda: string | null; cidade: string | null }
+type ClienteCriado = {
+  id: string; nome: string; nome_fazenda: string | null; cidade: string | null; estado: string | null
+  hectares: number | null; cultura_principal: string | null; telefone: string | null
+}
+type Cotacao = { id: string; numero: string; status: string; created_at: string; cliente_nome: string | null; enviada_em: string | null; motivo_perda: string | null; venda: number }
+const CAMPOS_CLIENTE = 'id, nome, nome_fazenda, cidade, estado, hectares, cultura_principal, telefone'
 
 const STATUS_LABEL: Record<string, string> = { agendada: 'Agendada', realizada: 'Realizada', cancelada: 'Cancelada' }
 
@@ -56,7 +64,9 @@ export default function AdminConsultorDetalhe() {
   const [criados, setCriados] = useState<ClienteCriado[]>([])
   const [kmMes, setKmMes] = useState(0)
   const [carregando, setCarregando] = useState(true)
-  const [aba, setAba] = useState<'visitas' | 'clientes'>('visitas')
+  const [aba, setAba] = useState<'visitas' | 'clientes' | 'cotacoes'>('visitas')
+  const [cotacoes, setCotacoes] = useState<Cotacao[]>([])
+  const [periodoCot, setPeriodoCot] = useState(() => calcRange(ATALHO_PADRAO))
   const [transferir, setTransferir] = useState(false)
   const [destino, setDestino] = useState('')
   const [outros, setOutros] = useState<{ id: string; nome_completo: string | null }[]>([])
@@ -70,20 +80,26 @@ export default function AdminConsultorDetalhe() {
   useEffect(() => {
     async function carregar() {
       const { inicio, fim } = calcRange('este-mes')
-      const [{ data: { user } }, { data: p }, { data: v }, { data: c }, { data: km }] = await Promise.all([
+      const [{ data: { user } }, { data: p }, { data: v }, { data: c }, { data: km }, { data: q }] = await Promise.all([
         supabase.auth.getUser(),
         supabase.from('profiles').select('id, nome_completo, cargo, telefone, role, ativo, created_at').eq('id', id).single(),
         supabase.from('visitas')
-          .select('id, data_visita, hora_visita, status, motivo_visita, cliente:clientes(id, nome, nome_fazenda, cidade)')
+          .select(`id, data_visita, hora_visita, status, motivo_visita, cliente:clientes(${CAMPOS_CLIENTE})`)
           .eq('funcionario_id', id)
           .order('data_visita', { ascending: false }),
-        supabase.from('clientes').select('id, nome, nome_fazenda, cidade').or(`responsavel_id.eq.${id},criado_por.eq.${id}`).order('nome'),
+        supabase.from('clientes').select(CAMPOS_CLIENTE).or(`responsavel_id.eq.${id},criado_por.eq.${id}`).order('nome'),
         supabase.from('km_diario').select('km_inicial, km_final').eq('funcionario_id', id).gte('data', inicio).lte('data', fim),
+        supabase.from('cotacoes').select('id, numero, status, created_at, cliente_nome, enviada_em, motivo_perda, ptax, juros_mes, aliquota_icms, aliquota_ir, itens:cotacao_itens(*)')
+          .eq('criado_por', id).order('created_at', { ascending: false }),
       ])
       setSouEu(user?.id === id)
       setPerfil(p)
       setVisitas((v ?? []) as Visita[])
-      setCriados(c ?? [])
+      setCriados((c ?? []) as ClienteCriado[])
+      setCotacoes((q ?? []).map(x => ({
+        id: x.id, numero: x.numero, status: x.status, created_at: x.created_at, cliente_nome: x.cliente_nome, enviada_em: x.enviada_em, motivo_perda: x.motivo_perda,
+        venda: calcularTotais(((x.itens ?? []) as Record<string, unknown>[]).map(itemDoBanco), parametrosDoBanco(x)).venda,
+      })))
       setKmMes((km ?? []).reduce((s, k) => s + (k.km_inicial != null && k.km_final != null ? Number(k.km_final) - Number(k.km_inicial) : 0), 0))
       setCarregando(false)
     }
@@ -104,7 +120,7 @@ export default function AdminConsultorDetalhe() {
 
   // Carteira: clientes cadastrados por ele + clientes com quem tem visita
   const carteira = useMemo(() => {
-    const map = new Map<string, { id: string; nome: string; nome_fazenda: string | null; cidade: string | null; visitas: number; ultima: string | null }>()
+    const map = new Map<string, ClienteCriado & { visitas: number; ultima: string | null }>()
     criados.forEach(c => map.set(c.id, { ...c, visitas: 0, ultima: null }))
     visitas.forEach(v => {
       const c = umCliente(v)
@@ -118,6 +134,8 @@ export default function AdminConsultorDetalhe() {
   }, [criados, visitas])
 
   const visitasFiltradas = filtroStatus === 'todas' ? visitas : visitas.filter(v => v.status === filtroStatus)
+  const hectaresCarteira = carteira.reduce((s, c) => s + (Number(c.hectares) || 0), 0)
+  const cotacoesPeriodo = cotacoes.filter(c => c.created_at.slice(0, 10) >= periodoCot.inicio && c.created_at.slice(0, 10) <= periodoCot.fim)
 
   async function abrirTransferencia() {
     const { data } = await supabase.from('profiles').select('id, nome_completo').eq('ativo', true).neq('id', id).order('nome_completo')
@@ -313,6 +331,9 @@ export default function AdminConsultorDetalhe() {
             <button role="tab" aria-selected={aba === 'clientes'} className={`cs-tab ${aba === 'clientes' ? 'ativo' : ''}`} onClick={() => setAba('clientes')}>
               Carteira de clientes <span className="ui-count">{carteira.length}</span>
             </button>
+            <button role="tab" aria-selected={aba === 'cotacoes'} className={`cs-tab ${aba === 'cotacoes' ? 'ativo' : ''}`} onClick={() => setAba('cotacoes')}>
+              Cotações <span className="ui-count">{cotacoes.length}</span>
+            </button>
           </div>
 
           {aba === 'visitas' ? (
@@ -356,7 +377,34 @@ export default function AdminConsultorDetalhe() {
                 ]}
               />
             </>
+          ) : aba === 'cotacoes' ? (
+            <div style={{ padding: '1rem 1.2rem 0' }}>
+              <PeriodoSeletor inicio={periodoCot.inicio} fim={periodoCot.fim} onChange={(inicio, fim) => setPeriodoCot({ inicio, fim })} />
+              <FunilCotacoes cotacoes={cotacoesPeriodo} periodo={descreverPeriodo(periodoCot.inicio, periodoCot.fim)} />
+              <div style={{ margin: '0 -1.2rem' }}>
+                <Tabela
+                  embutida
+                  linhas={cotacoesPeriodo}
+                  chave={c => c.id}
+                  href={c => `/admin/cotacoes/${c.id}`}
+                  porPagina={10}
+                  reiniciar={`${periodoCot.inicio}|${periodoCot.fim}`}
+                  rotulo="cotações"
+                  vazio={<div className="ui-empty"><div className="ui-empty-title">Nenhuma cotação no período</div></div>}
+                  colunas={[
+                    { id: 'num', titulo: 'Número', largura: '110px', ordenar: (a, b) => a.numero.localeCompare(b.numero), celula: c => <span className="ui-cel-forte ui-cel-num">{c.numero}</span> },
+                    { id: 'cli', titulo: 'Cliente', ordenar: (a, b) => (a.cliente_nome ?? '').localeCompare(b.cliente_nome ?? ''), celula: c => c.cliente_nome || <span className="ui-cel-mudo">Sem cliente</span> },
+                    { id: 'data', titulo: 'Data', ocultar: 'celular', ordenar: (a, b) => a.created_at.localeCompare(b.created_at), celula: c => <span className="ui-cel-num">{new Date(c.created_at).toLocaleDateString('pt-BR')}</span> },
+                    { id: 'valor', titulo: 'Valor', alinhar: 'dir', ordenar: (a, b) => a.venda - b.venda, celula: c => <span className="ui-cel-num ui-cel-forte">{brl(c.venda)}</span> },
+                    { id: 'st', titulo: 'Status', largura: '110px', ordenar: (a, b) => a.status.localeCompare(b.status),
+                      celula: c => { const st = STATUS_COTACAO[c.status] ?? STATUS_COTACAO.rascunho; return <span className={`ui-badge ${st.badge}`}>{st.label}</span> } },
+                  ]}
+                />
+              </div>
+            </div>
           ) : (
+            <>
+            <div className="cs-toolbar"><span className="ui-cel-sub" style={{ margin: 0 }}>{carteira.length} cliente{carteira.length !== 1 ? 's' : ''}{hectaresCarteira > 0 ? ` · ${hectaresCarteira.toLocaleString('pt-BR')} hectares no total` : ''}</span></div>
             <Tabela
               embutida
               linhas={carteira}
@@ -374,12 +422,18 @@ export default function AdminConsultorDetalhe() {
               colunas={[
                 { id: 'nome', titulo: 'Cliente', ordenar: (a, b) => a.nome.localeCompare(b.nome),
                   celula: c => <div className="ui-cel"><div className="ui-cel-ini">{c.nome.charAt(0).toUpperCase()}</div><div className="ui-cel-txt"><div className="ui-cel-titulo">{c.nome}</div>{c.nome_fazenda && <div className="ui-cel-sub laranja">{c.nome_fazenda}</div>}</div></div> },
-                { id: 'cidade', titulo: 'Cidade', ocultar: 'celular', celula: c => c.cidade || <span className="ui-cel-mudo">—</span> },
+                { id: 'cidade', titulo: 'Cidade', ocultar: 'celular', ordenar: (a, b) => (a.cidade ?? '').localeCompare(b.cidade ?? ''),
+                  celula: c => c.cidade ? <>{c.cidade}{c.estado ? `/${c.estado}` : ''}</> : <span className="ui-cel-mudo">—</span> },
+                { id: 'area', titulo: 'Área', alinhar: 'dir', ordenar: (a, b) => (Number(a.hectares) || 0) - (Number(b.hectares) || 0),
+                  celula: c => c.hectares ? <span className="ui-cel-num">{Number(c.hectares).toLocaleString('pt-BR')} ha</span> : <span className="ui-cel-mudo">—</span> },
+                { id: 'cultura', titulo: 'Cultura', ocultar: 'tablet', celula: c => c.cultura_principal || <span className="ui-cel-mudo">—</span> },
+                { id: 'tel', titulo: 'Telefone', ocultar: 'tablet', celula: c => c.telefone ? <span className="ui-cel-num">{c.telefone}</span> : <span className="ui-cel-mudo">—</span> },
                 { id: 'visitas', titulo: 'Visitas', alinhar: 'dir', ordenar: (a, b) => a.visitas - b.visitas, celula: c => <span className="ui-cel-num ui-cel-forte">{c.visitas}</span> },
                 { id: 'ultima', titulo: 'Última realizada', alinhar: 'dir', ocultar: 'celular', ordenar: (a, b) => (a.ultima ?? '').localeCompare(b.ultima ?? ''),
                   celula: c => c.ultima ? <span className="ui-cel-num">{new Date(c.ultima + 'T12:00').toLocaleDateString('pt-BR')}</span> : <span className="ui-cel-mudo">—</span> },
               ]}
             />
+            </>
           )}
         </div>
       </div>

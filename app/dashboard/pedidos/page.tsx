@@ -1,5 +1,6 @@
-import PedidosLista from '@/app/components/cotacoes/PedidosLista'
+import { redirect } from 'next/navigation'
 
+// Pedidos são acompanhados só pela gestão (painel admin)
 export default function PedidosPage() {
-  return <PedidosLista base="/dashboard/cotacoes" />
+  redirect('/dashboard/cotacoes')
 }

@@ -6,11 +6,12 @@ import { ATALHO_PADRAO, calcRange, descreverPeriodo, hojeISO, somarDias } from '
 import { STATUS_COTACAO, calcularTotais, itemDoBanco, parametrosDoBanco } from '@/lib/cotacao'
 import AdminCharts from '@/app/admin/AdminCharts'
 import DashboardPeriodoBar from './DashboardPeriodoBar'
+import FunilCotacoes from '@/app/components/cotacoes/FunilCotacoes'
 
 type SearchParams = Promise<{ inicio?: string; fim?: string }>
 type Rel<T> = T | T[] | null
 type VisitaLista = { id: string; data_visita: string; hora_visita: string | null; status: string; checkin_em: string | null; cliente: Rel<{ nome: string; nome_fazenda: string | null; latitude: number | null }> }
-type Cot = { id: string; numero: string; status: string; created_at: string; cliente_nome: string | null; aprovacao_status: string | null; enviada_em: string | null; validade: string | null; pedido_status: string | null }
+type Cot = { id: string; numero: string; status: string; created_at: string; cliente_nome: string | null; aprovacao_status: string | null; enviada_em: string | null; validade: string | null; pedido_status: string | null; motivo_perda: string | null }
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 const STATUS_VISITA: Record<string, string> = { agendada: 'Agendada', realizada: 'Realizada', cancelada: 'Cancelada' }
@@ -71,7 +72,7 @@ export default async function DashboardHome({ searchParams }: { searchParams: Se
     supabase.from('visitas').select(camposVisita, { count: 'exact' }).eq('funcionario_id', eu).eq('status', 'agendada').lt('data_visita', hoje).order('data_visita').limit(3),
     supabase.from('visitas').select('data_visita, status').eq('funcionario_id', eu).gte('data_visita', chaveMes(5) + '-01'),
     supabase.from('km_diario').select('km_inicial, km_final').eq('funcionario_id', eu).gte('data', inicio).lte('data', fim),
-    supabase.from('cotacoes').select('id, numero, status, created_at, cliente_nome, aprovacao_status, enviada_em, validade, pedido_status, ptax, juros_mes, aliquota_icms, aliquota_ir, itens:cotacao_itens(*)').eq('criado_por', eu).order('created_at', { ascending: false }),
+    supabase.from('cotacoes').select('id, numero, status, created_at, cliente_nome, aprovacao_status, enviada_em, validade, pedido_status, motivo_perda, ptax, juros_mes, aliquota_icms, aliquota_ir, itens:cotacao_itens(*)').eq('criado_por', eu).order('created_at', { ascending: false }),
     supabase.from('clientes').select('id, nome').eq('responsavel_id', eu),
     supabase.from('visitas').select('cliente_id, data_visita').eq('status', 'realizada').order('data_visita', { ascending: false }),
     supabase.from('configuracoes').select('dias_followup').eq('id', 1).maybeSingle(),
@@ -86,14 +87,14 @@ export default async function DashboardHome({ searchParams }: { searchParams: Se
   const km = (kms ?? []).reduce((s, k) => s + (k.km_inicial != null && k.km_final != null ? Number(k.km_final) - Number(k.km_inicial) : 0), 0)
   const cots = (cotacoes ?? []).map(c => ({ ...c, venda: calcularTotais(((c.itens ?? []) as Record<string, unknown>[]).map(itemDoBanco), parametrosDoBanco(c)).venda })) as (Cot & { venda: number })[]
   const noPeriodo = (d: string) => d.slice(0, 10) >= inicio && d.slice(0, 10) <= fim
-  const vendido = cots.filter(c => c.status === 'aprovada' && noPeriodo(c.created_at)).reduce((s, c) => s + c.venda, 0)
+  const vendido = cots.filter(c => c.status === 'efetivada' && noPeriodo(c.created_at)).reduce((s, c) => s + c.venda, 0)
 
   // ── atenção ──
   const diasFollow = cfg?.dias_followup ?? 3
   const aguardando = cots.filter(c => c.aprovacao_status === 'pendente')
   const reprovadas = cots.filter(c => c.aprovacao_status === 'reprovada' && c.status === 'rascunho')
   const paradas = cots.filter(c => c.status === 'enviada' && c.enviada_em && diasEntre(c.enviada_em, hoje) >= diasFollow)
-  const vencendo = cots.filter(c => (c.status === 'rascunho' || c.status === 'enviada') && c.validade && diasEntre(hoje, c.validade) <= 2)
+  const vencendo = cots.filter(c => (c.status === 'rascunho' || c.status === 'aprovada' || c.status === 'enviada') && c.validade && diasEntre(hoje, c.validade) <= 2)
   const ultimaPorCliente = new Map<string, string>()
   ;(realizadasCarteira ?? []).forEach(v => { if (!ultimaPorCliente.has(v.cliente_id)) ultimaPorCliente.set(v.cliente_id, v.data_visita) })
   const limite60 = somarDias(hoje, -60)
@@ -202,9 +203,9 @@ export default async function DashboardHome({ searchParams }: { searchParams: Se
           <div className="dh-kpi-s">{periodo}</div>
         </Link>
         <Link href="/dashboard/cotacoes" className="ui-card ui-card-hover dh-kpi">
-          <div className="dh-kpi-l"><span>Vendas aprovadas</span><span><Ic d={D.doc} /></span></div>
+          <div className="dh-kpi-l"><span>Vendas efetivadas</span><span><Ic d={D.doc} /></span></div>
           <div className="dh-kpi-n">{moeda(vendido)}</div>
-          <div className="dh-kpi-s">{cots.filter(c => c.status === 'aprovada' && noPeriodo(c.created_at)).length} cotações aprovadas</div>
+          <div className="dh-kpi-s">{cots.filter(c => c.status === 'efetivada' && noPeriodo(c.created_at)).length} cotações efetivadas</div>
         </Link>
         <Link href="/dashboard/km" className="ui-card ui-card-hover dh-kpi">
           <div className="dh-kpi-l"><span>KM rodado</span><span><Ic d={D.rota} /></span></div>
@@ -267,6 +268,9 @@ export default async function DashboardHome({ searchParams }: { searchParams: Se
           )}
         </div>
       </div>
+
+      {/* acompanhamento das próprias cotações: quantas foram enviadas, efetivadas e perdidas no período */}
+      <FunilCotacoes cotacoes={cots.filter(c => noPeriodo(c.created_at)).map(c => ({ status: c.status, enviada_em: c.enviada_em, venda: c.venda, motivo_perda: c.motivo_perda }))} periodo={`Minhas cotações · ${periodo}`} />
 
       <div className="dh-grid dh-g2">
         <AdminCharts visitasPorMes={visitasPorMes} />

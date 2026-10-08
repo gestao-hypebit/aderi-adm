@@ -116,11 +116,39 @@ export function calcularTotais(itens: ItemCotacao[], p: ParametrosCotacao) {
   }
 }
 
-export const STATUS_COTACAO: Record<string, { label: string; badge: string }> = {
-  rascunho: { label: 'Rascunho', badge: 'ui-badge-neutro' },
-  enviada: { label: 'Enviada', badge: 'ui-badge-agendada' },
-  aprovada: { label: 'Aprovada', badge: 'ui-badge-realizada' },
-  perdida: { label: 'Perdida', badge: 'ui-badge-cancelada' },
+// Aprovada = aprovação da gestão (só admin marca). Efetivada = o cliente fechou; é ela que vira pedido.
+export const STATUS_COTACAO: Record<string, { label: string; badge: string; cor: string }> = {
+  rascunho: { label: 'Rascunho', badge: 'ui-badge-neutro', cor: '#b8bdb6' },
+  aprovada: { label: 'Aprovada', badge: 'ui-badge-aprovada', cor: '#2c5c9e' },
+  enviada: { label: 'Enviada', badge: 'ui-badge-agendada', cor: '#E67E22' },
+  efetivada: { label: 'Efetivada', badge: 'ui-badge-realizada', cor: '#1a7f4b' },
+  perdida: { label: 'Perdida', badge: 'ui-badge-cancelada', cor: '#c0392b' },
+}
+
+// Funil: cada etapa conta as cotações que chegaram até ela (uma efetivada também foi enviada).
+export function funilCotacoes<T extends { status: string; enviada_em: string | null; venda: number; motivo_perda?: string | null }>(cots: T[]) {
+  const enviou = (c: T) => c.status === 'enviada' || c.status === 'efetivada' || !!c.enviada_em
+  const etapa = (rotulo: string, cor: string, lista: T[]) => ({ rotulo, cor, qtd: lista.length, valor: lista.reduce((s, c) => s + c.venda, 0) })
+  const efetivadas = cots.filter(c => c.status === 'efetivada')
+  const perdidas = cots.filter(c => c.status === 'perdida')
+  const etapas = [
+    etapa('Cotadas', '#5b6660', cots),
+    etapa('Enviadas ao cliente', STATUS_COTACAO.enviada.cor, cots.filter(enviou)),
+    etapa('Efetivadas', STATUS_COTACAO.efetivada.cor, efetivadas),
+  ]
+  const decididas = efetivadas.length + perdidas.length
+  const motivos = new Map<string, number>()
+  perdidas.forEach(c => {
+    const m = (c.motivo_perda || 'Sem motivo').split(' — ')[0]
+    motivos.set(m, (motivos.get(m) ?? 0) + 1)
+  })
+  return {
+    etapas,
+    perdidas: etapa('Perdidas', STATUS_COTACAO.perdida.cor, perdidas),
+    conversao: decididas ? efetivadas.length / decididas : null,
+    ticket: efetivadas.length ? etapas[2].valor / efetivadas.length : null,
+    motivos: [...motivos.entries()].sort((a, b) => b[1] - a[1]),
+  }
 }
 
 export const brl = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })

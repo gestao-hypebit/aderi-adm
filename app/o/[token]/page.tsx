@@ -33,7 +33,7 @@ export default async function OrcamentoPublicoPage({ params }: { params: Promise
   const total = o.itens.reduce((s, i) => s + Number(i.quantidade) * Number(i.preco), 0)
   const totalQtd = o.itens.reduce((s, i) => s + Number(i.quantidade), 0)
   const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
-  const vencido = o.validade != null && o.validade < hoje && o.status !== 'aprovada'
+  const vencido = o.validade != null && o.validade < hoje && o.status !== 'efetivada'
 
   return (
     <DocumentoPublico titulo={`Orçamento ${o.numero}`}>

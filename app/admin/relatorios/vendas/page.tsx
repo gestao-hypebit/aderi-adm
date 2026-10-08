@@ -23,7 +23,6 @@ type Cotacao = {
   itens: (ItemCotacao & { calc: ReturnType<typeof calcularItem> })[]
 }
 
-const COR_STATUS: Record<string, string> = { rascunho: '#b8bdb6', enviada: '#E67E22', aprovada: '#1a7f4b', perdida: '#c0392b' }
 
 export default function RelatorioVendas() {
   const { filtros, setFiltros, consultores, periodo } = useFiltrosRelatorio()
@@ -52,38 +51,38 @@ export default function RelatorioVendas() {
   }, [filtros.dataInicio, filtros.dataFim, filtros.funcionarioId])
 
   const r = useMemo(() => {
-    const aprovadas = cotacoes.filter(c => c.status === 'aprovada')
+    const efetivadas = cotacoes.filter(c => c.status === 'efetivada')
     const perdidas = cotacoes.filter(c => c.status === 'perdida')
-    const vendido = aprovadas.reduce((s, c) => s + c.venda, 0)
-    const resultado = aprovadas.reduce((s, c) => s + c.resultado, 0)
+    const vendido = efetivadas.reduce((s, c) => s + c.venda, 0)
+    const resultado = efetivadas.reduce((s, c) => s + c.resultado, 0)
 
     const funil = Object.keys(STATUS_COTACAO).map(st => {
       const l = cotacoes.filter(c => c.status === st)
       return { status: st, qtd: l.length, valor: l.reduce((s, c) => s + c.venda, 0) }
     })
 
-    const porConsultor = new Map<string, { id: string; nome: string; total: number; aprovadas: number; perdidas: number; cotado: number; vendido: number; resultado: number }>()
+    const porConsultor = new Map<string, { id: string; nome: string; total: number; efetivadas: number; perdidas: number; cotado: number; vendido: number; resultado: number }>()
     cotacoes.forEach(c => {
-      const x = porConsultor.get(c.criado_por) ?? { id: c.criado_por, nome: um(c.autor)?.nome_completo ?? '—', total: 0, aprovadas: 0, perdidas: 0, cotado: 0, vendido: 0, resultado: 0 }
+      const x = porConsultor.get(c.criado_por) ?? { id: c.criado_por, nome: um(c.autor)?.nome_completo ?? '—', total: 0, efetivadas: 0, perdidas: 0, cotado: 0, vendido: 0, resultado: 0 }
       x.total++; x.cotado += c.venda
-      if (c.status === 'aprovada') { x.aprovadas++; x.vendido += c.venda; x.resultado += c.resultado }
+      if (c.status === 'efetivada') { x.efetivadas++; x.vendido += c.venda; x.resultado += c.resultado }
       if (c.status === 'perdida') x.perdidas++
       porConsultor.set(c.criado_por, x)
     })
 
     const porProduto = new Map<string, { produto: string; unidade: string; quantidade: number; valor: number; resultado: number; cotacoes: Set<string> }>()
-    aprovadas.forEach(c => c.itens.forEach(i => {
+    efetivadas.forEach(c => c.itens.forEach(i => {
       const k = i.produto_nome.trim().toUpperCase()
       const x = porProduto.get(k) ?? { produto: i.produto_nome, unidade: i.unidade ?? '', quantidade: 0, valor: 0, resultado: 0, cotacoes: new Set<string>() }
       x.quantidade += i.quantidade; x.valor += i.calc.total; x.resultado += i.calc.resultadoLiquido; x.cotacoes.add(c.id)
       porProduto.set(k, x)
     }))
 
-    const porCliente = new Map<string, { cliente: string; aprovadas: number; valor: number }>()
-    aprovadas.forEach(c => {
+    const porCliente = new Map<string, { cliente: string; efetivadas: number; valor: number }>()
+    efetivadas.forEach(c => {
       const k = c.cliente_id ?? c.cliente_nome ?? '—'
-      const x = porCliente.get(k) ?? { cliente: c.cliente_nome ?? '—', aprovadas: 0, valor: 0 }
-      x.aprovadas++; x.valor += c.venda
+      const x = porCliente.get(k) ?? { cliente: c.cliente_nome ?? '—', efetivadas: 0, valor: 0 }
+      x.efetivadas++; x.valor += c.venda
       porCliente.set(k, x)
     })
 
@@ -100,9 +99,9 @@ export default function RelatorioVendas() {
       motivos: [...porMotivo.values()].sort((a, b) => b.qtd - a.qtd),
       valorPerdido: perdidas.reduce((s, c) => s + c.venda, 0),
       total: cotacoes.length, cotado: cotacoes.reduce((s, c) => s + c.venda, 0),
-      aprovadas: aprovadas.length, vendido, resultado,
-      conversao: div(aprovadas.length, aprovadas.length + perdidas.length),
-      ticket: div(vendido, aprovadas.length),
+      efetivadas: efetivadas.length, vendido, resultado,
+      conversao: div(efetivadas.length, efetivadas.length + perdidas.length),
+      ticket: div(vendido, efetivadas.length),
       margem: div(resultado, vendido),
       funil,
       consultores: [...porConsultor.values()].sort((a, b) => b.vendido - a.vendido),
@@ -128,9 +127,9 @@ export default function RelatorioVendas() {
 
       <Indicadores carregando={carregando} itens={[
         { rotulo: 'Cotações', valor: num(r.total), sub: `${brl(r.cotado)} cotados` },
-        { rotulo: 'Vendas aprovadas', valor: brl(r.vendido), cor: '#1a7f4b', sub: `${r.aprovadas} cotaç${r.aprovadas === 1 ? 'ão' : 'ões'}` },
-        { rotulo: 'Conversão', valor: pctTxt(r.conversao), sub: 'aprovadas ÷ (aprovadas + perdidas)' },
-        { rotulo: 'Ticket médio', valor: r.ticket != null ? brl(r.ticket) : '—', sub: 'por cotação aprovada' },
+        { rotulo: 'Vendas efetivadas', valor: brl(r.vendido), cor: '#1a7f4b', sub: `${r.efetivadas} cotaç${r.efetivadas === 1 ? 'ão' : 'ões'}` },
+        { rotulo: 'Conversão', valor: pctTxt(r.conversao), sub: 'efetivadas ÷ (efetivadas + perdidas)' },
+        { rotulo: 'Ticket médio', valor: r.ticket != null ? brl(r.ticket) : '—', sub: 'por cotação efetivada' },
         { rotulo: 'Resultado líquido', valor: brl(r.resultado), cor: r.resultado < 0 ? '#c0392b' : undefined, sub: `margem de ${pctTxt(r.margem, 1)}` },
       ]} />
 
@@ -138,18 +137,18 @@ export default function RelatorioVendas() {
         <Secao titulo="Funil por status" sub="Quantidade e valor das cotações">
           <Tabela linhas={r.funil} chave={f => f.status} carregando={carregando} paginar={false}
             colunas={[
-              { id: 'st', titulo: 'Status', celula: f => <span className="ui-cel" style={{ gap: '.5rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: COR_STATUS[f.status] }} />{STATUS_COTACAO[f.status].label}</span> },
+              { id: 'st', titulo: 'Status', celula: f => <span className="ui-cel" style={{ gap: '.5rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COTACAO[f.status].cor }} />{STATUS_COTACAO[f.status].label}</span> },
               { id: 'qtd', titulo: 'Qtd.', alinhar: 'dir', celula: f => <span className="ui-cel-num">{f.qtd}</span> },
-              { id: 'valor', titulo: 'Valor', celula: f => <Barra valor={f.valor} max={maxFunil} cor={COR_STATUS[f.status]} texto={brl(f.valor)} /> },
+              { id: 'valor', titulo: 'Valor', celula: f => <Barra valor={f.valor} max={maxFunil} cor={STATUS_COTACAO[f.status].cor} texto={brl(f.valor)} /> },
             ]} />
         </Secao>
 
         <Secao titulo="Principais clientes" sub="Valor aprovado no período">
           <Tabela linhas={r.clientes} chave={c => c.cliente} carregando={carregando} porPagina={5} rotulo="clientes"
-            vazio={<div className="ui-empty"><div className="ui-empty-title">Nenhuma venda aprovada</div></div>}
+            vazio={<div className="ui-empty"><div className="ui-empty-title">Nenhuma venda efetivada</div></div>}
             colunas={[
               { id: 'cli', titulo: 'Cliente', ordenar: (a, b) => a.cliente.localeCompare(b.cliente), celula: c => <span className="ui-cel-titulo">{c.cliente}</span> },
-              { id: 'n', titulo: 'Aprov.', alinhar: 'dir', ocultar: 'celular', ordenar: (a, b) => a.aprovadas - b.aprovadas, celula: c => <span className="ui-cel-num">{c.aprovadas}</span> },
+              { id: 'n', titulo: 'Efet.', alinhar: 'dir', ocultar: 'celular', ordenar: (a, b) => a.efetivadas - b.efetivadas, celula: c => <span className="ui-cel-num">{c.efetivadas}</span> },
               { id: 'valor', titulo: 'Valor', ordenar: (a, b) => a.valor - b.valor, celula: c => <Barra valor={c.valor} max={maxCli} texto={brl(c.valor)} /> },
             ]} />
         </Secao>
@@ -157,15 +156,15 @@ export default function RelatorioVendas() {
 
       <div style={{ height: '1.6rem' }} />
 
-      <Secao titulo="Por consultor" sub="Valor e resultado das cotações aprovadas">
+      <Secao titulo="Por consultor" sub="Valor e resultado das cotações efetivadas">
         <Tabela linhas={r.consultores} chave={c => c.id} carregando={carregando} porPagina={10} rotulo="consultores"
           colunas={[
             { id: 'nome', titulo: 'Consultor', ordenar: (a, b) => a.nome.localeCompare(b.nome), celula: c => <span className="ui-cel-titulo">{c.nome}</span> },
             { id: 'total', titulo: 'Cotações', alinhar: 'dir', ordenar: (a, b) => a.total - b.total, celula: c => <span className="ui-cel-num">{c.total}</span> },
-            { id: 'apr', titulo: 'Aprovadas', alinhar: 'dir', ordenar: (a, b) => a.aprovadas - b.aprovadas, celula: c => <span className="ui-cel-num ui-cel-forte">{c.aprovadas}</span> },
+            { id: 'apr', titulo: 'Efetivadas', alinhar: 'dir', ordenar: (a, b) => a.efetivadas - b.efetivadas, celula: c => <span className="ui-cel-num ui-cel-forte">{c.efetivadas}</span> },
             { id: 'perd', titulo: 'Perdidas', alinhar: 'dir', ocultar: 'celular', ordenar: (a, b) => a.perdidas - b.perdidas, celula: c => <span className="ui-cel-num">{c.perdidas}</span> },
-            { id: 'conv', titulo: 'Conversão', alinhar: 'dir', ocultar: 'celular', ordenar: (a, b) => (div(a.aprovadas, a.aprovadas + a.perdidas) ?? -1) - (div(b.aprovadas, b.aprovadas + b.perdidas) ?? -1),
-              celula: c => <span className="ui-cel-num">{pctTxt(div(c.aprovadas, c.aprovadas + c.perdidas))}</span> },
+            { id: 'conv', titulo: 'Conversão', alinhar: 'dir', ocultar: 'celular', ordenar: (a, b) => (div(a.efetivadas, a.efetivadas + a.perdidas) ?? -1) - (div(b.efetivadas, b.efetivadas + b.perdidas) ?? -1),
+              celula: c => <span className="ui-cel-num">{pctTxt(div(c.efetivadas, c.efetivadas + c.perdidas))}</span> },
             { id: 'cot', titulo: 'Cotado', alinhar: 'dir', ocultar: 'tablet', ordenar: (a, b) => a.cotado - b.cotado, celula: c => <span className="ui-cel-num">{brl(c.cotado)}</span> },
             { id: 'vend', titulo: 'Vendido', alinhar: 'dir', ordenar: (a, b) => a.vendido - b.vendido, celula: c => <span className="ui-cel-num ui-cel-forte">{brl(c.vendido)}</span> },
             { id: 'res', titulo: 'Resultado', alinhar: 'dir', ocultar: 'tablet', ordenar: (a, b) => a.resultado - b.resultado,
@@ -183,9 +182,9 @@ export default function RelatorioVendas() {
           ]} />
       </Secao>
 
-      <Secao titulo="Produtos mais vendidos" sub="Somente cotações aprovadas">
+      <Secao titulo="Produtos mais vendidos" sub="Somente cotações efetivadas">
         <Tabela linhas={r.produtos} chave={p => p.produto} carregando={carregando} porPagina={10} rotulo="produtos"
-          vazio={<div className="ui-empty"><div className="ui-empty-title">Nenhuma venda aprovada no período</div></div>}
+          vazio={<div className="ui-empty"><div className="ui-empty-title">Nenhuma venda efetivada no período</div></div>}
           colunas={[
             { id: 'prod', titulo: 'Produto', ordenar: (a, b) => a.produto.localeCompare(b.produto), celula: p => <span className="ui-cel-titulo">{p.produto}</span> },
             { id: 'qtd', titulo: 'Quantidade', alinhar: 'dir', ordenar: (a, b) => a.quantidade - b.quantidade, celula: p => <span className="ui-cel-num">{num(p.quantidade, p.quantidade % 1 ? 2 : 0)} {p.unidade}</span> },

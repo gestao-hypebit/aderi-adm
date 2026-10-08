@@ -10,6 +10,7 @@ import ConfirmDialog from '@/app/admin/_ui/ConfirmDialog'
 import NumInput from './NumInput'
 import ProdutoPicker, { ProdutoCadastro } from './ProdutoPicker'
 import DocumentoCotacao, { DOC_CSS, type DadosDocumento, type TipoDocumento } from './Documento'
+import { elementoParaPdf, compartilharArquivo, baixarArquivo, podeCompartilharArquivo } from '@/lib/pdf'
 import {
   ItemCotacao, ParametrosCotacao, PARAMETROS_PADRAO, STATUS_COTACAO, CalculoItem, MOTIVOS_PERDA, PEDIDO_STATUS, PAGAMENTO_STATUS,
   calcularTotais, itemVazio, itemDoBanco, parametrosDoBanco, brl, num, pct, dataCurta, precoMinimo, abaixoDoMinimo, menorMargem,
@@ -53,11 +54,9 @@ type Cabecalho = {
   pedido_obs: string
 }
 
-const OBS_CLIENTE_PADRAO = 'PREÇO CIF - POSTO FAZENDA\nFÁBRICA EUROCHEM - HERINGER\nPRODUTO 100% GRANULADO SEM PÓ\nEMBALAGEM: BIG BAG 1000 QUILOS'
-
 const CAB_VAZIO: Cabecalho = {
   numero: '', status: 'rascunho', cliente_id: '', cliente_nome: '', empresa_rural: '', cidade: '', cpf_cnpj: '',
-  inscricao_produtor: '', contato: '', observacoes: '', observacoes_cliente: OBS_CLIENTE_PADRAO, transportador: '', obs_pedido: '',
+  inscricao_produtor: '', contato: '', observacoes: '', observacoes_cliente: '', transportador: '', obs_pedido: '',
   validade: '', visita_id: '', ptax_modo: 'manual', ptax_data: '', motivo_perda: '', aprovacao_status: '', aprovacao_obs: '',
   aprovacao_margem: null, enviada_em: '', token_publico: '', pedido_status: '', nota_fiscal: '', faturado_em: '', entregue_em: '',
   pagamento_status: '', pago_em: '', pedido_obs: '',
@@ -95,6 +94,7 @@ const D = {
   relogio: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
   caminhao: '<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
   atualizar: '<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
+  pdf: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/>',
 }
 function IconChevron({ aberto }: { aberto: boolean }) {
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ transform: aberto ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><polyline points="6 9 12 15 18 9"/></svg>
@@ -144,6 +144,8 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
   const [reprovarAberto, setReprovarAberto] = useState(false)
   const [obsAprovacao, setObsAprovacao] = useState('')
   const [copiado, setCopiado] = useState(false)
+  const [pdf, setPdf] = useState<{ etapa: 'gerando' | 'pronto'; arquivo?: File } | null>(null)
+  const folhaPdf = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     async function carregar() {
@@ -158,6 +160,8 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
       const conf = cfg ? { margem_minima: Number(cfg.margem_minima), validade_cotacao_dias: cfg.validade_cotacao_dias, dias_followup: cfg.dias_followup } : CONFIG_PADRAO
       setConfig(conf)
       setAdmin(perfil?.role === 'admin')
+      // pedido e resultado são só da gestão
+      if (perfil?.role !== 'admin') setAba(a => (a === 'pedido' || a === 'resultado' ? 'cotacao' : a))
       setProdutos((prods ?? []).map(p => ({ ...p, preco_tabela: Number(p.preco_tabela) })))
       const listaClientes = (clis ?? []) as ClienteOpcao[]
       setClientes(listaClientes)
@@ -213,14 +217,14 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
     carregar()
   }, [cotacaoId])
 
-  // Histórico de preços: último preço aprovado para este cliente e média aprovada recente
+  // Histórico de preços: último preço efetivado para este cliente e média efetivada recente
   useEffect(() => {
     const desde = somarDias(hojeISO(), -180)
     Promise.all([
       cab.cliente_id
-        ? supabase.from('cotacoes').select('id, numero, created_at, itens:cotacao_itens(produto_nome, preco_cliente)').eq('cliente_id', cab.cliente_id).eq('status', 'aprovada').order('created_at', { ascending: false }).limit(30)
+        ? supabase.from('cotacoes').select('id, numero, created_at, itens:cotacao_itens(produto_nome, preco_cliente)').eq('cliente_id', cab.cliente_id).eq('status', 'efetivada').order('created_at', { ascending: false }).limit(30)
         : Promise.resolve({ data: [] as { id: string; numero: string; created_at: string; itens: { produto_nome: string; preco_cliente: number }[] }[] }),
-      supabase.from('cotacoes').select('id, itens:cotacao_itens(produto_nome, preco_cliente, quantidade)').eq('status', 'aprovada').gte('created_at', desde).limit(300),
+      supabase.from('cotacoes').select('id, itens:cotacao_itens(produto_nome, preco_cliente, quantidade)').eq('status', 'efetivada').gte('created_at', desde).limit(300),
     ]).then(([doCliente, recentes]) => {
       const cliente = new Map<string, Historico['cliente']>()
       ;(doCliente.data ?? []).forEach(q => {
@@ -351,17 +355,28 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
     if (validos.length === 0) { setErro('Adicione ao menos um produto.'); return null }
     const statusDesejado = statusForcado ?? cab.status
     const semQtd = validos.find(i => !(i.quantidade > 0))
-    if (semQtd && (statusDesejado === 'enviada' || statusDesejado === 'aprovada')) {
+    if (semQtd && (statusDesejado === 'enviada' || statusDesejado === 'efetivada')) {
       setErro(`Informe a quantidade de "${semQtd.produto_nome}" antes de enviar.`)
       setFechados(f => { const n = new Set(f); n.delete(semQtd._k); return n })
       setTimeout(() => document.querySelector<HTMLInputElement>(`[data-qtd="${semQtd._k}"]`)?.focus(), 50)
       return null
     }
-    if (!admin && (statusDesejado === 'enviada' || statusDesejado === 'aprovada') && !liberada) {
+    if (!admin && statusDesejado === 'aprovada' && statusDesejado !== statusSalvo) {
+      setErro('Somente a gestão pode marcar a cotação como aprovada. Se o preço estiver abaixo do mínimo, solicite a aprovação.')
+      return null
+    }
+    if (!admin && (statusDesejado === 'enviada' || statusDesejado === 'efetivada') && !liberada) {
       setErro('Há preço abaixo do mínimo permitido. Solicite a aprovação do administrador antes de enviar.')
       return null
     }
     setSalvando(true)
+
+    // cliente e produtos digitados fora do cadastro entram no cadastro automaticamente
+    if (!cab.cliente_id) {
+      const clienteId = await cadastrarCliente(cab)
+      if (clienteId) { cab.cliente_id = clienteId; setCab(c => ({ ...c, cliente_id: clienteId })) }
+    }
+    const validosComProduto = await cadastrarProdutos(validos)
 
     const nulo = (v: string) => v || null
     const payload: Record<string, unknown> = {
@@ -393,7 +408,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
       id = data.id
     }
 
-    const { error: errIt } = await supabase.rpc('salvar_itens_cotacao', { p_cotacao: id, p_itens: linhasParaBanco(validos) })
+    const { error: errIt } = await supabase.rpc('salvar_itens_cotacao', { p_cotacao: id, p_itens: linhasParaBanco(validosComProduto) })
     if (errIt) { setErro(mensagemErro(errIt, 'Erro ao salvar os produtos. Nada foi alterado nos itens.')); setSalvando(false); return cotacaoId ? null : id ?? null }
 
     if (statusDesejado !== statusAtual && !statusJunto) {
@@ -410,13 +425,54 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
     setAlterado(false)
     if (!cotacaoId) { router.replace(`${base}/${id}`); return id ?? null }
     // recarrega campos que o banco preenche (data de envio, pedido)
-    const { data: atual } = await supabase.from('cotacoes').select('status, enviada_em, pedido_status, pagamento_status, aprovacao_status').eq('id', id).single()
+    const { data: atual } = await supabase.from('cotacoes').select('status, enviada_em, pedido_status, pagamento_status, aprovacao_status, aprovacao_margem').eq('id', id).single()
     if (atual) {
       setStatusSalvo(atual.status)
-      setCab(c => ({ ...c, status: atual.status, enviada_em: atual.enviada_em ?? '', pedido_status: atual.pedido_status ?? '', pagamento_status: atual.pagamento_status ?? '', aprovacao_status: atual.aprovacao_status ?? '' }))
+      setCab(c => ({
+        ...c, status: atual.status, enviada_em: atual.enviada_em ?? '', pedido_status: atual.pedido_status ?? '', pagamento_status: atual.pagamento_status ?? '',
+        aprovacao_status: atual.aprovacao_status ?? '', aprovacao_margem: atual.aprovacao_margem != null ? Number(atual.aprovacao_margem) : null,
+      }))
     }
     setOk('Cotação salva.')
     return id ?? null
+  }
+
+  // Cliente novo: reaproveita um cadastro com o mesmo CPF/CNPJ ou nome; senão cadastra (o consultor vira o responsável)
+  async function cadastrarCliente(c: Cabecalho): Promise<string | null> {
+    const nome = c.cliente_nome.trim()
+    if (!nome) return null
+    if (c.cpf_cnpj.replace(/\D/g, '').length >= 11) {
+      const { data } = await supabase.rpc('cliente_por_documento', { doc: c.cpf_cnpj, ignorar: null })
+      const achado = (data ?? [])[0] as { id: string } | undefined
+      if (achado) return achado.id
+    }
+    const mesmoNome = clientes.find(x => x.nome.trim().toLowerCase() === nome.toLowerCase())
+    if (mesmoNome) return mesmoNome.id
+    const m = c.cidade.trim().match(/^(.*?)\s*[-/]\s*([A-Za-z]{2})$/)
+    const { data, error } = await supabase.from('clientes').insert({
+      nome, nome_fazenda: c.empresa_rural.trim() || null, cidade: (m ? m[1] : c.cidade).trim() || null, estado: m ? m[2].toUpperCase() : 'MG',
+      cpf_cnpj: c.cpf_cnpj.trim() || null, inscricao_produtor: c.inscricao_produtor.trim() || null, telefone: c.contato.trim() || null,
+    }).select('id, nome, nome_fazenda, cidade, estado, cpf_cnpj, telefone, inscricao_produtor').single()
+    if (error || !data) return null
+    setClientes(l => [...l, data as ClienteOpcao].sort((a, b) => a.nome.localeCompare(b.nome)))
+    return data.id
+  }
+
+  // Produto digitado fora do cadastro: cadastra (ou acha pelo nome) e vincula o item
+  async function cadastrarProdutos(lista: Linha[]): Promise<Linha[]> {
+    const novos = new Map<string, string>()
+    for (const it of lista) {
+      const k = chaveProduto(it.produto_nome)
+      if (it.produto_id || novos.has(k)) continue
+      const { data } = await supabase.rpc('cadastrar_produto_rapido', { p_nome: it.produto_nome.trim(), p_fornecedor: it.fornecedor, p_unidade: it.unidade, p_preco: it.preco_tabela })
+      if (data) novos.set(k, data as string)
+    }
+    if (!novos.size) return lista
+    const comId = (it: Linha) => (!it.produto_id && novos.has(chaveProduto(it.produto_nome)) ? { ...it, produto_id: novos.get(chaveProduto(it.produto_nome))! } : it)
+    setItens(l => l.map(comId))
+    const { data: prods } = await supabase.from('produtos').select('id, nome, fornecedor, unidade, preco_tabela').eq('ativo', true).order('nome')
+    if (prods) setProdutos(prods.map(p => ({ ...p, preco_tabela: Number(p.preco_tabela) })))
+    return lista.map(comId)
   }
 
   function mudarStatus(st: string) {
@@ -442,19 +498,23 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
   async function decidirAprovacao(aprovar: boolean) {
     if (!cotacaoId) return
     if (alterado) { setErro('Salve a cotação antes de aprovar ou reprovar.'); return }
+    // aprovar o preço de um rascunho também marca a cotação como aprovada pela gestão
+    const marcarAprovada = aprovar && statusSalvo === 'rascunho'
     const campos = aprovar
-      ? { aprovacao_status: 'aprovada', aprovacao_margem: minMargem ?? 0, aprovado_por: uid, aprovado_em: new Date().toISOString(), aprovacao_obs: obsAprovacao || null }
+      ? { aprovacao_status: 'aprovada', aprovacao_margem: minMargem ?? 0, aprovado_por: uid, aprovado_em: new Date().toISOString(), aprovacao_obs: obsAprovacao || null, ...(marcarAprovada ? { status: 'aprovada' } : {}) }
       : { aprovacao_status: 'reprovada', aprovacao_obs: obsAprovacao || null }
     const { error } = await supabase.from('cotacoes').update(campos).eq('id', cotacaoId)
     if (error) { setErro('Não foi possível registrar a decisão.'); return }
-    setCab(c => ({ ...c, aprovacao_status: campos.aprovacao_status, aprovacao_obs: obsAprovacao, ...(aprovar ? { aprovacao_margem: minMargem ?? 0 } : {}) }))
+    if (marcarAprovada) setStatusSalvo('aprovada')
+    setCab(c => ({ ...c, aprovacao_status: campos.aprovacao_status, aprovacao_obs: obsAprovacao, ...(aprovar ? { aprovacao_margem: minMargem ?? 0 } : {}), ...(marcarAprovada ? { status: 'aprovada' } : {}) }))
     setReprovarAberto(false)
     setObsAprovacao('')
-    setOk(aprovar ? 'Preço aprovado. O consultor já pode enviar a cotação.' : 'Preço reprovado. O consultor foi orientado a revisar.')
+    setOk(aprovar ? 'Cotação aprovada pela gestão. O consultor já pode enviar ao cliente.' : 'Preço reprovado. O consultor foi orientado a revisar.')
   }
 
   async function imprimir(doc: string) {
     setImprimirAberto(false)
+    if (doc !== 'orcamento' && !admin) return
     if (doc !== 'resultado' && !liberada) { setErro('Documento bloqueado: há preço abaixo do mínimo sem aprovação.'); return }
     const id = alterado || !cotacaoId ? await salvar() : cotacaoId
     if (id) window.open(`/imprimir/cotacao/${id}?doc=${doc}`, '_blank')
@@ -464,7 +524,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
   async function enviarCliente(canal: 'whatsapp' | 'email' | 'link') {
     if (!liberada) { setErro('Há preço abaixo do mínimo sem aprovação. Solicite a aprovação antes de enviar.'); return }
     const janela = canal === 'whatsapp' ? window.open('', '_blank') : null
-    const precisaEnviar = cab.status === 'rascunho'
+    const precisaEnviar = cab.status === 'rascunho' || cab.status === 'aprovada'
     const id = alterado || !cotacaoId || precisaEnviar ? await salvar(precisaEnviar ? 'enviada' : undefined) : cotacaoId
     if (!id) { janela?.close(); return }
     const link = `${window.location.origin}/o/${cab.token_publico}`
@@ -473,6 +533,43 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
     if (canal === 'whatsapp' && janela) janela.location.href = `https://wa.me/${telZap(cab.contato)}?text=${encodeURIComponent(texto)}`
     if (canal === 'email') window.location.href = `mailto:?subject=${encodeURIComponent(`Orçamento Nº ${cab.numero} - Aderi Agro`)}&body=${encodeURIComponent(texto)}`
     if (canal === 'link') { await navigator.clipboard.writeText(link); setCopiado(true); setTimeout(() => setCopiado(false), 2000) }
+  }
+
+  // Envio do PDF em duas etapas: gera o arquivo e depois compartilha (o navegador exige um clique novo para compartilhar)
+  async function gerarPdf() {
+    if (!liberada) { setErro('Há preço abaixo do mínimo sem aprovação. Solicite a aprovação antes de enviar.'); return }
+    const precisaEnviar = cab.status === 'rascunho' || cab.status === 'aprovada'
+    const id = alterado || !cotacaoId || precisaEnviar ? await salvar(precisaEnviar ? 'enviada' : undefined) : cotacaoId
+    if (!id) return
+    setPdf({ etapa: 'gerando' })
+    // espera a folha escondida renderizar
+    await new Promise(r => setTimeout(r, 150))
+    try {
+      const folha = folhaPdf.current?.querySelector<HTMLElement>('.pr-folha')
+      if (!folha) throw new Error('sem folha')
+      const nome = `Orcamento ${cab.numero} - ${cab.cliente_nome}`.replace(/[\\/:*?"<>|]/g, '').trim() + '.pdf'
+      setPdf({ etapa: 'pronto', arquivo: await elementoParaPdf(folha, nome) })
+    } catch {
+      setPdf(null)
+      setErro('Não foi possível gerar o PDF. Use "Imprimir / PDF" e salve como PDF.')
+    }
+  }
+
+  const textoPdf = () => `Olá, ${cab.cliente_nome.split(' ')[0]}! Segue em anexo o orçamento Nº ${cab.numero} da Aderi Agro${cab.validade ? `, válido até ${dataCurta(cab.validade)}` : ''}.`
+
+  async function compartilharPdf() {
+    if (!pdf?.arquivo) return
+    const r = await compartilharArquivo(pdf.arquivo, textoPdf())
+    if (r === 'ok') { setPdf(null); setOk('Orçamento em PDF enviado.') }
+    else if (r === 'erro') { baixarArquivo(pdf.arquivo); setPdf(null); setOk('PDF baixado. Anexe o arquivo na conversa com o cliente.') }
+  }
+
+  function baixarPdfZap() {
+    if (!pdf?.arquivo) return
+    baixarArquivo(pdf.arquivo)
+    window.open(`https://wa.me/${telZap(cab.contato)}?text=${encodeURIComponent(textoPdf())}`, '_blank')
+    setPdf(null)
+    setOk('PDF baixado. Na conversa do WhatsApp, anexe o arquivo que acabou de ser salvo.')
   }
 
   function cobrarFollowup() {
@@ -509,14 +606,14 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
     else document.querySelector<HTMLButtonElement>('[data-add-produto]')?.focus()
   }
 
-  const atalhos = useRef({ salvar, adicionarItem, imprimir })
-  useEffect(() => { atalhos.current = { salvar, adicionarItem, imprimir } })
+  const atalhos = useRef({ salvar, adicionarItem, imprimir, admin })
+  useEffect(() => { atalhos.current = { salvar, adicionarItem, imprimir, admin } })
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const mod = e.ctrlKey || e.metaKey
       const k = e.key.toLowerCase()
       if (mod && k === 's') { e.preventDefault(); atalhos.current.salvar() }
-      else if (mod && k === 'p') { e.preventDefault(); atalhos.current.imprimir(e.shiftKey ? 'pedido' : 'orcamento') }
+      else if (mod && k === 'p') { e.preventDefault(); atalhos.current.imprimir(e.shiftKey && atalhos.current.admin ? 'pedido' : 'orcamento') }
       else if (e.altKey && k === 'n') { e.preventDefault(); atalhos.current.adicionarItem() }
     }
     window.addEventListener('keydown', onKey)
@@ -540,7 +637,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
   const corResultado = tot.resultado < 0 ? '#c0392b' : '#1e8a4c'
   const hoje = hojeISO()
   const diasEnviada = cab.status === 'enviada' && cab.enviada_em ? diasEntre(cab.enviada_em, hoje) : null
-  const diasValidade = cab.validade && (cab.status === 'rascunho' || cab.status === 'enviada') ? diasEntre(hoje, cab.validade) : null
+  const diasValidade = cab.validade && (cab.status === 'rascunho' || cab.status === 'aprovada' || cab.status === 'enviada') ? diasEntre(hoje, cab.validade) : null
 
   return (
     <>
@@ -563,10 +660,11 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
         <div className="ui-header-actions">
           <div className="ce-status" role="radiogroup" aria-label="Status">
             {Object.entries(STATUS_COTACAO).map(([k, v]) => {
-              const bloqueado = !liberada && (k === 'enviada' || k === 'aprovada')
+              const soGestao = k === 'aprovada' && !admin && cab.status !== 'aprovada'
+              const bloqueado = soGestao || (!liberada && (k === 'enviada' || k === 'efetivada'))
               return (
                 <button key={k} role="radio" aria-checked={cab.status === k} disabled={bloqueado}
-                  title={bloqueado ? 'Preço abaixo do mínimo: precisa de aprovação do administrador' : undefined}
+                  title={soGestao ? 'Aprovação da gestão: só o administrador marca' : bloqueado ? 'Preço abaixo do mínimo: precisa de aprovação do administrador' : undefined}
                   className={`ce-status-btn ${cab.status === k ? `ativo ${k}` : ''}`} onClick={() => mudarStatus(k)}>{v.label}</button>
               )
             })}
@@ -620,14 +718,13 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
         {([
           ['cotacao', 'Cotação', 'Preencher'],
           ['orcamento', 'Orçamento', 'Para o cliente'],
-          ['pedido', 'Pedido', 'Pedido de compra'],
-          ...(admin ? [['resultado', 'Resultado', 'Custos (interno)']] : []),
+          ...(admin ? [['pedido', 'Pedido', 'Pedido de compra'], ['resultado', 'Resultado', 'Custos (interno)']] : []),
         ] as [typeof aba, string, string][]).map(([k, t, d]) => (
           <button key={k} role="tab" aria-selected={aba === k} className={`ce-aba ${aba === k ? 'ativo' : ''}`} onClick={() => setAba(k)}>
             <span className="ce-aba-t">{t}</span><span className="ce-aba-d">{d}</span>
           </button>
         ))}
-        <span className="ce-abas-dica">Orçamento, Pedido e Resultado são gerados automaticamente a partir da cotação, como nas abas da planilha.</span>
+        <span className="ce-abas-dica">{admin ? 'Orçamento, Pedido e Resultado são gerados automaticamente a partir da cotação, como nas abas da planilha.' : 'O orçamento é gerado automaticamente a partir da cotação.'}</span>
       </div>
 
       {aba !== 'cotacao' && (
@@ -641,17 +738,17 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
             </div>
             <div className="ce-doc-acoes">
               {aba === 'orcamento' && cotacaoId && cab.status !== 'perdida' && <>
-                <button className="ui-btn ui-btn-success ui-btn-sm" onClick={() => enviarCliente('whatsapp')} disabled={!liberada || salvando}><Ic d={D.zap} /> WhatsApp</button>
-                <button className="ui-btn ui-btn-secondary ui-btn-sm" onClick={() => enviarCliente('email')} disabled={!liberada || salvando}><Ic d={D.mail} /> E-mail</button>
+                <button className="ui-btn ui-btn-success ui-btn-sm" onClick={gerarPdf} disabled={!liberada || salvando || !!pdf}><Ic d={D.pdf} /> {pdf?.etapa === 'gerando' ? 'Gerando PDF...' : 'Enviar PDF'}</button>
+                <button className="ui-btn ui-btn-secondary ui-btn-sm" onClick={() => enviarCliente('whatsapp')} disabled={!liberada || salvando}><Ic d={D.zap} /> Link no WhatsApp</button>
                 <button className="ui-btn ui-btn-ghost ui-btn-sm" onClick={() => enviarCliente('link')} disabled={!liberada || salvando}><Ic d={D.link} /> {copiado ? 'Copiado!' : 'Copiar link'}</button>
               </>}
               <button className="ui-btn ui-btn-primary ui-btn-sm" onClick={() => imprimir(aba)} disabled={salvando || (aba !== 'resultado' && !liberada)}><Ic d={D.impr} /> Imprimir / PDF</button>
             </div>
           </div>
-          {aba === 'pedido' && cab.status !== 'aprovada' && !cab.pedido_status && (
-            <div className="ce-faixa info" style={{ maxWidth: '210mm', margin: '0 auto 1rem' }}><Ic d={D.alerta} size={16} /><div>O pedido já pode ser impresso para o cliente assinar. Quando ele aprovar, marque a cotação como <b>Aprovada</b> e acompanhe aqui o faturamento, a entrega e o pagamento.</div></div>
+          {aba === 'pedido' && cab.status !== 'efetivada' && !cab.pedido_status && (
+            <div className="ce-faixa info" style={{ maxWidth: '210mm', margin: '0 auto 1rem' }}><Ic d={D.alerta} size={16} /><div>O pedido já pode ser impresso para o cliente assinar. Quando o cliente fechar, marque a cotação como <b>Efetivada</b> e acompanhe aqui o faturamento, a entrega e o pagamento.</div></div>
           )}
-          {aba === 'pedido' && (cab.status === 'aprovada' || cab.pedido_status) && (
+          {aba === 'pedido' && (cab.status === 'efetivada' || cab.pedido_status) && (
             <section className="ui-card ce-sec" style={{ maxWidth: '210mm', margin: '0 auto 1.2rem' }}>
               <div className="ce-sec-head">
                 <span className="ce-step" style={{ background: '#1a7f4b' }}><Ic d={D.caminhao} size={12} /></span>
@@ -821,7 +918,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
               {imprimirAberto && (
                 <div className="ce-imprimir-menu" onMouseLeave={() => setImprimirAberto(false)}>
                   <button onClick={() => imprimir('orcamento')} disabled={!liberada}><span>Orçamento<small>{liberada ? 'Para enviar ao cliente' : 'Bloqueado até aprovação'}</small></span><kbd>{CTRL} P</kbd></button>
-                  <button onClick={() => imprimir('pedido')} disabled={!liberada}><span>Pedido do cliente<small>Pedido de compra Verde Agro</small></span><kbd>{CTRL} ⇧ P</kbd></button>
+                  {admin && <button onClick={() => imprimir('pedido')} disabled={!liberada}><span>Pedido do cliente<small>Pedido de compra Verde Agro</small></span><kbd>{CTRL} ⇧ P</kbd></button>}
                   {admin && <button onClick={() => imprimir('resultado')}><span>Resultado<small>Custos e resultado (interno)</small></span></button>}
                 </div>
               )}
@@ -832,11 +929,12 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
             <div className="ui-card ce-cond">
               <div className="ce-cond-tit">Enviar ao cliente</div>
               <div className="ce-envio">
-                <button className="ui-btn ui-btn-success ui-btn-sm" onClick={() => enviarCliente('whatsapp')} disabled={!liberada || salvando}><Ic d={D.zap} /> WhatsApp</button>
+                <button className="ui-btn ui-btn-success ui-btn-sm ce-envio-pdf" onClick={gerarPdf} disabled={!liberada || salvando || !!pdf}><Ic d={D.pdf} /> {pdf?.etapa === 'gerando' ? 'Gerando PDF...' : 'Enviar orçamento em PDF'}</button>
+                <button className="ui-btn ui-btn-secondary ui-btn-sm" onClick={() => enviarCliente('whatsapp')} disabled={!liberada || salvando}><Ic d={D.zap} /> Link</button>
                 <button className="ui-btn ui-btn-secondary ui-btn-sm" onClick={() => enviarCliente('email')} disabled={!liberada || salvando}><Ic d={D.mail} /> E-mail</button>
-                <button className="ui-btn ui-btn-ghost ui-btn-sm" onClick={() => enviarCliente('link')} disabled={!liberada || salvando}><Ic d={D.link} /> {copiado ? 'Copiado!' : 'Copiar link'}</button>
+                <button className="ui-btn ui-btn-ghost ui-btn-sm" onClick={() => enviarCliente('link')} disabled={!liberada || salvando}><Ic d={D.link} /> {copiado ? 'Copiado!' : 'Copiar'}</button>
               </div>
-              <div className="ce-cond-dica">{cab.status === 'rascunho' ? 'Ao enviar, a cotação passa para "Enviada" e o cliente recebe um link do orçamento (sem custos).' : 'O cliente abre o orçamento pelo link, sem precisar de login.'}</div>
+              <div className="ce-cond-dica">{cab.status === 'rascunho' || cab.status === 'aprovada' ? 'Ao enviar, a cotação passa para "Enviada". O PDF vai como arquivo; o link abre o orçamento sem login (sem custos).' : 'O PDF vai como arquivo; o link abre o orçamento sem precisar de login.'}</div>
             </div>
           )}
 
@@ -885,6 +983,26 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
         <button className="ui-btn ui-btn-secondary" onClick={() => imprimir('orcamento')} disabled={salvando || !liberada} aria-label="Gerar orçamento"><Ic d={D.impr} /></button>
         <button className="ui-btn ui-btn-primary" onClick={() => salvar()} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar'}</button>
       </div>
+
+      {pdf && (
+        <div className="pr-pdf" ref={folhaPdf} aria-hidden="true">
+          <DocumentoCotacao tipo="orcamento" dados={dadosDoc} itens={itens} param={param} />
+        </div>
+      )}
+      {pdf?.etapa === 'pronto' && pdf.arquivo && (
+        <div className="ui-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setPdf(null) }}>
+          <div className="ui-modal" style={{ maxWidth: 440 }}>
+            <div className="ui-title" style={{ fontSize: '1.1rem', marginBottom: '.3rem' }}>PDF do orçamento pronto</div>
+            <div className="ui-sub" style={{ marginBottom: '1.1rem' }}>{pdf.arquivo.name}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+              {podeCompartilharArquivo(pdf.arquivo) && <button className="ui-btn ui-btn-success" onClick={compartilharPdf}><Ic d={D.zap} /> Enviar arquivo (WhatsApp, e-mail...)</button>}
+              <button className={`ui-btn ${podeCompartilharArquivo(pdf.arquivo) ? 'ui-btn-secondary' : 'ui-btn-success'}`} onClick={baixarPdfZap}><Ic d={D.zap} /> Baixar e abrir conversa no WhatsApp</button>
+              <button className="ui-btn ui-btn-ghost" onClick={() => { baixarArquivo(pdf.arquivo!); setPdf(null) }}><Ic d={D.pdf} /> Só baixar o PDF</button>
+            </div>
+            <div className="ui-hint" style={{ marginTop: '.8rem' }}>{podeCompartilharArquivo(pdf.arquivo) ? 'No celular, "Enviar arquivo" abre o WhatsApp com o PDF já anexado.' : 'No computador o WhatsApp não aceita anexo automático: o PDF é baixado e você anexa na conversa.'}</div>
+          </div>
+        </div>
+      )}
 
       {perdaAberta && (
         <div className="ui-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setPerdaAberta(false) }}>
@@ -1048,7 +1166,7 @@ function ItemCard({ it, idx, c, admin, produtos, aberto, minimo, abaixo, histori
             <div className="ce-hist">
               {minimo != null && <span className={abaixo ? 'neg' : ''}>Preço mínimo sem aprovação: <b>{brl(minimo)}</b></span>}
               {historico.cliente && <span>Último p/ este cliente: <b>{brl(historico.cliente.preco)}</b> em {dataCurta(historico.cliente.data.slice(0, 10))} (Nº {historico.cliente.numero})</span>}
-              {historico.media && <span>Média aprovada (6 meses): <b>{brl(historico.media.media)}</b> · {historico.media.n} venda{historico.media.n !== 1 ? 's' : ''}</span>}
+              {historico.media && <span>Média efetivada (6 meses): <b>{brl(historico.media.media)}</b> · {historico.media.n} venda{historico.media.n !== 1 ? 's' : ''}</span>}
             </div>
           )}
 
@@ -1188,7 +1306,7 @@ const EDITOR_CSS = `
   .ce-status-btn:hover:not(:disabled){color:#162a1e}
   .ce-status-btn:disabled{opacity:.4;cursor:not-allowed}
   .ce-status-btn.ativo{background:#fff;color:#162a1e;box-shadow:0 1px 3px rgba(22,42,30,.12)}
-  .ce-status-btn.ativo.enviada{color:#c0651a}.ce-status-btn.ativo.aprovada{color:#1e8a4c}.ce-status-btn.ativo.perdida{color:#c0392b}
+  .ce-status-btn.ativo.aprovada{color:#2c5c9e}.ce-status-btn.ativo.enviada{color:#c0651a}.ce-status-btn.ativo.efetivada{color:#1e8a4c}.ce-status-btn.ativo.perdida{color:#c0392b}
   .ce-resumo{padding:1.2rem}
   .ce-resumo-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem}
   .ce-pend{font-size:.66rem;font-weight:600;color:#c0651a}
@@ -1224,6 +1342,11 @@ const EDITOR_CSS = `
   .ce-ptax-obs b{color:#162a1e;font-weight:600}
   .ce-envio{display:flex;flex-wrap:wrap;gap:.4rem}
   .ce-envio .ui-btn{flex:1}
+  .ce-envio .ce-envio-pdf{flex-basis:100%}
+  .pr-pdf{position:fixed;left:-10000px;top:0;width:210mm;pointer-events:none}
+  .pr-pdf .pr-folha{width:210mm !important;min-height:297mm !important;padding:14mm 13mm !important;box-shadow:none !important}
+  .pr-pdf .pr-duas{grid-template-columns:1.4fr 1fr !important}
+  .pr-pdf .pr-assinaturas{gap:40px !important}
   .ce-motivos{display:flex;flex-wrap:wrap;gap:.4rem}
   .ce-motivo{border:1.5px solid #eae5de;background:#fff;border-radius:999px;padding:.4rem .85rem;font-family:inherit;font-size:.76rem;font-weight:600;color:#5b6660;cursor:pointer}
   .ce-motivo.on{background:#c0392b;border-color:#c0392b;color:#fff}

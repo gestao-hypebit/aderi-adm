@@ -8,7 +8,7 @@ import { baixarCsv } from '@/lib/csv'
 import { hojeISO } from '@/lib/dateUtils'
 import { PAGAMENTO_STATUS, PEDIDO_STATUS, brl, calcularTotais, itemDoBanco, parametrosDoBanco } from '@/lib/cotacao'
 
-// Pedidos = cotações aprovadas pelo cliente. A lista acompanha faturamento, entrega e pagamento;
+// Pedidos = cotações efetivadas (o cliente fechou). A lista acompanha faturamento, entrega e pagamento;
 // o registro em si é editado na aba "Pedido" da cotação.
 
 type Pedido = {
@@ -52,7 +52,7 @@ export default function PedidosLista({ base }: { base: string }) {
         supabase.from('profiles').select('role').eq('id', user?.id ?? '').single(),
         supabase.from('cotacoes')
           .select('id, numero, cliente_nome, empresa_rural, criado_por, created_at, pedido_status, pagamento_status, nota_fiscal, faturado_em, entregue_em, pago_em, ptax, juros_mes, aliquota_icms, aliquota_ir, autor:profiles!cotacoes_criado_por_fkey(nome_completo), itens:cotacao_itens(*)')
-          .eq('status', 'aprovada')
+          .eq('status', 'efetivada')
           .order('created_at', { ascending: false }),
       ])
       setAdmin(perfil?.role === 'admin')
@@ -99,7 +99,7 @@ export default function PedidosLista({ base }: { base: string }) {
       <div className="ui-page-header">
         <div>
           <div className="ui-title">Pedidos</div>
-          <div className="ui-sub">Cotações aprovadas pelo cliente: o que já foi faturado, entregue e pago. Para atualizar, abra o pedido.</div>
+          <div className="ui-sub">Cotações efetivadas (o cliente fechou): o que já foi faturado, entregue e pago. Para atualizar, abra o pedido.</div>
         </div>
         <div className="ui-header-actions">
           <button className="ui-btn ui-btn-secondary" onClick={exportar} disabled={carregando || !lista.length}>Exportar CSV</button>

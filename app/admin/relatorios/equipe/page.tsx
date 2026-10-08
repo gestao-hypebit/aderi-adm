@@ -19,7 +19,7 @@ type Linha = {
   km: number
   gasto: number
   cotacoes: number
-  aprovadas: number
+  efetivadas: number
   perdidas: number
   vendido: number
 }
@@ -41,7 +41,7 @@ export default function RelatorioEquipe() {
       supabase.from('cotacoes').select('criado_por, status, ptax, juros_mes, aliquota_icms, aliquota_ir, itens:cotacao_itens(*)').gte('created_at', ini).lte('created_at', fim + 'T23:59:59'),
     ]).then(([v, k, a, c]) => {
       const mapa = new Map<string, Linha & { cli: Set<string> }>()
-      consultores.forEach(p => mapa.set(p.id, { id: p.id, nome: p.nome_completo, realizadas: 0, agendadas: 0, atrasadas: 0, canceladas: 0, clientes: 0, km: 0, gasto: 0, cotacoes: 0, aprovadas: 0, perdidas: 0, vendido: 0, cli: new Set() }))
+      consultores.forEach(p => mapa.set(p.id, { id: p.id, nome: p.nome_completo, realizadas: 0, agendadas: 0, atrasadas: 0, canceladas: 0, clientes: 0, km: 0, gasto: 0, cotacoes: 0, efetivadas: 0, perdidas: 0, vendido: 0, cli: new Set() }))
       ;(v.data ?? []).forEach(x => {
         const m = mapa.get(x.funcionario_id); if (!m) return
         if (x.status === 'realizada') { m.realizadas++; m.cli.add(x.cliente_id) }
@@ -55,8 +55,8 @@ export default function RelatorioEquipe() {
         const m = mapa.get(x.criado_por); if (!m) return
         m.cotacoes++
         if (x.status === 'perdida') m.perdidas++
-        if (x.status === 'aprovada') {
-          m.aprovadas++
+        if (x.status === 'efetivada') {
+          m.efetivadas++
           m.vendido += calcularTotais(((x.itens ?? []) as Record<string, unknown>[]).map(itemDoBanco), parametrosDoBanco(x)).venda
         }
       })
@@ -70,19 +70,19 @@ export default function RelatorioEquipe() {
   const tot = {
     realizadas: soma(l => l.realizadas), pendentes: soma(l => l.agendadas + l.atrasadas), clientes: soma(l => l.clientes),
     km: soma(l => l.km), gasto: soma(l => l.gasto), vendido: soma(l => l.vendido),
-    aprovadas: soma(l => l.aprovadas), perdidas: soma(l => l.perdidas),
+    efetivadas: soma(l => l.efetivadas), perdidas: soma(l => l.perdidas),
   }
   const conclusao = (l: Linha) => div(l.realizadas, l.realizadas + l.agendadas + l.atrasadas)
-  const conversao = (l: Linha) => div(l.aprovadas, l.aprovadas + l.perdidas)
+  const conversao = (l: Linha) => div(l.efetivadas, l.efetivadas + l.perdidas)
   const custoVisita = (l: Linha) => div(l.gasto, l.realizadas)
   const maxReal = Math.max(1, ...exibidas.map(l => l.realizadas))
   const maxVend = Math.max(1, ...exibidas.map(l => l.vendido))
   const destaque = useMemo(() => [...exibidas].sort((a, b) => b.realizadas - a.realizadas)[0], [exibidas])
 
   function exportar() {
-    baixarCsv(`relatorio-equipe-${hoje}`, ['Consultor', 'Visitas realizadas', 'Agendadas', 'Atrasadas', 'Canceladas', 'Conclusão (%)', 'Clientes atendidos', 'KM', 'Combustível (R$)', 'Combustível por visita (R$)', 'Cotações', 'Aprovadas', 'Perdidas', 'Conversão (%)', 'Vendido (R$)'],
+    baixarCsv(`relatorio-equipe-${hoje}`, ['Consultor', 'Visitas realizadas', 'Agendadas', 'Atrasadas', 'Canceladas', 'Conclusão (%)', 'Clientes atendidos', 'KM', 'Combustível (R$)', 'Combustível por visita (R$)', 'Cotações', 'Efetivadas', 'Perdidas', 'Conversão (%)', 'Vendido (R$)'],
       exibidas.map(l => [l.nome, l.realizadas, l.agendadas, l.atrasadas, l.canceladas, conclusao(l) != null ? Math.round(conclusao(l)! * 100) : '', l.clientes, l.km,
-        l.gasto.toFixed(2).replace('.', ','), custoVisita(l)?.toFixed(2).replace('.', ',') ?? '', l.cotacoes, l.aprovadas, l.perdidas,
+        l.gasto.toFixed(2).replace('.', ','), custoVisita(l)?.toFixed(2).replace('.', ',') ?? '', l.cotacoes, l.efetivadas, l.perdidas,
         conversao(l) != null ? Math.round(conversao(l)! * 100) : '', l.vendido.toFixed(2).replace('.', ',')]))
   }
 
@@ -95,7 +95,7 @@ export default function RelatorioEquipe() {
         { rotulo: 'Visitas realizadas', valor: num(tot.realizadas), sub: `${tot.pendentes} ainda pendentes` },
         { rotulo: 'Clientes atendidos', valor: num(tot.clientes) },
         { rotulo: 'Combustível por visita', valor: div(tot.gasto, tot.realizadas) != null ? brl(div(tot.gasto, tot.realizadas)!, 2) : '—', sub: `${num(tot.km)} km · ${brl(tot.gasto)}` },
-        { rotulo: 'Vendas aprovadas', valor: brl(tot.vendido), cor: '#1a7f4b', sub: `conversão de ${pctTxt(div(tot.aprovadas, tot.aprovadas + tot.perdidas))}` },
+        { rotulo: 'Vendas efetivadas', valor: brl(tot.vendido), cor: '#1a7f4b', sub: `conversão de ${pctTxt(div(tot.efetivadas, tot.efetivadas + tot.perdidas))}` },
         { rotulo: 'Destaque em visitas', valor: destaque && destaque.realizadas ? destaque.nome.split(' ')[0] : '—', sub: destaque && destaque.realizadas ? `${destaque.realizadas} realizadas` : undefined },
       ]} />
 

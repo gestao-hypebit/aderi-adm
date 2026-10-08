@@ -16,7 +16,7 @@ type Props = {
 }
 
 // Campo de produto: digitar filtra o cadastro; setas navegam; Enter escolhe.
-// Se o produto não existe no cadastro, dá para usar o nome digitado.
+// Se o produto não existe no cadastro, o nome digitado é cadastrado ao salvar a cotação.
 export default function ProdutoPicker({ produtos, nome, produtoId, onEscolher, onLivre, onConcluir, inputProps }: Props) {
   const [aberto, setAberto] = useState(false)
   const [termo, setTermo] = useState<string | null>(null)
@@ -128,7 +128,7 @@ export default function ProdutoPicker({ produtos, nome, produtoId, onEscolher, o
               <button type="button" data-idx={filtrados.length} className={`pp-opt pp-livre ${ativo === filtrados.length ? 'ativo' : ''}`}
                 onMouseEnter={() => setAtivo(filtrados.length)} onMouseDown={e => e.preventDefault()} onClick={() => escolher(filtrados.length)}>
                 <span className="pp-ico">+</span>
-                <span className="pp-txt"><div className="pp-nome">Usar &quot;{livre}&quot;</div><div className="pp-sub">Produto fora do cadastro, só nesta cotação</div></span>
+                <span className="pp-txt"><div className="pp-nome">Cadastrar &quot;{livre}&quot;</div><div className="pp-sub">Novo produto: entra no cadastro ao salvar a cotação</div></span>
               </button>
             )}
             {total === 0 && <div className="pp-vazio">{produtos.length ? 'Nenhum produto encontrado' : 'Nenhum produto cadastrado. Digite o nome.'}</div>}

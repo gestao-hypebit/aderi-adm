@@ -77,3 +77,17 @@ export function linkPontoGoogle(p: Ponto) {
 
 export const temCoordenadas = (x: { latitude?: number | null; longitude?: number | null }) =>
   x.latitude != null && x.longitude != null
+
+// Lê coordenadas de um link do Google Maps (…/@-20.46,-45.95…, ?q=…, ?query=…, !3d…!4d…) ou de "lat, lng" digitado
+export function pontoDeTexto(texto: string): Ponto | null {
+  const t = decodeURIComponent(texto.trim())
+  const padroes = [/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/, /@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/, /[?&](?:q|query|ll|destination)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/, /^(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)$/]
+  for (const re of padroes) {
+    const m = t.match(re)
+    if (!m) continue
+    const lat = Number(m[1])
+    const lng = Number(m[2])
+    if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng }
+  }
+  return null
+}

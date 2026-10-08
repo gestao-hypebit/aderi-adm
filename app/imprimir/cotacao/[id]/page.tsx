@@ -51,7 +51,7 @@ function Conteudo() {
 
   if (erro) return <div className="pr-msg">{erro}</div>
   if (!c) return <div className="pr-msg">Carregando...</div>
-  if (tipo === 'resultado' && !admin) return <div className="pr-msg">Documento disponível só para administradores.</div>
+  if ((tipo === 'resultado' || tipo === 'pedido') && !admin) return <div className="pr-msg">Documento disponível só para administradores.</div>
   if (tipo !== 'resultado' && c.bloqueado) return <div className="pr-msg">Documento bloqueado: há preço abaixo do mínimo permitido. Solicite a aprovação do administrador na cotação.</div>
 
   return (
