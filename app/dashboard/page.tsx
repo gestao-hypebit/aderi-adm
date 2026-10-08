@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ATALHO_PADRAO, calcRange, descreverPeriodo, hojeISO, somarDias } from '@/lib/dateUtils'
-import { STATUS_COTACAO, calcularTotais, itemDoBanco, parametrosDoBanco } from '@/lib/cotacao'
+import { ETAPAS, etapaDe, calcularTotais, itemDoBanco, parametrosDoBanco } from '@/lib/cotacao'
 import AdminCharts from '@/app/admin/AdminCharts'
 import DashboardPeriodoBar from './DashboardPeriodoBar'
 import FunilCotacoes from '@/app/components/cotacoes/FunilCotacoes'
@@ -93,6 +93,7 @@ export default async function DashboardHome({ searchParams }: { searchParams: Se
   const diasFollow = cfg?.dias_followup ?? 3
   const aguardando = cots.filter(c => c.aprovacao_status === 'pendente')
   const reprovadas = cots.filter(c => c.aprovacao_status === 'reprovada' && c.status === 'rascunho')
+  const paraEnviar = cots.filter(c => c.status === 'aprovada')
   const paradas = cots.filter(c => c.status === 'enviada' && c.enviada_em && diasEntre(c.enviada_em, hoje) >= diasFollow)
   const vencendo = cots.filter(c => (c.status === 'rascunho' || c.status === 'aprovada' || c.status === 'enviada') && c.validade && diasEntre(hoje, c.validade) <= 2)
   const ultimaPorCliente = new Map<string, string>()
@@ -100,7 +101,7 @@ export default async function DashboardHome({ searchParams }: { searchParams: Se
   const limite60 = somarDias(hoje, -60)
   const esquecidos = (carteira ?? []).map(c => ({ ...c, ultima: ultimaPorCliente.get(c.id) ?? null })).filter(c => !c.ultima || c.ultima < limite60)
     .sort((a, b) => (a.ultima ?? '').localeCompare(b.ultima ?? ''))
-  const qtdAtencao = (totalAtrasadas ?? 0) + aguardando.length + reprovadas.length + paradas.length + vencendo.length + esquecidos.length
+  const qtdAtencao = (totalAtrasadas ?? 0) + aguardando.length + reprovadas.length + paraEnviar.length + paradas.length + vencendo.length + esquecidos.length
 
   // ── histórico ──
   const meses: Record<string, { realizadas: number; agendadas: number }> = {}
@@ -240,17 +241,22 @@ export default async function DashboardHome({ searchParams }: { searchParams: Se
                 </ItemAtencao>
               )}
               {aguardando.length > 0 && (
-                <ItemAtencao n={aguardando.length} cls="a" titulo="Cotações aguardando aprovação do admin">
+                <ItemAtencao n={aguardando.length} cls="a" titulo="Cotações aguardando aprovação da gestão">
                   {aguardando.slice(0, 3).map(c => <Link key={c.id} href={`/dashboard/cotacoes/${c.id}`} className="dh-at-li"><span>Nº {c.numero} · {c.cliente_nome}</span><span>{moeda(c.venda)}</span></Link>)}
                 </ItemAtencao>
               )}
               {reprovadas.length > 0 && (
-                <ItemAtencao n={reprovadas.length} cls="r" titulo="Preços reprovados para revisar">
+                <ItemAtencao n={reprovadas.length} cls="r" titulo="Reprovadas pela gestão para revisar">
                   {reprovadas.slice(0, 3).map(c => <Link key={c.id} href={`/dashboard/cotacoes/${c.id}`} className="dh-at-li"><span>Nº {c.numero} · {c.cliente_nome}</span><span>revisar</span></Link>)}
                 </ItemAtencao>
               )}
+              {paraEnviar.length > 0 && (
+                <ItemAtencao n={paraEnviar.length} cls="a" titulo="Aprovadas pela gestão: enviar orçamento ao cliente">
+                  {paraEnviar.slice(0, 3).map(c => <Link key={c.id} href={`/dashboard/cotacoes/${c.id}`} className="dh-at-li"><span>Nº {c.numero} · {c.cliente_nome}</span><span>{moeda(c.venda)}</span></Link>)}
+                </ItemAtencao>
+              )}
               {paradas.length > 0 && (
-                <ItemAtencao n={paradas.length} cls="a" titulo="Cotações enviadas sem resposta">
+                <ItemAtencao n={paradas.length} cls="a" titulo="Orçamentos enviados sem resposta">
                   {paradas.slice(0, 3).map(c => <Link key={c.id} href={`/dashboard/cotacoes/${c.id}`} className="dh-at-li"><span>Nº {c.numero} · {c.cliente_nome}</span><span>há {diasEntre(c.enviada_em!, hoje)} dias</span></Link>)}
                 </ItemAtencao>
               )}
@@ -270,7 +276,7 @@ export default async function DashboardHome({ searchParams }: { searchParams: Se
       </div>
 
       {/* acompanhamento das próprias cotações: quantas foram enviadas, efetivadas e perdidas no período */}
-      <FunilCotacoes cotacoes={cots.filter(c => noPeriodo(c.created_at)).map(c => ({ status: c.status, enviada_em: c.enviada_em, venda: c.venda, motivo_perda: c.motivo_perda }))} periodo={`Minhas cotações · ${periodo}`} />
+      <FunilCotacoes cotacoes={cots.filter(c => noPeriodo(c.created_at)).map(c => ({ status: c.status, enviada_em: c.enviada_em, venda: c.venda, motivo_perda: c.motivo_perda, aprovacao_status: c.aprovacao_status }))} periodo={`Minhas cotações · ${periodo}`} />
 
       <div className="dh-grid dh-g2">
         <AdminCharts visitasPorMes={visitasPorMes} />
@@ -284,7 +290,7 @@ export default async function DashboardHome({ searchParams }: { searchParams: Se
             <div className="dh-card-h"><span className="dh-card-t"><Ic d={D.doc} /> Cotações recentes</span><Link href="/dashboard/cotacoes" className="dh-link">Ver todas <Ic d={D.seta} size={12} /></Link></div>
             {cots.length === 0 ? <div className="dh-vazio"><b>Nenhuma cotação ainda</b><Link href="/dashboard/cotacoes/nova" style={{ color: '#E67E22', fontWeight: 600 }}>Criar cotação</Link></div>
               : cots.slice(0, 4).map(c => {
-                const st = STATUS_COTACAO[c.status] ?? STATUS_COTACAO.rascunho
+                const st = ETAPAS[etapaDe(c)]
                 return (
                   <Link key={c.id} href={`/dashboard/cotacoes/${c.id}`} className="dh-cot">
                     <div className="dh-vis-main"><div className="dh-vis-t">{c.cliente_nome || 'Sem cliente'}</div><div className="dh-vis-m">Nº {c.numero} · {moeda(c.venda)}</div></div>

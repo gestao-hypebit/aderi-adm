@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { SeletorVisao, useVisao } from '@/app/components/AlternarVisao'
 import Tabela, { Paginacao, usePaginacao } from '@/app/components/Tabela'
-import { STATUS_COTACAO, PEDIDO_STATUS, calcularTotais, itemDoBanco, parametrosDoBanco, brl, pct } from '@/lib/cotacao'
+import { ETAPAS, etapaDe, PEDIDO_STATUS, calcularTotais, itemDoBanco, parametrosDoBanco, brl, pct } from '@/lib/cotacao'
 import { ATALHO_PADRAO, calcRange, descreverPeriodo, hojeISO } from '@/lib/dateUtils'
 import PeriodoSeletor from '@/app/components/PeriodoSeletor'
 import NumInput from './NumInput'
@@ -38,12 +38,12 @@ type Config = { margem_minima: number; validade_cotacao_dias: number; dias_follo
 const diasEntre = (de: string, ate: string) => Math.round((Date.parse(ate.slice(0, 10)) - Date.parse(de.slice(0, 10))) / 86400000)
 
 // Situações que pedem ação: aprovação de preço, follow-up, validade e pedidos em andamento
-function alertasDe(l: Linha, cfg: Config, admin: boolean): { alertas: Alerta[]; aprovacao: boolean; followup: boolean; pedido: boolean } {
+function alertasDe(l: Linha, cfg: Config, admin: boolean): { alertas: Alerta[]; aprovacao: boolean; enviar: boolean; followup: boolean; pedido: boolean } {
   const hoje = hojeISO()
   const alertas: Alerta[] = []
-  const aprovacao = l.aprovacao_status === 'pendente'
-  if (aprovacao) alertas.push({ txt: 'Aguardando aprovação de preço', cls: 'ui-badge-agendada' })
-  if (l.aprovacao_status === 'reprovada' && l.status === 'rascunho') alertas.push({ txt: 'Preço reprovado', cls: 'ui-badge-cancelada' })
+  const aprovacao = etapaDe(l) === 'aguardando'
+  const enviar = l.status === 'aprovada'
+  if (l.aprovacao_status === 'reprovada' && l.status === 'rascunho') alertas.push({ txt: 'Gestão reprovou', cls: 'ui-badge-cancelada' })
   let followup = false
   if (l.status === 'enviada' && l.enviada_em) {
     const d = diasEntre(l.enviada_em, hoje)
@@ -57,7 +57,7 @@ function alertasDe(l: Linha, cfg: Config, admin: boolean): { alertas: Alerta[]; 
   // pedidos são acompanhados só pela gestão
   const pedido = admin && l.status === 'efetivada' && (l.pedido_status !== 'entregue' && l.pedido_status !== 'cancelado' || l.pagamento_status !== 'pago')
   if (admin && l.status === 'efetivada' && l.pedido_status) alertas.push({ txt: `Pedido: ${PEDIDO_STATUS[l.pedido_status]}${l.pagamento_status === 'pago' ? ' · pago' : ''}`, cls: l.pedido_status === 'entregue' && l.pagamento_status === 'pago' ? 'ui-badge-realizada' : 'ui-badge-neutro' })
-  return { alertas, aprovacao, followup, pedido }
+  return { alertas, aprovacao, enviar, followup, pedido }
 }
 
 function IconPlus() {
@@ -73,6 +73,7 @@ function IconBox() {
   return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
 }
 
+const ORDEM_ETAPA = Object.keys(ETAPAS)
 const fmtData = (d: string) => new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ de /g, ' ').replace('.', '')
 
 export default function CotacoesLista({ base }: { base: string }) {
@@ -129,7 +130,7 @@ export default function CotacoesLista({ base }: { base: string }) {
   const situacao = useMemo(() => new Map(linhas.map(l => [l.id, alertasDe(l, config, admin)])), [linhas, config, admin])
   const naFila = (l: Linha, f: string) => {
     const x = situacao.get(l.id)!
-    return f === 'x-aprovacao' ? x.aprovacao : f === 'x-followup' ? x.followup : f === 'x-pedidos' ? x.pedido : l.status === f
+    return f === 'x-aprovacao' ? x.aprovacao : f === 'x-enviar' ? x.enviar : f === 'x-followup' ? x.followup : f === 'x-pedidos' ? x.pedido : etapaDe(l) === f
   }
   // período (data de criação) e consultor valem para a lista, as contagens e o funil
   const doPeriodo = useMemo(() => linhas.filter(l => {
@@ -149,10 +150,10 @@ export default function CotacoesLista({ base }: { base: string }) {
 
   const chaveFiltro = `${busca}|${status}|${consultor}|${periodo.inicio}|${periodo.fim}`
   const cards = usePaginacao(lista, 24, chaveFiltro)
-  const contagem = (s: string) => doPeriodo.filter(l => l.status === s).length
+  const contagem = (e: string) => doPeriodo.filter(l => etapaDe(l) === e).length
   const totalEfetivado = doPeriodo.filter(l => l.status === 'efetivada').reduce((s, l) => s + l.venda, 0)
   const filas: [string, string][] = [
-    ['x-aprovacao', admin ? 'Aprovar preço' : 'Aguardando aprovação'], ['x-followup', 'Follow-up / validade'],
+    ['x-aprovacao', admin ? 'Aguardando sua aprovação' : 'Na gestão para aprovar'], ['x-enviar', 'Aprovadas: enviar orçamento'], ['x-followup', 'Orçamento sem resposta / validade'],
     ...(admin ? [['x-pedidos', 'Pedidos em andamento'] as [string, string]] : []),
   ]
 
@@ -187,7 +188,7 @@ export default function CotacoesLista({ base }: { base: string }) {
         <div>
           <div className="ui-title">Cotações</div>
           <div className="ui-sub">
-            {carregando ? 'Carregando...' : `${doPeriodo.length} cotaç${doPeriodo.length !== 1 ? 'ões' : 'ão'} · ${contagem('efetivada')} efetivada${contagem('efetivada') !== 1 ? 's' : ''} (${brl(totalEfetivado)}). Aprovada = liberada pela gestão; efetivada = o cliente fechou.`}
+            {carregando ? 'Carregando...' : `${doPeriodo.length} cotaç${doPeriodo.length !== 1 ? 'ões' : 'ão'} · ${contagem('efetivada')} virou pedido (${brl(totalEfetivado)}). Etapas: cotação → aprovação da gestão → orçamento ao cliente → cliente aprova → pedido.`}
           </div>
         </div>
         <div className="ui-header-actions">
@@ -208,12 +209,10 @@ export default function CotacoesLista({ base }: { base: string }) {
             {consultores.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
           </select>
         )}
-        <div className="ui-segmented" role="tablist" aria-label="Filtrar por status" style={{ marginLeft: 'auto' }}>
-          <button className={!status ? 'ativo' : ''} onClick={() => setStatus('')}>Todas</button>
-          {Object.entries(STATUS_COTACAO).map(([k, v]) => (
-            <button key={k} className={status === k ? 'ativo' : ''} onClick={() => setStatus(k)}>{v.label} <span className="ui-count">{contagem(k)}</span></button>
-          ))}
-        </div>
+        <select className="ui-select ui-select-sm" style={{ marginLeft: 'auto', width: 'auto' }} value={status.startsWith('x-') ? '' : status} onChange={e => setStatus(e.target.value)} aria-label="Filtrar por etapa">
+          <option value="">Todas as etapas ({doPeriodo.length})</option>
+          {Object.entries(ETAPAS).map(([k, v]) => <option key={k} value={k}>{v.label} ({contagem(k)})</option>)}
+        </select>
         <SeletorVisao visao={visao} onChange={setVisao} />
       </div>
       <div className="cq-filas">
@@ -251,7 +250,7 @@ export default function CotacoesLista({ base }: { base: string }) {
         <>
           <div className="cq-grid">
             {cards.visiveis.map(l => {
-              const st = STATUS_COTACAO[l.status] ?? STATUS_COTACAO.rascunho
+              const st = ETAPAS[etapaDe(l)]
               return (
                 <Link key={l.id} href={`${base}/${l.id}`} className="ui-card ui-card-hover cq-card">
                   <div className="cq-card-top"><span className="ui-cel-forte">Nº {l.numero}</span><span className={`ui-badge ${st.badge}`}>{st.label}</span></div>
@@ -301,9 +300,9 @@ export default function CotacoesLista({ base }: { base: string }) {
             { id: 'total', titulo: 'Total', alinhar: 'dir', ordenar: (a, b) => a.venda - b.venda, celula: l => <span className="ui-cel-num ui-cel-forte">{brl(l.venda)}</span> },
             ...(admin ? [{ id: 'res', titulo: 'Resultado', alinhar: 'dir' as const, ocultar: 'tablet' as const, ordenar: (a: Linha, b: Linha) => a.resultado - b.resultado,
               celula: (l: Linha) => <><div className="ui-cel-num ui-cel-forte" style={{ color: l.resultado < 0 ? '#c0392b' : '#1e8a4c' }}>{brl(l.resultado)}</div><div className="ui-cel-sub">{pct(l.pctResultado, 2)}</div></> }] : []),
-            { id: 'status', titulo: 'Status', largura: '170px', ordenar: (a, b) => a.status.localeCompare(b.status),
+            { id: 'status', titulo: 'Etapa', largura: '190px', ordenar: (a, b) => ORDEM_ETAPA.indexOf(etapaDe(a)) - ORDEM_ETAPA.indexOf(etapaDe(b)),
               celula: l => {
-                const st = STATUS_COTACAO[l.status] ?? STATUS_COTACAO.rascunho
+                const st = ETAPAS[etapaDe(l)]
                 const al = situacao.get(l.id)?.alertas ?? []
                 return <><span className={`ui-badge ${st.badge}`}>{st.label}</span>{al.length > 0 && <div className="cq-alertas">{al.map(a => <span key={a.txt} className={`ui-badge ${a.cls}`}>{a.txt}</span>)}</div>}</>
               } },

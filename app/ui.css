@@ -103,6 +103,7 @@ a.ui-card-hover:hover, .ui-card-hover:hover { box-shadow: var(--sombra-hover); t
 .ui-badge-cancelada { background: var(--erro-suave); color: #c0392b }
 .ui-badge-neutro { background: var(--fundo-2); color: var(--texto-2) }
 .ui-badge-aprovada { background: #e8f0fb; color: #2c5c9e }
+.ui-badge-aguardando { background: #f3eefb; color: #7a52b3 }
 
 /* ── Segmentado / pills ──────────────────────────────────── */
 .ui-segmented { display: inline-flex; background: var(--fundo-2); border: 1px solid var(--borda); border-radius: 10px; padding: 3px; gap: 2px; flex-wrap: wrap }

@@ -1,16 +1,16 @@
 'use client'
 
-import { STATUS_COTACAO, funilCotacoes, brl, pct } from '@/lib/cotacao'
+import { ETAPAS, etapaDe, funilCotacoes, brl, pct, type Etapa } from '@/lib/cotacao'
 
-type Cot = { status: string; enviada_em: string | null; venda: number; motivo_perda: string | null }
+type Cot = { status: string; enviada_em: string | null; venda: number; motivo_perda: string | null; aprovacao_status: string | null }
 
-// Funil de vendas das cotações: cotadas → enviadas → efetivadas, com conversão entre etapas,
-// situação atual por status e motivos de perda.
-export default function FunilCotacoes({ cotacoes, periodo, onStatus }: { cotacoes: Cot[]; periodo: string; onStatus?: (s: string) => void }) {
+// Funil de vendas: cotações → aprovadas pela gestão → orçamentos enviados → cliente aprovou (pedido),
+// com conversão entre etapas, situação atual por etapa e motivos de perda.
+export default function FunilCotacoes({ cotacoes, periodo, onStatus }: { cotacoes: Cot[]; periodo: string; onStatus?: (etapa: Etapa) => void }) {
   const f = funilCotacoes(cotacoes)
   const topo = Math.max(f.etapas[0].qtd, 1)
-  const porStatus = Object.entries(STATUS_COTACAO).map(([k, v]) => {
-    const l = cotacoes.filter(c => c.status === k)
+  const porEtapa = (Object.entries(ETAPAS) as [Etapa, (typeof ETAPAS)[Etapa]][]).map(([k, v]) => {
+    const l = cotacoes.filter(c => etapaDe(c) === k)
     return { k, ...v, qtd: l.length, valor: l.reduce((s, c) => s + c.venda, 0) }
   })
 
@@ -65,12 +65,12 @@ export default function FunilCotacoes({ cotacoes, periodo, onStatus }: { cotacoe
 
       <div>
         <div className="fn-kpis">
-          <div className="fn-kpi"><div className="fn-kpi-l">Conversão</div><div className="fn-kpi-n">{f.conversao == null ? '—' : pct(f.conversao, 0)}</div><div className="fn-kpi-s">efetivadas ÷ (efetivadas + perdidas)</div></div>
-          <div className="fn-kpi"><div className="fn-kpi-l">Ticket médio</div><div className="fn-kpi-n">{f.ticket == null ? '—' : brl(f.ticket)}</div><div className="fn-kpi-s">por cotação efetivada</div></div>
+          <div className="fn-kpi"><div className="fn-kpi-l">Conversão</div><div className="fn-kpi-n">{f.conversao == null ? '—' : pct(f.conversao, 0)}</div><div className="fn-kpi-s">pedidos ÷ (pedidos + perdidas)</div></div>
+          <div className="fn-kpi"><div className="fn-kpi-l">Ticket médio</div><div className="fn-kpi-n">{f.ticket == null ? '—' : brl(f.ticket)}</div><div className="fn-kpi-s">por pedido</div></div>
         </div>
         <div className="fn-l2">Situação atual</div>
         <div className="fn-st">
-          {porStatus.map(s => (
+          {porEtapa.map(s => (
             <button key={s.k} type="button" onClick={() => onStatus?.(s.k)} title={brl(s.valor)}><i style={{ background: s.cor }} />{s.label} {s.qtd}</button>
           ))}
         </div>

@@ -7,7 +7,7 @@ import Link from 'next/link'
 import Tabela from '@/app/components/Tabela'
 import ConfirmDialog from '../../_ui/ConfirmDialog'
 import { ATALHO_PADRAO, calcRange, descreverPeriodo, hojeISO } from '@/lib/dateUtils'
-import { STATUS_COTACAO, calcularTotais, itemDoBanco, parametrosDoBanco, brl } from '@/lib/cotacao'
+import { ETAPAS, etapaDe, calcularTotais, itemDoBanco, parametrosDoBanco, brl } from '@/lib/cotacao'
 import FunilCotacoes from '@/app/components/cotacoes/FunilCotacoes'
 import PeriodoSeletor from '@/app/components/PeriodoSeletor'
 
@@ -24,7 +24,7 @@ type ClienteCriado = {
   id: string; nome: string; nome_fazenda: string | null; cidade: string | null; estado: string | null
   hectares: number | null; cultura_principal: string | null; telefone: string | null
 }
-type Cotacao = { id: string; numero: string; status: string; created_at: string; cliente_nome: string | null; enviada_em: string | null; motivo_perda: string | null; venda: number }
+type Cotacao = { id: string; numero: string; status: string; created_at: string; cliente_nome: string | null; enviada_em: string | null; motivo_perda: string | null; aprovacao_status: string | null; venda: number }
 const CAMPOS_CLIENTE = 'id, nome, nome_fazenda, cidade, estado, hectares, cultura_principal, telefone'
 
 const STATUS_LABEL: Record<string, string> = { agendada: 'Agendada', realizada: 'Realizada', cancelada: 'Cancelada' }
@@ -89,7 +89,7 @@ export default function AdminConsultorDetalhe() {
           .order('data_visita', { ascending: false }),
         supabase.from('clientes').select(CAMPOS_CLIENTE).or(`responsavel_id.eq.${id},criado_por.eq.${id}`).order('nome'),
         supabase.from('km_diario').select('km_inicial, km_final').eq('funcionario_id', id).gte('data', inicio).lte('data', fim),
-        supabase.from('cotacoes').select('id, numero, status, created_at, cliente_nome, enviada_em, motivo_perda, ptax, juros_mes, aliquota_icms, aliquota_ir, itens:cotacao_itens(*)')
+        supabase.from('cotacoes').select('id, numero, status, created_at, cliente_nome, enviada_em, motivo_perda, aprovacao_status, ptax, juros_mes, aliquota_icms, aliquota_ir, itens:cotacao_itens(*)')
           .eq('criado_por', id).order('created_at', { ascending: false }),
       ])
       setSouEu(user?.id === id)
@@ -97,7 +97,7 @@ export default function AdminConsultorDetalhe() {
       setVisitas((v ?? []) as Visita[])
       setCriados((c ?? []) as ClienteCriado[])
       setCotacoes((q ?? []).map(x => ({
-        id: x.id, numero: x.numero, status: x.status, created_at: x.created_at, cliente_nome: x.cliente_nome, enviada_em: x.enviada_em, motivo_perda: x.motivo_perda,
+        id: x.id, numero: x.numero, status: x.status, created_at: x.created_at, cliente_nome: x.cliente_nome, enviada_em: x.enviada_em, motivo_perda: x.motivo_perda, aprovacao_status: x.aprovacao_status,
         venda: calcularTotais(((x.itens ?? []) as Record<string, unknown>[]).map(itemDoBanco), parametrosDoBanco(x)).venda,
       })))
       setKmMes((km ?? []).reduce((s, k) => s + (k.km_inicial != null && k.km_final != null ? Number(k.km_final) - Number(k.km_inicial) : 0), 0))
@@ -396,8 +396,8 @@ export default function AdminConsultorDetalhe() {
                     { id: 'cli', titulo: 'Cliente', ordenar: (a, b) => (a.cliente_nome ?? '').localeCompare(b.cliente_nome ?? ''), celula: c => c.cliente_nome || <span className="ui-cel-mudo">Sem cliente</span> },
                     { id: 'data', titulo: 'Data', ocultar: 'celular', ordenar: (a, b) => a.created_at.localeCompare(b.created_at), celula: c => <span className="ui-cel-num">{new Date(c.created_at).toLocaleDateString('pt-BR')}</span> },
                     { id: 'valor', titulo: 'Valor', alinhar: 'dir', ordenar: (a, b) => a.venda - b.venda, celula: c => <span className="ui-cel-num ui-cel-forte">{brl(c.venda)}</span> },
-                    { id: 'st', titulo: 'Status', largura: '110px', ordenar: (a, b) => a.status.localeCompare(b.status),
-                      celula: c => { const st = STATUS_COTACAO[c.status] ?? STATUS_COTACAO.rascunho; return <span className={`ui-badge ${st.badge}`}>{st.label}</span> } },
+                    { id: 'st', titulo: 'Etapa', largura: '170px', ordenar: (a, b) => a.status.localeCompare(b.status),
+                      celula: c => { const st = ETAPAS[etapaDe(c)]; return <span className={`ui-badge ${st.badge}`}>{st.label}</span> } },
                   ]}
                 />
               </div>

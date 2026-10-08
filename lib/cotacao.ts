@@ -116,25 +116,43 @@ export function calcularTotais(itens: ItemCotacao[], p: ParametrosCotacao) {
   }
 }
 
-// Aprovada = aprovação da gestão (só admin marca). Efetivada = o cliente fechou; é ela que vira pedido.
+// Status gravado no banco. Fluxo: cotação → aprovação da gestão → orçamento enviado → cliente aprova (vira pedido) ou não.
 export const STATUS_COTACAO: Record<string, { label: string; badge: string; cor: string }> = {
-  rascunho: { label: 'Rascunho', badge: 'ui-badge-neutro', cor: '#b8bdb6' },
-  aprovada: { label: 'Aprovada', badge: 'ui-badge-aprovada', cor: '#2c5c9e' },
-  enviada: { label: 'Enviada', badge: 'ui-badge-agendada', cor: '#E67E22' },
-  efetivada: { label: 'Efetivada', badge: 'ui-badge-realizada', cor: '#1a7f4b' },
+  rascunho: { label: 'Em elaboração', badge: 'ui-badge-neutro', cor: '#b8bdb6' },
+  aprovada: { label: 'Aprovada pela gestão', badge: 'ui-badge-aprovada', cor: '#2c5c9e' },
+  enviada: { label: 'Orçamento enviado', badge: 'ui-badge-agendada', cor: '#E67E22' },
+  efetivada: { label: 'Cliente aprovou', badge: 'ui-badge-realizada', cor: '#1a7f4b' },
   perdida: { label: 'Perdida', badge: 'ui-badge-cancelada', cor: '#c0392b' },
 }
 
-// Funil: cada etapa conta as cotações que chegaram até ela (uma efetivada também foi enviada).
-export function funilCotacoes<T extends { status: string; enviada_em: string | null; venda: number; motivo_perda?: string | null }>(cots: T[]) {
+// Etapa que aparece na tela: igual ao status, mas separa a cotação que está esperando a gestão
+export type Etapa = 'elaboracao' | 'aguardando' | 'aprovada' | 'enviada' | 'efetivada' | 'perdida'
+export const ETAPAS: Record<Etapa, { label: string; badge: string; cor: string }> = {
+  elaboracao: { label: 'Em elaboração', badge: 'ui-badge-neutro', cor: '#b8bdb6' },
+  aguardando: { label: 'Aguardando gestão', badge: 'ui-badge-aguardando', cor: '#7a52b3' },
+  aprovada: { label: 'Aprovada pela gestão', badge: 'ui-badge-aprovada', cor: '#2c5c9e' },
+  enviada: { label: 'Orçamento enviado', badge: 'ui-badge-agendada', cor: '#E67E22' },
+  efetivada: { label: 'Cliente aprovou · pedido', badge: 'ui-badge-realizada', cor: '#1a7f4b' },
+  perdida: { label: 'Perdida', badge: 'ui-badge-cancelada', cor: '#c0392b' },
+}
+export function etapaDe(c: { status: string; aprovacao_status?: string | null }): Etapa {
+  if (c.status === 'rascunho') return c.aprovacao_status === 'pendente' ? 'aguardando' : 'elaboracao'
+  return c.status in ETAPAS ? (c.status as Etapa) : 'elaboracao'
+}
+
+// Funil: cada etapa conta as cotações que chegaram até ela (um pedido também foi aprovado e enviado).
+type CotFunil = { status: string; enviada_em: string | null; venda: number; motivo_perda?: string | null; aprovacao_status?: string | null }
+export function funilCotacoes<T extends CotFunil>(cots: T[]) {
   const enviou = (c: T) => c.status === 'enviada' || c.status === 'efetivada' || !!c.enviada_em
+  const aprovou = (c: T) => c.aprovacao_status === 'aprovada' || c.status === 'aprovada' || enviou(c)
   const etapa = (rotulo: string, cor: string, lista: T[]) => ({ rotulo, cor, qtd: lista.length, valor: lista.reduce((s, c) => s + c.venda, 0) })
   const efetivadas = cots.filter(c => c.status === 'efetivada')
   const perdidas = cots.filter(c => c.status === 'perdida')
   const etapas = [
-    etapa('Cotadas', '#5b6660', cots),
-    etapa('Enviadas ao cliente', STATUS_COTACAO.enviada.cor, cots.filter(enviou)),
-    etapa('Efetivadas', STATUS_COTACAO.efetivada.cor, efetivadas),
+    etapa('Cotações', '#5b6660', cots),
+    etapa('Aprovadas pela gestão', ETAPAS.aprovada.cor, cots.filter(aprovou)),
+    etapa('Orçamentos enviados', ETAPAS.enviada.cor, cots.filter(enviou)),
+    etapa('Cliente aprovou (pedidos)', ETAPAS.efetivada.cor, efetivadas),
   ]
   const decididas = efetivadas.length + perdidas.length
   const motivos = new Map<string, number>()
@@ -144,9 +162,9 @@ export function funilCotacoes<T extends { status: string; enviada_em: string | n
   })
   return {
     etapas,
-    perdidas: etapa('Perdidas', STATUS_COTACAO.perdida.cor, perdidas),
+    perdidas: etapa('Perdidas', ETAPAS.perdida.cor, perdidas),
     conversao: decididas ? efetivadas.length / decididas : null,
-    ticket: efetivadas.length ? etapas[2].valor / efetivadas.length : null,
+    ticket: efetivadas.length ? etapas[3].valor / efetivadas.length : null,
     motivos: [...motivos.entries()].sort((a, b) => b[1] - a[1]),
   }
 }

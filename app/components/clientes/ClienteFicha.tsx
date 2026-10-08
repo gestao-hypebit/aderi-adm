@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { hojeISO } from '@/lib/dateUtils'
 import { linkPontoGoogle, linkRotaGoogle } from '@/lib/geo'
-import { STATUS_COTACAO, calcularTotais, itemDoBanco, parametrosDoBanco, brl } from '@/lib/cotacao'
+import { ETAPAS, etapaDe, calcularTotais, itemDoBanco, parametrosDoBanco, brl } from '@/lib/cotacao'
 import ConfirmDialog from '@/app/admin/_ui/ConfirmDialog'
 import { Paginacao, usePaginacao } from '@/app/components/Tabela'
 
@@ -27,7 +27,7 @@ type Visita = {
   observacao_finalizacao: string | null; checkin_em: string | null; checklist: { cultura?: string; estadio?: string } | null
   funcionario: Rel<{ id: string; nome_completo: string | null }>
 }
-type Cotacao = { id: string; numero: string; status: string; created_at: string; pedido_status: string | null; venda: number; autor: string }
+type Cotacao = { id: string; numero: string; status: string; aprovacao_status: string | null; created_at: string; pedido_status: string | null; venda: number; autor: string }
 type Contato = { id: string; nome: string; funcao: string | null; telefone: string | null; email: string | null; principal: boolean }
 
 type Evento = { id: string; data: string; tipo: 'visita' | 'cotacao'; titulo: string; sub: string; badge: { txt: string; cls: string }; href: string; extra?: string }
@@ -86,14 +86,14 @@ export default function ClienteFicha({ clienteId, base, admin }: { clienteId: st
       supabase.from('clientes').select('*, responsavel:profiles!clientes_responsavel_id_fkey(id, nome_completo)').eq('id', clienteId).single(),
       supabase.from('visitas').select('id, data_visita, hora_visita, status, motivo_visita, motivo_outro, observacao_finalizacao, checkin_em, checklist, funcionario:profiles(id, nome_completo)')
         .eq('cliente_id', clienteId).order('data_visita', { ascending: false }),
-      supabase.from('cotacoes').select('id, numero, status, created_at, pedido_status, ptax, juros_mes, aliquota_icms, aliquota_ir, autor:profiles!cotacoes_criado_por_fkey(nome_completo), itens:cotacao_itens(*)')
+      supabase.from('cotacoes').select('id, numero, status, aprovacao_status, created_at, pedido_status, ptax, juros_mes, aliquota_icms, aliquota_ir, autor:profiles!cotacoes_criado_por_fkey(nome_completo), itens:cotacao_itens(*)')
         .eq('cliente_id', clienteId).order('created_at', { ascending: false }),
       supabase.from('cliente_contatos').select('*').eq('cliente_id', clienteId).order('principal', { ascending: false }).order('nome'),
     ]).then(([c, v, q, ct]) => {
       setCliente(c.data as Cliente | null)
       setVisitas((v.data ?? []) as unknown as Visita[])
       setCotacoes((q.data ?? []).map(x => ({
-        id: x.id, numero: x.numero, status: x.status, created_at: x.created_at, pedido_status: x.pedido_status,
+        id: x.id, numero: x.numero, status: x.status, aprovacao_status: x.aprovacao_status, created_at: x.created_at, pedido_status: x.pedido_status,
         autor: um(x.autor as Rel<{ nome_completo: string | null }>)?.nome_completo ?? '—',
         venda: calcularTotais(((x.itens ?? []) as Record<string, unknown>[]).map(itemDoBanco), parametrosDoBanco(x)).venda,
       })))
@@ -116,10 +116,10 @@ export default function ClienteFicha({ clienteId, base, admin }: { clienteId: st
       }
     })
     cotacoes.forEach(q => {
-      const st = STATUS_COTACAO[q.status] ?? STATUS_COTACAO.rascunho
+      const st = ETAPAS[etapaDe(q)]
       ev.push({
         id: `q-${q.id}`, data: q.created_at, tipo: 'cotacao', titulo: `Cotação ${q.numero} · ${brl(q.venda)}`,
-        sub: `${q.autor}${q.pedido_status ? ` · ${PEDIDO_LABEL[q.pedido_status]}` : ''}`,
+        sub: `${q.autor}${admin && q.pedido_status ? ` · ${PEDIDO_LABEL[q.pedido_status]}` : ''}`,
         badge: { txt: st.label, cls: st.badge }, href: `${raiz}/cotacoes/${q.id}`,
       })
     })
