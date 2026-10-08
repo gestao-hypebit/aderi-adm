@@ -276,7 +276,7 @@ export default async function DashboardHome({ searchParams }: { searchParams: Se
       </div>
 
       {/* acompanhamento das próprias cotações: quantas foram enviadas, efetivadas e perdidas no período */}
-      <FunilCotacoes cotacoes={cots.filter(c => noPeriodo(c.created_at)).map(c => ({ status: c.status, enviada_em: c.enviada_em, venda: c.venda, motivo_perda: c.motivo_perda, aprovacao_status: c.aprovacao_status }))} periodo={`Minhas cotações · ${periodo}`} />
+      <FunilCotacoes cotacoes={cots.filter(c => noPeriodo(c.created_at)).map(c => ({ status: c.status, enviada_em: c.enviada_em, venda: c.venda, motivo_perda: c.motivo_perda, aprovacao_status: c.aprovacao_status }))} periodo={`Minhas cotações · ${periodo}`} link="/dashboard/cotacoes/acompanhamento" />
 
       <div className="dh-grid dh-g2">
         <AdminCharts visitasPorMes={visitasPorMes} />

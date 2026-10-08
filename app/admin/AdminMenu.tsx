@@ -94,6 +94,7 @@ const titulos: [string, string][] = [
   ['/admin/cotacoes', 'Cotações'],
   ['/admin/produtos', 'Produtos'],
   ['/admin/pedidos', 'Pedidos'],
+  ['/admin/relatorios/cotacoes', 'Relatório · Acompanhamento de cotações'],
   ['/admin/relatorios/equipe', 'Relatório · Desempenho da equipe'],
   ['/admin/relatorios/visitas', 'Relatório · Visitas'],
   ['/admin/relatorios/carteira', 'Relatório · Cobertura da carteira'],

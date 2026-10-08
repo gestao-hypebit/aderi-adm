@@ -20,6 +20,9 @@ function IconArrow() {
 }
 
 const RELATORIOS = [
+  { href: '/admin/relatorios/cotacoes', titulo: 'Acompanhamento de cotações', Icon: IconDoc, cor: '#2c5c9e', fundo: '#e8f0fb',
+    desc: 'Quantas cotações há em cada etapa (elaboração, aguardando gestão, aprovada, orçamento enviado, pedido), quais estão paradas, quanto tempo cada passo leva e como está cada consultor.',
+    perguntas: ['Quantas esperam aprovação?', 'O que está parado?', 'Quanto o cliente demora a responder?'] },
   { href: '/admin/relatorios/equipe', titulo: 'Desempenho da equipe', Icon: IconTrophy, cor: '#1a7f4b', fundo: '#eaf7ef',
     desc: 'Placar por consultor: visitas, clientes atendidos, KM, custo por visita, vendas e conversão.',
     perguntas: ['Quem está entregando mais?', 'Quanto custa cada visita?'] },

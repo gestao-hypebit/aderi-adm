@@ -1,12 +1,13 @@
 'use client'
 
+import Link from 'next/link'
 import { ETAPAS, etapaDe, funilCotacoes, brl, pct, type Etapa } from '@/lib/cotacao'
 
 type Cot = { status: string; enviada_em: string | null; venda: number; motivo_perda: string | null; aprovacao_status: string | null }
 
 // Funil de vendas: cotações → aprovadas pela gestão → orçamentos enviados → cliente aprovou (pedido),
 // com conversão entre etapas, situação atual por etapa e motivos de perda.
-export default function FunilCotacoes({ cotacoes, periodo, onStatus }: { cotacoes: Cot[]; periodo: string; onStatus?: (etapa: Etapa) => void }) {
+export default function FunilCotacoes({ cotacoes, periodo, onStatus, link }: { cotacoes: Cot[]; periodo: string; onStatus?: (etapa: Etapa) => void; link?: string }) {
   const f = funilCotacoes(cotacoes)
   const topo = Math.max(f.etapas[0].qtd, 1)
   const porEtapa = (Object.entries(ETAPAS) as [Etapa, (typeof ETAPAS)[Etapa]][]).map(([k, v]) => {
@@ -21,6 +22,7 @@ export default function FunilCotacoes({ cotacoes, periodo, onStatus }: { cotacoe
         .fn-h{display:flex;align-items:baseline;gap:.5rem;margin-bottom:.8rem}
         .fn-t{font-size:.9rem;font-weight:600;color:#162a1e}
         .fn-sub{font-size:.7rem;color:#8f978f}
+        .fn-link{margin-left:auto;font-size:.72rem;font-weight:600;color:#E67E22;text-decoration:none}
         .fn-etapa{margin-bottom:.7rem}
         .fn-etapa-l{display:flex;justify-content:space-between;align-items:baseline;gap:.6rem;font-size:.76rem;margin-bottom:.3rem}
         .fn-etapa-l span{font-weight:600;color:#162a1e}
@@ -45,7 +47,7 @@ export default function FunilCotacoes({ cotacoes, periodo, onStatus }: { cotacoe
       `}</style>
 
       <div>
-        <div className="fn-h"><span className="fn-t">Funil de vendas</span><span className="fn-sub">{periodo}</span></div>
+        <div className="fn-h"><span className="fn-t">Funil de vendas</span><span className="fn-sub">{periodo}</span>{link && <Link href={link} className="fn-link">Acompanhamento detalhado →</Link>}</div>
         {f.etapas.map((e, i) => {
           const ant = i > 0 ? f.etapas[i - 1].qtd : null
           return (

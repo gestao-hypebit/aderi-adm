@@ -23,6 +23,7 @@ const PAGINAS: Item[] = [
   { id: 'p-pedidos', grupo: 'Páginas', titulo: 'Pedidos', href: '/admin/pedidos', icone: 'pagina' },
   { id: 'p-produtos', grupo: 'Páginas', titulo: 'Produtos', href: '/admin/produtos', icone: 'pagina' },
   { id: 'p-relatorios', grupo: 'Páginas', titulo: 'Relatórios', href: '/admin/relatorios', icone: 'pagina' },
+  { id: 'p-rel-cotacoes', grupo: 'Relatórios', titulo: 'Acompanhamento de cotações', href: '/admin/relatorios/cotacoes', icone: 'pagina' },
   { id: 'p-rel-equipe', grupo: 'Relatórios', titulo: 'Desempenho da equipe', href: '/admin/relatorios/equipe', icone: 'pagina' },
   { id: 'p-rel-visitas', grupo: 'Relatórios', titulo: 'Relatório de visitas', href: '/admin/relatorios/visitas', icone: 'pagina' },
   { id: 'p-rel-carteira', grupo: 'Relatórios', titulo: 'Cobertura da carteira', href: '/admin/relatorios/carteira', icone: 'pagina' },

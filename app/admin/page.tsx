@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { defaultFiltros, descreverPeriodo, ehDesdeInicio, hojeISO, somarDias } from '@/lib/dateUtils'
-import { calcularTotais, itemDoBanco, parametrosDoBanco, STATUS_COTACAO } from '@/lib/cotacao'
+import { calcularTotais, itemDoBanco, parametrosDoBanco, ETAPAS, etapaDe } from '@/lib/cotacao'
 import AdminFiltersBar from './AdminFiltersBar'
 import AdminCharts, { type DadosColaborador } from './AdminCharts'
 import EquipeTabela from './EquipeTabela'
@@ -115,7 +115,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
     supabase.from('visitas').select(camposVisita).eq('status', 'agendada').gt('data_visita', hoje).order('data_visita').limit(5).match(porFunc),
     supabase.from('visitas').select(camposVisita, { count: 'exact' }).eq('status', 'agendada').lt('data_visita', hoje).order('data_visita').limit(3).match(porFunc),
     supabase.from('visitas').select('cliente_id, data_visita').eq('status', 'realizada').order('data_visita', { ascending: false }),
-    supabase.from('cotacoes').select('status, criado_por, ptax, juros_mes, aliquota_icms, aliquota_ir, itens:cotacao_itens(*)').gte('created_at', inicio).lte('created_at', fim + 'T23:59:59').match(porAutor),
+    supabase.from('cotacoes').select('status, aprovacao_status, criado_por, ptax, juros_mes, aliquota_icms, aliquota_ir, itens:cotacao_itens(*)').gte('created_at', inicio).lte('created_at', fim + 'T23:59:59').match(porAutor),
     supabase.from('cotacoes').select('status, ptax, juros_mes, aliquota_icms, aliquota_ir, itens:cotacao_itens(*)').eq('status', 'efetivada').gte('created_at', antIni).lte('created_at', antFim + 'T23:59:59').match(porAutor),
     supabase.from('cotacoes').select('id, numero, cliente_nome, autor:profiles!cotacoes_criado_por_fkey(nome_completo)').eq('aprovacao_status', 'pendente').order('updated_at', { ascending: false }).limit(5).match(porAutor),
   ])
@@ -145,10 +145,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
   // ── cotações ──
   const valorCot = (c: Record<string, unknown>) =>
     calcularTotais(((c.itens ?? []) as Record<string, unknown>[]).map(itemDoBanco), parametrosDoBanco(c)).venda
-  const funil = Object.keys(STATUS_COTACAO).map(s => ({ status: s, qtd: 0, valor: 0 }))
+  const funil = Object.keys(ETAPAS).map(s => ({ status: s, qtd: 0, valor: 0 }))
   ;(cotacoes ?? []).forEach(c => {
     const v = valorCot(c)
-    const f = funil.find(x => x.status === c.status); if (f) { f.qtd++; f.valor += v }
+    const f = funil.find(x => x.status === etapaDe(c)); if (f) { f.qtd++; f.valor += v }
     if (c.status === 'efetivada') { const m = porColab.get(c.criado_por); if (m) m.vendido += v }
   })
   const efetivado = funil.find(f => f.status === 'efetivada')!
@@ -383,7 +383,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
           <div className="pn-card-h">
             <span className="pn-card-t"><IconDoc /> Cotações</span>
             <span className="pn-card-sub">{totalCotacoes} no período</span>
-            <Link href="/admin/cotacoes" className="pn-card-link">Ver todas <IconArrow /></Link>
+            <Link href="/admin/relatorios/cotacoes" className="pn-card-link">Acompanhar <IconArrow /></Link>
           </div>
           {totalCotacoes === 0 ? (
             <div className="pn-vazio"><b>Nenhuma cotação no período</b><Link href="/admin/cotacoes/nova" style={{ color: '#E67E22', fontWeight: 600 }}>Criar cotação</Link></div>
@@ -393,10 +393,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
                 {funil.map(f => (
                   <div key={f.status}>
                     <div className="pn-funil-l">
-                      <span><i className="pn-dot" style={{ background: STATUS_COTACAO[f.status].cor }} />{STATUS_COTACAO[f.status].label} <small>· {f.qtd}</small></span>
+                      <span><i className="pn-dot" style={{ background: ETAPAS[f.status as keyof typeof ETAPAS].cor }} />{ETAPAS[f.status as keyof typeof ETAPAS].label} <small>· {f.qtd}</small></span>
                       <b>{compacto(f.valor)}</b>
                     </div>
-                    <div className="pn-funil-bar"><span style={{ width: `${(f.valor / maiorFunil) * 100}%`, background: STATUS_COTACAO[f.status].cor }} /></div>
+                    <div className="pn-funil-bar"><span style={{ width: `${(f.valor / maiorFunil) * 100}%`, background: ETAPAS[f.status as keyof typeof ETAPAS].cor }} /></div>
                   </div>
                 ))}
               </div>

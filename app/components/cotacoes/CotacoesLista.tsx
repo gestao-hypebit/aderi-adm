@@ -192,6 +192,7 @@ export default function CotacoesLista({ base }: { base: string }) {
           </div>
         </div>
         <div className="ui-header-actions">
+          <Link href={base.startsWith('/admin') ? '/admin/relatorios/cotacoes' : `${base}/acompanhamento`} className="ui-btn ui-btn-secondary">Acompanhamento por etapa</Link>
           {admin && base.startsWith('/admin') && <button className="ui-btn ui-btn-ghost" onClick={() => { setConfigForm(config); setConfigAberta(true) }}><IconGear /> Configurações</button>}
           {admin && base.startsWith('/admin') && <Link href="/admin/produtos" className="ui-btn ui-btn-secondary"><IconBox /> Produtos</Link>}
           <Link href={`${base}/nova`} className="ui-btn ui-btn-primary"><IconPlus /> Nova cotação</Link>

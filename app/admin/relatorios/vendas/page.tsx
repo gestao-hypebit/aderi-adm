@@ -2,16 +2,18 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 import Tabela from '@/app/components/Tabela'
 import { baixarCsv } from '@/lib/csv'
 import { hojeISO } from '@/lib/dateUtils'
-import { STATUS_COTACAO, calcularItem, itemDoBanco, parametrosDoBanco, type ItemCotacao } from '@/lib/cotacao'
+import { ETAPAS, etapaDe, calcularItem, itemDoBanco, parametrosDoBanco, type ItemCotacao } from '@/lib/cotacao'
 import { Barra, CabecalhoRelatorio, FiltrosRelatorio, Indicadores, Secao, brl, dataBR, div, num, pctTxt, um, useFiltrosRelatorio } from '../Comum'
 
 type Cotacao = {
   id: string
   numero: string
   status: string
+  aprovacao_status: string | null
   created_at: string
   criado_por: string
   cliente_id: string | null
@@ -31,7 +33,7 @@ export default function RelatorioVendas() {
 
   useEffect(() => {
     createClient().from('cotacoes')
-      .select('id, numero, status, created_at, criado_por, cliente_id, cliente_nome, motivo_perda, ptax, juros_mes, aliquota_icms, aliquota_ir, autor:profiles!cotacoes_criado_por_fkey(nome_completo), itens:cotacao_itens(*)')
+      .select('id, numero, status, aprovacao_status, created_at, criado_por, cliente_id, cliente_nome, motivo_perda, ptax, juros_mes, aliquota_icms, aliquota_ir, autor:profiles!cotacoes_criado_por_fkey(nome_completo), itens:cotacao_itens(*)')
       .gte('created_at', filtros.dataInicio).lte('created_at', filtros.dataFim + 'T23:59:59')
       .match(filtros.funcionarioId ? { criado_por: filtros.funcionarioId } : {})
       .order('created_at', { ascending: false })
@@ -40,7 +42,7 @@ export default function RelatorioVendas() {
           const p = parametrosDoBanco(c)
           const itens = ((c.itens ?? []) as Record<string, unknown>[]).map(itemDoBanco).map(i => ({ ...i, calc: calcularItem(i, p) }))
           return {
-            id: c.id, numero: c.numero, status: c.status, created_at: c.created_at, criado_por: c.criado_por,
+            id: c.id, numero: c.numero, status: c.status, aprovacao_status: c.aprovacao_status, created_at: c.created_at, criado_por: c.criado_por,
             cliente_id: c.cliente_id, cliente_nome: c.cliente_nome, motivo_perda: c.motivo_perda, autor: c.autor, itens,
             venda: itens.reduce((s, i) => s + i.calc.total, 0),
             resultado: itens.reduce((s, i) => s + i.calc.resultadoLiquido, 0),
@@ -56,8 +58,8 @@ export default function RelatorioVendas() {
     const vendido = efetivadas.reduce((s, c) => s + c.venda, 0)
     const resultado = efetivadas.reduce((s, c) => s + c.resultado, 0)
 
-    const funil = Object.keys(STATUS_COTACAO).map(st => {
-      const l = cotacoes.filter(c => c.status === st)
+    const funil = (Object.keys(ETAPAS) as (keyof typeof ETAPAS)[]).map(st => {
+      const l = cotacoes.filter(c => etapaDe(c) === st)
       return { status: st, qtd: l.length, valor: l.reduce((s, c) => s + c.venda, 0) }
     })
 
@@ -115,8 +117,8 @@ export default function RelatorioVendas() {
   const maxCli = Math.max(1, ...r.clientes.map(c => c.valor))
 
   function exportar() {
-    baixarCsv(`relatorio-cotacoes-${hojeISO()}`, ['Número', 'Data', 'Cliente', 'Consultor', 'Status', 'Total (R$)', 'Resultado (R$)', 'Margem líquida (%)', 'Motivo da perda'],
-      cotacoes.map(c => [c.numero, dataBR(c.created_at), c.cliente_nome, um(c.autor)?.nome_completo, STATUS_COTACAO[c.status]?.label ?? c.status,
+    baixarCsv(`relatorio-cotacoes-${hojeISO()}`, ['Número', 'Data', 'Cliente', 'Consultor', 'Etapa', 'Total (R$)', 'Resultado (R$)', 'Margem líquida (%)', 'Motivo da perda'],
+      cotacoes.map(c => [c.numero, dataBR(c.created_at), c.cliente_nome, um(c.autor)?.nome_completo, ETAPAS[etapaDe(c)].label,
         c.venda.toFixed(2).replace('.', ','), c.resultado.toFixed(2).replace('.', ','), c.venda ? ((c.resultado / c.venda) * 100).toFixed(2).replace('.', ',') : '', c.motivo_perda ?? '']))
   }
 
@@ -134,12 +136,12 @@ export default function RelatorioVendas() {
       ]} />
 
       <div className="rl-duas">
-        <Secao titulo="Funil por status" sub="Quantidade e valor das cotações">
+        <Secao titulo="Cotações por etapa" sub="Quantidade e valor em cada etapa" acao={<Link href="/admin/relatorios/cotacoes" className="ui-card-link">Acompanhamento detalhado →</Link>}>
           <Tabela linhas={r.funil} chave={f => f.status} carregando={carregando} paginar={false}
             colunas={[
-              { id: 'st', titulo: 'Status', celula: f => <span className="ui-cel" style={{ gap: '.5rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COTACAO[f.status].cor }} />{STATUS_COTACAO[f.status].label}</span> },
+              { id: 'st', titulo: 'Etapa', celula: f => <span className="ui-cel" style={{ gap: '.5rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: ETAPAS[f.status].cor }} />{ETAPAS[f.status].label}</span> },
               { id: 'qtd', titulo: 'Qtd.', alinhar: 'dir', celula: f => <span className="ui-cel-num">{f.qtd}</span> },
-              { id: 'valor', titulo: 'Valor', celula: f => <Barra valor={f.valor} max={maxFunil} cor={STATUS_COTACAO[f.status].cor} texto={brl(f.valor)} /> },
+              { id: 'valor', titulo: 'Valor', celula: f => <Barra valor={f.valor} max={maxFunil} cor={ETAPAS[f.status].cor} texto={brl(f.valor)} /> },
             ]} />
         </Secao>
 
