@@ -213,5 +213,40 @@ export function menorMargem(itens: ItemCotacao[], p: ParametrosCotacao) {
 
 export const MOTIVOS_PERDA = ['Preço', 'Prazo / condição de pagamento', 'Concorrente', 'Desistiu da compra', 'Produto indisponível', 'Prazo de entrega', 'Outro']
 
-export const PEDIDO_STATUS: Record<string, string> = { aguardando: 'Aguardando faturamento', faturado: 'Faturado', entregue: 'Entregue', cancelado: 'Cancelado' }
+export const PEDIDO_STATUS: Record<string, string> = { aguardando: 'Aguardando faturamento', faturado: 'Faturado', parcial: 'Entrega parcial', entregue: 'Entregue', cancelado: 'Cancelado' }
+
+// ── Entregas parceladas (cargas) ──────────────────────────
+export type Entrega = {
+  id: string; cotacao_id: string; produto_nome: string; unidade: string | null; quantidade: number; data: string
+  nota_fiscal: string | null; transportador: string | null; motorista: string | null; placa: string | null; observacao: string | null
+}
+export type SaldoProduto = { chave: string; produto: string; unidade: string; pedido: number; entregue: number; saldo: number; cargas: number }
+
+const chaveProd = (nome: string) => nome.trim().toUpperCase()
+
+// Pedido × entregue × saldo por produto (as cargas se ligam ao item pelo nome do produto)
+export function saldoPorProduto(itens: { produto_nome: string; quantidade: number; unidade: string | null }[], entregas: { produto_nome: string; quantidade: number; unidade?: string | null }[]): SaldoProduto[] {
+  const m = new Map<string, SaldoProduto>()
+  const pegar = (nome: string, unidade: string | null | undefined) => {
+    const k = chaveProd(nome)
+    if (!m.has(k)) m.set(k, { chave: k, produto: nome.trim(), unidade: unidade || 'TON', pedido: 0, entregue: 0, saldo: 0, cargas: 0 })
+    return m.get(k)!
+  }
+  itens.filter(i => i.produto_nome.trim()).forEach(i => { pegar(i.produto_nome, i.unidade).pedido += Number(i.quantidade) || 0 })
+  entregas.forEach(e => { const x = pegar(e.produto_nome, e.unidade); x.entregue += Number(e.quantidade) || 0; x.cargas++ })
+  return [...m.values()].map(x => ({ ...x, saldo: Math.max(0, x.pedido - x.entregue) }))
+}
+
+// Soma por unidade, para mostrar "80 de 130 TON"
+export function totaisPorUnidade(saldos: SaldoProduto[]) {
+  const m = new Map<string, { unidade: string; pedido: number; entregue: number; saldo: number }>()
+  saldos.forEach(s => {
+    const x = m.get(s.unidade) ?? { unidade: s.unidade, pedido: 0, entregue: 0, saldo: 0 }
+    x.pedido += s.pedido; x.entregue += s.entregue; x.saldo += s.saldo
+    m.set(s.unidade, x)
+  })
+  return [...m.values()]
+}
+
+export const qtd = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 3 })
 export const PAGAMENTO_STATUS: Record<string, string> = { em_aberto: 'Em aberto', parcial: 'Pago parcialmente', pago: 'Pago' }

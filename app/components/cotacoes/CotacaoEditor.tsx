@@ -9,6 +9,7 @@ import Combobox from '@/app/admin/_ui/Combobox'
 import ConfirmDialog from '@/app/admin/_ui/ConfirmDialog'
 import NumInput from './NumInput'
 import ProdutoPicker, { ProdutoCadastro } from './ProdutoPicker'
+import EntregasPedido from './EntregasPedido'
 import DocumentoCotacao, { DOC_CSS, type DadosDocumento, type TipoDocumento } from './Documento'
 import { elementoParaPdf, compartilharArquivo, baixarArquivo, podeCompartilharArquivo } from '@/lib/pdf'
 import {
@@ -531,6 +532,13 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
     setOk('Cotação reprovada. O consultor vê a orientação e pode ajustar e enviar de novo.')
   }
 
+  // situação e data de entrega são atualizadas pelo banco a cada carga registrada
+  async function recarregarPedido() {
+    if (!cotacaoId) return
+    const { data } = await supabase.from('cotacoes').select('pedido_status, entregue_em').eq('id', cotacaoId).single()
+    if (data) setCab(c => ({ ...c, pedido_status: data.pedido_status ?? '', entregue_em: data.entregue_em ?? '' }))
+  }
+
   async function imprimir(doc: string) {
     setImprimirAberto(false)
     if (doc !== 'orcamento' && !admin) return
@@ -791,12 +799,15 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
               <button className="ui-btn ui-btn-primary ui-btn-sm" onClick={() => imprimir(aba)} disabled={salvando || (aba !== 'resultado' && !liberada)}><Ic d={D.impr} /> Imprimir / PDF</button>
             </div>
           </div>
+          {aba === 'pedido' && cotacaoId && (cab.status === 'efetivada' || cab.pedido_status) && (
+            <EntregasPedido cotacaoId={cotacaoId} itens={itens} onMudou={recarregarPedido} />
+          )}
           {aba === 'pedido' && (cab.status === 'efetivada' || cab.pedido_status) && (
             <section className="ui-card ce-sec" style={{ maxWidth: '210mm', margin: '0 auto 1.2rem' }}>
               <div className="ce-sec-head">
                 <span className="ce-step" style={{ background: '#1a7f4b' }}><Ic d={D.caminhao} size={12} /></span>
-                <span className="ce-sec-tit">Pedido</span>
-                {cab.pedido_status && <span className={`ui-badge ${cab.pedido_status === 'entregue' ? 'ui-badge-realizada' : cab.pedido_status === 'cancelado' ? 'ui-badge-cancelada' : 'ui-badge-agendada'}`} style={{ marginLeft: 'auto' }}>{PEDIDO_STATUS[cab.pedido_status]}</span>}
+                <span className="ce-sec-tit">Faturamento e pagamento</span>
+                {cab.pedido_status && <span className={`ui-badge ${cab.pedido_status === 'entregue' ? 'ui-badge-realizada' : cab.pedido_status === 'cancelado' ? 'ui-badge-cancelada' : cab.pedido_status === 'parcial' ? 'ui-badge-aprovada' : 'ui-badge-agendada'}`} style={{ marginLeft: 'auto' }}>{PEDIDO_STATUS[cab.pedido_status]}</span>}
               </div>
               <div className="ce-sec-body">
                 <div className="ce-campos" style={{ gridTemplateColumns: 'repeat(3,minmax(0,1fr))' }}>
