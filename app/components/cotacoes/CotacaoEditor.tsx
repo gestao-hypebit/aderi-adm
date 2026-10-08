@@ -54,6 +54,7 @@ type Cabecalho = {
   pagamento_status: string
   pago_em: string
   pedido_obs: string
+  valor_recebido: number
 }
 
 const CAB_VAZIO: Cabecalho = {
@@ -61,7 +62,7 @@ const CAB_VAZIO: Cabecalho = {
   inscricao_produtor: '', contato: '', observacoes: '', observacoes_cliente: '', transportador: '', obs_pedido: '',
   validade: '', visita_id: '', ptax_modo: 'manual', ptax_data: '', motivo_perda: '', aprovacao_status: '', aprovacao_obs: '',
   aprovacao_margem: null, enviada_em: '', token_publico: '', pedido_status: '', nota_fiscal: '', faturado_em: '', entregue_em: '',
-  pagamento_status: '', pago_em: '', pedido_obs: '',
+  pagamento_status: '', pago_em: '', pedido_obs: '', valor_recebido: 0,
 }
 
 const CONFIG_PADRAO: Config = { margem_minima: 0, validade_cotacao_dias: 7, dias_followup: 3 }
@@ -150,6 +151,8 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
   const [reprovarAberto, setReprovarAberto] = useState(false)
   const [obsAprovacao, setObsAprovacao] = useState('')
   const [copiado, setCopiado] = useState(false)
+  const [pedidoAlterado, setPedidoAlterado] = useState(false)
+  const [salvandoPedido, setSalvandoPedido] = useState(false)
   const [confirmarPedido, setConfirmarPedido] = useState(false)
   const [pdf, setPdf] = useState<{ etapa: 'gerando' | 'pronto'; arquivo?: File } | null>(null)
   const folhaPdf = useRef<HTMLDivElement>(null)
@@ -194,7 +197,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
           aprovacao_margem: c.aprovacao_margem != null ? Number(c.aprovacao_margem) : null, enviada_em: s(c.enviada_em),
           token_publico: s(c.token_publico), pedido_status: s(c.pedido_status), nota_fiscal: s(c.nota_fiscal),
           faturado_em: s(c.faturado_em), entregue_em: s(c.entregue_em), pagamento_status: s(c.pagamento_status),
-          pago_em: s(c.pago_em), pedido_obs: s(c.pedido_obs),
+          pago_em: s(c.pago_em), pedido_obs: s(c.pedido_obs), valor_recebido: Number(c.valor_recebido ?? 0),
         })
         setStatusSalvo(c.status)
         setEditandoCliente(!c.cliente_nome)
@@ -255,11 +258,11 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
   }, [cab.cliente_id, cotacaoId])
 
   useEffect(() => {
-    if (!alterado) return
+    if (!alterado && !pedidoAlterado) return
     const aviso = (e: BeforeUnloadEvent) => { e.preventDefault() }
     window.addEventListener('beforeunload', aviso)
     return () => window.removeEventListener('beforeunload', aviso)
-  }, [alterado])
+  }, [alterado, pedidoAlterado])
 
   useEffect(() => {
     if (focar == null) return
@@ -405,7 +408,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
       motivo_perda: nulo(cab.motivo_perda), aprovacao_status: nulo(cab.aprovacao_status),
       pedido_status: nulo(cab.pedido_status), nota_fiscal: nulo(cab.nota_fiscal), faturado_em: nulo(cab.faturado_em),
       entregue_em: nulo(cab.entregue_em), pagamento_status: nulo(cab.pagamento_status), pago_em: nulo(cab.pago_em),
-      pedido_obs: nulo(cab.pedido_obs),
+      pedido_obs: nulo(cab.pedido_obs), valor_recebido: cab.valor_recebido || 0,
       ...param, updated_at: new Date().toISOString(),
     }
 
@@ -439,6 +442,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
 
     setSalvando(false)
     setAlterado(false)
+    setPedidoAlterado(false)
     if (!cotacaoId) { router.replace(`${base}/${id}`); return id ?? null }
     // recarrega campos que o banco preenche (data de envio, pedido)
     const { data: atual } = await supabase.from('cotacoes').select('status, enviada_em, pedido_status, pagamento_status, aprovacao_status, aprovacao_margem').eq('id', id).single()
@@ -544,6 +548,33 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
     if (!cotacaoId) return
     const { data } = await supabase.from('cotacoes').select('pedido_status, entregue_em').eq('id', cotacaoId).single()
     if (data) setCab(c => ({ ...c, pedido_status: data.pedido_status ?? '', entregue_em: data.entregue_em ?? '' }))
+  }
+
+  function mudarPedido<K extends keyof Cabecalho>(k: K, v: Cabecalho[K]) { setCab(c => ({ ...c, [k]: v })); setPedidoAlterado(true); setOk('') }
+
+  // valor recebido define a situação do pagamento: nada = em aberto, parte = parcial, tudo = pago
+  function mudarRecebido(v: number) {
+    const total = tot.venda
+    const situacao = v <= 0 ? 'em_aberto' : v >= total - 0.005 ? 'pago' : 'parcial'
+    setCab(c => ({ ...c, valor_recebido: v, pagamento_status: situacao, pago_em: situacao === 'pago' ? c.pago_em || hojeISO() : c.pago_em }))
+    setPedidoAlterado(true)
+    setOk('')
+  }
+
+  async function salvarPedido() {
+    if (!cotacaoId) return
+    setSalvandoPedido(true)
+    setErro('')
+    const nulo = (v: string) => v || null
+    const { error } = await supabase.from('cotacoes').update({
+      pedido_status: nulo(cab.pedido_status), nota_fiscal: nulo(cab.nota_fiscal), faturado_em: nulo(cab.faturado_em),
+      pagamento_status: nulo(cab.pagamento_status), pago_em: nulo(cab.pago_em), valor_recebido: cab.valor_recebido || 0,
+      pedido_obs: nulo(cab.pedido_obs), updated_at: new Date().toISOString(),
+    }).eq('id', cotacaoId)
+    setSalvandoPedido(false)
+    if (error) { setErro('Não foi possível salvar o faturamento e o pagamento.'); return }
+    setPedidoAlterado(false)
+    setOk('Faturamento e pagamento salvos.')
   }
 
   async function imprimir(doc: string) {
@@ -807,34 +838,60 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
           {aba === 'pedido' && cotacaoId && (cab.status === 'efetivada' || cab.pedido_status) && (
             <EntregasPedido cotacaoId={cotacaoId} itens={itens} onMudou={recarregarPedido} />
           )}
-          {aba === 'pedido' && (cab.status === 'efetivada' || cab.pedido_status) && (
+          {aba === 'pedido' && (cab.status === 'efetivada' || cab.pedido_status) && (() => {
+            const pago = cab.pagamento_status === 'pago'
+            const falta = pago ? 0 : Math.max(0, tot.venda - (cab.valor_recebido || 0))
+            return (
             <section className="ui-card ce-sec" style={{ maxWidth: '210mm', margin: '0 auto 1.2rem' }}>
               <div className="ce-sec-head">
                 <span className="ce-step" style={{ background: '#1a7f4b' }}><Ic d={D.caminhao} size={12} /></span>
-                <span className="ce-sec-tit">Faturamento e pagamento</span>
+                <span className="ce-sec-tit">Faturamento e recebimento</span>
                 {cab.pedido_status && <span className={`ui-badge ${cab.pedido_status === 'entregue' ? 'ui-badge-realizada' : cab.pedido_status === 'cancelado' ? 'ui-badge-cancelada' : cab.pedido_status === 'parcial' ? 'ui-badge-aprovada' : 'ui-badge-agendada'}`} style={{ marginLeft: 'auto' }}>{PEDIDO_STATUS[cab.pedido_status]}</span>}
               </div>
               <div className="ce-sec-body">
-                <div className="ce-campos" style={{ gridTemplateColumns: 'repeat(3,minmax(0,1fr))' }}>
-                  <div className="ui-field"><label className="ui-label">Situação do pedido</label>
-                    <select className="ui-select" value={cab.pedido_status} onChange={e => mudarCab('pedido_status', e.target.value)}>
-                      <option value="">—</option>{Object.entries(PEDIDO_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                    </select>
+                <div className="ce-ped-bloco">
+                  <div className="ce-ped-tit">Faturamento</div>
+                  <div className="ce-campos" style={{ gridTemplateColumns: 'repeat(3,minmax(0,1fr))' }}>
+                    <div className="ui-field"><label className="ui-label">Nota fiscal</label><input className="ui-input" value={cab.nota_fiscal} onChange={e => { mudarPedido('nota_fiscal', e.target.value); if (e.target.value && cab.pedido_status === 'aguardando') mudarPedido('pedido_status', 'faturado') }} placeholder="Nº da NF" /></div>
+                    <div className="ui-field"><label className="ui-label">Faturado em</label><input type="date" className="ui-input" value={cab.faturado_em} onChange={e => mudarPedido('faturado_em', e.target.value)} /></div>
+                    <div className="ui-field"><label className="ui-label">Situação do pedido</label>
+                      <select className="ui-select" value={cab.pedido_status} onChange={e => mudarPedido('pedido_status', e.target.value)}>
+                        <option value="">—</option>{Object.entries(PEDIDO_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
+                    </div>
                   </div>
-                  <div className="ui-field"><label className="ui-label">Nota fiscal</label><input className="ui-input" value={cab.nota_fiscal} onChange={e => mudarCab('nota_fiscal', e.target.value)} placeholder="Nº da NF" /></div>
-                  <div className="ui-field"><label className="ui-label">Faturado em</label><input type="date" className="ui-input" value={cab.faturado_em} onChange={e => mudarCab('faturado_em', e.target.value)} /></div>
-                  <div className="ui-field"><label className="ui-label">Entregue em</label><input type="date" className="ui-input" value={cab.entregue_em} onChange={e => { mudarCab('entregue_em', e.target.value); if (e.target.value && cab.pedido_status !== 'cancelado') mudarCab('pedido_status', 'entregue') }} /></div>
-                  <div className="ui-field"><label className="ui-label">Pagamento</label>
-                    <select className="ui-select" value={cab.pagamento_status} onChange={e => mudarCab('pagamento_status', e.target.value)}>
-                      <option value="">—</option>{Object.entries(PAGAMENTO_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                    </select>
-                  </div>
-                  <div className="ui-field"><label className="ui-label">Pago em</label><input type="date" className="ui-input" value={cab.pago_em} onChange={e => mudarCab('pago_em', e.target.value)} /></div>
+                  <div className="ui-hint">A entrega é atualizada pelas cargas acima{cab.entregue_em ? ` · entregue em ${dataCurta(cab.entregue_em)}` : ''}.</div>
                 </div>
-                <div className="ui-field" style={{ marginBottom: 0 }}><label className="ui-label">Observações do pedido</label><input className="ui-input" value={cab.pedido_obs} onChange={e => mudarCab('pedido_obs', e.target.value)} placeholder="Ex.: entrega em 2 cargas, pagamento parcial na safra..." /></div>
+
+                <div className="ce-ped-bloco">
+                  <div className="ce-ped-tit">Recebimento</div>
+                  <div className="ce-ped-resumo">
+                    <div><span>Total do pedido</span><b>{brl(tot.venda)}</b></div>
+                    <div><span>Recebido</span><b style={{ color: '#1a7f4b' }}>{brl(pago ? Math.max(cab.valor_recebido, tot.venda) : cab.valor_recebido || 0)}</b></div>
+                    <div><span>Falta receber</span><b style={{ color: falta > 0.005 ? '#c0651a' : '#1a7f4b' }}>{falta > 0.005 ? brl(falta) : 'Nada'}</b></div>
+                  </div>
+                  <div className="ce-campos" style={{ gridTemplateColumns: 'repeat(3,minmax(0,1fr))' }}>
+                    <div className="ui-field"><label className="ui-label">Valor recebido até agora (R$)</label><NumInput className="ui-input" valor={cab.valor_recebido} onChange={mudarRecebido} /></div>
+                    <div className="ui-field"><label className="ui-label">Último recebimento em</label><input type="date" className="ui-input" value={cab.pago_em} onChange={e => mudarPedido('pago_em', e.target.value)} /></div>
+                    <div className="ui-field"><label className="ui-label">Situação do pagamento</label>
+                      <select className="ui-select" value={cab.pagamento_status} onChange={e => mudarPedido('pagamento_status', e.target.value)}>
+                        <option value="">—</option>{Object.entries(PAGAMENTO_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="ui-hint">A situação muda sozinha pelo valor recebido: nada = em aberto, uma parte = parcial, tudo = pago.</div>
+                </div>
+
+                <div className="ui-field" style={{ marginBottom: 0 }}><label className="ui-label">Observações do pedido</label><input className="ui-input" value={cab.pedido_obs} onChange={e => mudarPedido('pedido_obs', e.target.value)} placeholder="Ex.: pagamento em 2 parcelas, metade na safra..." /></div>
+
+                <div className="ce-ped-salvar">
+                  {pedidoAlterado ? <span className="ce-pend">Alterações não salvas</span> : <span className="ce-salvo"><Ic d={D.check} /> Salvo</span>}
+                  <button className="ui-btn ui-btn-primary" onClick={salvarPedido} disabled={!pedidoAlterado || salvandoPedido}>{salvandoPedido ? 'Salvando...' : 'Salvar faturamento e recebimento'}</button>
+                </div>
               </div>
             </section>
-          )}
+            )
+          })()}
           {aba !== 'resultado' && !liberada
             ? <div className="ce-faixa alerta" style={{ maxWidth: '210mm', margin: '0 auto' }}><Ic d={D.cadeado} size={16} /><div><b>Orçamento ainda não liberado</b><div>O orçamento só pode ir para o cliente depois que a gestão aprovar a cotação.</div></div></div>
             : <DocumentoCotacao tipo={aba} dados={dadosDoc} itens={itens} param={param} embutida />}
@@ -1411,6 +1468,14 @@ const EDITOR_CSS = `
   .ce-aviso-linha.erro{color:#a93226}
   .ce-aviso-linha .ce-link{margin:0}
   .ce-mais{position:relative}
+  .ce-ped-bloco{padding-bottom:.9rem;margin-bottom:.9rem;border-bottom:1px solid #f2efea}
+  .ce-ped-tit{font-size:.66rem;font-weight:600;color:#8f978f;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.6rem}
+  .ce-ped-resumo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem;margin-bottom:.8rem}
+  .ce-ped-resumo div{background:#faf8f5;border-radius:10px;padding:.55rem .75rem;display:flex;flex-direction:column;gap:.15rem}
+  .ce-ped-resumo span{font-size:.64rem;color:#8f978f;font-weight:600}
+  .ce-ped-resumo b{font-size:.95rem;color:#162a1e;font-variant-numeric:tabular-nums}
+  .ce-ped-salvar{display:flex;align-items:center;justify-content:flex-end;gap:.8rem;margin-top:1rem;flex-wrap:wrap}
+  @media(max-width:640px){.ce-ped-resumo{grid-template-columns:1fr}}
   .ce-mais-menu{position:absolute;right:0;top:calc(100% + 6px);min-width:240px;background:#fff;border:1px solid #eae5de;border-radius:12px;box-shadow:0 16px 40px rgba(22,42,30,.16);padding:.35rem;z-index:200}
   .ce-mais-menu button{display:flex;align-items:center;gap:.55rem;width:100%;text-align:left;border:none;background:none;padding:.55rem .7rem;border-radius:8px;font-family:inherit;font-size:.78rem;font-weight:600;color:#162a1e;cursor:pointer}
   .ce-mais-menu button:hover{background:#f7f5f1}

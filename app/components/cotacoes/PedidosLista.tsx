@@ -27,6 +27,7 @@ type Pedido = {
   pago_em: string | null
   vencimento: string | null
   total: number
+  recebido: number
   saldos: SaldoProduto[]
 }
 
@@ -34,6 +35,8 @@ const BADGE_PEDIDO: Record<string, string> = { aguardando: 'ui-badge-agendada', 
 const BADGE_PAGTO: Record<string, string> = { em_aberto: 'ui-badge-agendada', parcial: 'ui-badge-neutro', pago: 'ui-badge-realizada' }
 const dataBR = (d: string | null) => (d ? d.slice(0, 10).split('-').reverse().join('/') : '—')
 const situacaoDe = (p: Pedido) => p.pedido_status ?? 'aguardando'
+// quanto falta receber: pago = nada; senão total menos o que já entrou
+const falta = (p: Pedido) => (p.pagamento_status === 'pago' ? 0 : Math.max(0, p.total - p.recebido))
 const faturado = (p: Pedido) => p.pedido_status === 'faturado' || p.pedido_status === 'parcial' || p.pedido_status === 'entregue'
 const unidades = (l: { unidade: string; saldo: number; pedido: number; entregue: number }[], campo: 'saldo' | 'pedido' | 'entregue') =>
   l.filter(x => x[campo] > 0.0001).map(x => `${qtd(x[campo])} ${x.unidade}`).join(' + ') || '0'
@@ -56,7 +59,7 @@ export default function PedidosLista({ base }: { base: string }) {
       const [{ data: perfil }, { data }, { data: cargas }] = await Promise.all([
         supabase.from('profiles').select('role').eq('id', user?.id ?? '').single(),
         supabase.from('cotacoes')
-          .select('id, numero, cliente_nome, empresa_rural, criado_por, created_at, pedido_status, pagamento_status, nota_fiscal, faturado_em, entregue_em, pago_em, ptax, juros_mes, aliquota_icms, aliquota_ir, autor:profiles!cotacoes_criado_por_fkey(nome_completo), itens:cotacao_itens(*)')
+          .select('id, numero, cliente_nome, empresa_rural, criado_por, created_at, pedido_status, pagamento_status, nota_fiscal, faturado_em, entregue_em, pago_em, valor_recebido, ptax, juros_mes, aliquota_icms, aliquota_ir, autor:profiles!cotacoes_criado_por_fkey(nome_completo), itens:cotacao_itens(*)')
           .eq('status', 'efetivada')
           .order('created_at', { ascending: false }),
         supabase.from('pedido_entregas').select('cotacao_id, produto_nome, unidade, quantidade'),
@@ -74,6 +77,7 @@ export default function PedidosLista({ base }: { base: string }) {
           nota_fiscal: c.nota_fiscal, faturado_em: c.faturado_em, entregue_em: c.entregue_em, pago_em: c.pago_em,
           vencimento: vencs[0] ?? null, total: calcularTotais(itens, parametrosDoBanco(c)).venda,
           saldos: saldoPorProduto(itens, porPedido.get(c.id) ?? []),
+          recebido: Number(c.valor_recebido ?? 0),
         }
       }))
       setCarregando(false)
@@ -117,10 +121,10 @@ export default function PedidosLista({ base }: { base: string }) {
         produtos.map(x => [x.produto, x.unidade, qtd(x.pedido), qtd(x.entregue), qtd(x.saldo), x.pedidos, [...x.clientes].join(', ')]))
       return
     }
-    baixarCsv(`pedidos-aderi-${hoje}`, ['Número', 'Data', 'Cliente', 'Consultor', 'Total (R$)', 'Situação', 'Pedido (qtd)', 'Entregue (qtd)', 'Saldo (qtd)', 'Nota fiscal', 'Faturado em', 'Entregue em', 'Pagamento', 'Pago em'],
+    baixarCsv(`pedidos-aderi-${hoje}`, ['Número', 'Data', 'Cliente', 'Consultor', 'Total (R$)', 'Situação', 'Pedido (qtd)', 'Entregue (qtd)', 'Saldo (qtd)', 'Nota fiscal', 'Faturado em', 'Entregue em', 'Pagamento', 'Recebido (R$)', 'Falta receber (R$)', 'Pago em'],
       lista.map(p => { const t = totaisPorUnidade(p.saldos); return [p.numero, dataBR(p.created_at), p.cliente_nome, p.autor, p.total.toFixed(2).replace('.', ','), PEDIDO_STATUS[situacaoDe(p)],
         unidades(t, 'pedido'), unidades(t, 'entregue'), unidades(t, 'saldo'),
-        p.nota_fiscal, dataBR(p.faturado_em), dataBR(p.entregue_em), PAGAMENTO_STATUS[p.pagamento_status ?? 'em_aberto'], dataBR(p.pago_em)] }))
+        p.nota_fiscal, dataBR(p.faturado_em), dataBR(p.entregue_em), PAGAMENTO_STATUS[p.pagamento_status ?? 'em_aberto'], p.recebido.toFixed(2).replace('.', ','), falta(p).toFixed(2).replace('.', ','), dataBR(p.pago_em)] }))
   }
 
   return (
@@ -141,7 +145,7 @@ export default function PedidosLista({ base }: { base: string }) {
         <div className="ui-kpi"><div className="ui-kpi-body"><div className="ui-kpi-label">Faturado</div><div className="ui-kpi-num" style={{ color: '#1a7f4b' }}>{brl(soma(faturado))}</div><div className="ui-kpi-sub">{conta(faturado)} pedido{conta(faturado) !== 1 ? 's' : ''} com nota emitida</div></div></div>
         <div className="ui-kpi"><div className="ui-kpi-body"><div className="ui-kpi-label">Saldo a entregar</div><div className="ui-kpi-num" style={{ color: saldoGeral.some(u => u.saldo > 0.0001) ? '#c0651a' : '#1a7f4b', fontSize: '1.15rem' }}>{unidades(saldoGeral, 'saldo')}</div><div className="ui-kpi-sub">de {unidades(saldoGeral, 'pedido')} vendidos</div></div></div>
         <div className="ui-kpi"><div className="ui-kpi-body"><div className="ui-kpi-label">A faturar</div><div className="ui-kpi-num">{brl(soma(p => situacaoDe(p) === 'aguardando'))}</div><div className="ui-kpi-sub">{conta(p => situacaoDe(p) === 'aguardando')} aguardando faturamento</div></div></div>
-        <div className="ui-kpi"><div className="ui-kpi-body"><div className="ui-kpi-label">A receber</div><div className="ui-kpi-num">{brl(soma(p => p.pagamento_status !== 'pago'))}</div><div className="ui-kpi-sub">{conta(p => p.pagamento_status !== 'pago')} com pagamento em aberto</div></div></div>
+        <div className="ui-kpi"><div className="ui-kpi-body"><div className="ui-kpi-label">A receber</div><div className="ui-kpi-num">{brl(ativos.reduce((s, p) => s + falta(p), 0))}</div><div className="ui-kpi-sub">{conta(p => falta(p) > 0.005)} pedido{conta(p => falta(p) > 0.005) !== 1 ? 's' : ''} com saldo a receber</div></div></div>
       </div>
 
       <div className="ui-segmented" role="tablist" aria-label="Visão" style={{ marginBottom: '.8rem' }}>
@@ -228,7 +232,7 @@ export default function PedidosLista({ base }: { base: string }) {
             celula: p => {
               const s = p.pagamento_status ?? 'em_aberto'
               const vencido = s !== 'pago' && p.vencimento && p.vencimento < hoje
-              return <><span className={`ui-badge ${vencido ? 'ui-badge-cancelada' : BADGE_PAGTO[s]}`}>{vencido ? 'Vencido' : PAGAMENTO_STATUS[s]}</span><div className="ui-cel-sub">{s === 'pago' ? `pago ${dataBR(p.pago_em)}` : p.vencimento ? `venc. ${dataBR(p.vencimento)}` : ''}</div></>
+              return <><span className={`ui-badge ${vencido ? 'ui-badge-cancelada' : BADGE_PAGTO[s]}`}>{vencido ? 'Vencido' : PAGAMENTO_STATUS[s]}</span><div className="ui-cel-sub">{s === 'pago' ? `pago ${dataBR(p.pago_em)}` : `falta ${brl(falta(p))}${p.vencimento ? ` · venc. ${dataBR(p.vencimento)}` : ''}`}</div></>
             } },
         ]}
       />
