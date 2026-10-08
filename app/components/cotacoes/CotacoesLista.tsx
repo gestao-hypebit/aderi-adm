@@ -5,11 +5,10 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { SeletorVisao, useVisao } from '@/app/components/AlternarVisao'
 import Tabela, { Paginacao, usePaginacao } from '@/app/components/Tabela'
-import { ETAPAS, etapaDe, PEDIDO_STATUS, calcularTotais, itemDoBanco, parametrosDoBanco, brl, pct } from '@/lib/cotacao'
-import { ATALHO_PADRAO, calcRange, descreverPeriodo, hojeISO } from '@/lib/dateUtils'
+import { ETAPAS, etapaDe, type Etapa, PEDIDO_STATUS, calcularTotais, itemDoBanco, parametrosDoBanco, brl, pct } from '@/lib/cotacao'
+import { ATALHO_PADRAO, calcRange, hojeISO } from '@/lib/dateUtils'
 import PeriodoSeletor from '@/app/components/PeriodoSeletor'
 import NumInput from './NumInput'
-import FunilCotacoes from './FunilCotacoes'
 
 type Linha = {
   id: string
@@ -76,7 +75,39 @@ function IconBox() {
 const ORDEM_ETAPA = Object.keys(ETAPAS)
 const fmtData = (d: string) => new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ de /g, ' ').replace('.', '')
 
-export default function CotacoesLista({ base }: { base: string }) {
+// A mesma negociação passa por fases, e cada fase tem sua página no menu:
+// Cotações (montagem e aprovação) → Orçamentos (com o cliente) → Pedidos (cliente aprovou).
+export type Fase = 'cotacoes' | 'aprovacoes' | 'orcamentos'
+type ConfigFase = { titulo: string; sub: string; etapas: Etapa[]; extras: Etapa[]; filas: string[]; vazio: string }
+const FASES: Record<Fase, ConfigFase> = {
+  cotacoes: {
+    titulo: 'Cotações', sub: 'Montagem e aprovação pela gestão. Quando a gestão aprova, a cotação passa para Orçamentos.',
+    etapas: ['elaboracao', 'aguardando'], extras: ['perdida'], filas: ['x-aprovacao', 'x-reprovada'],
+    vazio: 'Nenhuma cotação em andamento. Crie uma nova: depois da aprovação da gestão ela vira orçamento.',
+  },
+  aprovacoes: {
+    titulo: 'Aprovações', sub: 'Cotações esperando a gestão aprovar. Abra, confira preços e margens e aprove ou reprove.',
+    etapas: ['aguardando'], extras: [], filas: [],
+    vazio: 'Nada aguardando aprovação.',
+  },
+  orcamentos: {
+    titulo: 'Orçamentos', sub: 'Aprovados pela gestão: para enviar ao cliente e já enviados, esperando resposta. Quando o cliente aprova, vira pedido.',
+    etapas: ['aprovada', 'enviada'], extras: ['efetivada', 'perdida'], filas: ['x-enviar', 'x-followup'],
+    vazio: 'Nenhum orçamento em aberto. As cotações aparecem aqui depois que a gestão aprova.',
+  },
+}
+const ROTULO_FILA: Record<string, (admin: boolean) => string> = {
+  'x-aprovacao': admin => (admin ? 'Aguardando sua aprovação' : 'Na gestão para aprovar'),
+  'x-reprovada': () => 'Reprovadas pela gestão',
+  'x-enviar': () => 'Aprovados: falta enviar',
+  'x-followup': () => 'Sem resposta / validade vencendo',
+}
+
+// Perdida conta na fase em que parou: antes de enviar (Cotações) ou depois (Orçamentos)
+function faseDaPerdida(l: { enviada_em: string | null }): Fase { return l.enviada_em ? 'orcamentos' : 'cotacoes' }
+
+export default function CotacoesLista({ base, fase = 'cotacoes' }: { base: string; fase?: Fase }) {
+  const cfgFase = FASES[fase]
   const supabase = createClient()
   const [linhas, setLinhas] = useState<Linha[]>([])
   const [admin, setAdmin] = useState(false)
@@ -131,19 +162,28 @@ export default function CotacoesLista({ base }: { base: string }) {
   const situacao = useMemo(() => new Map(linhas.map(l => [l.id, alertasDe(l, config, admin)])), [linhas, config, admin])
   const naFila = (l: Linha, f: string) => {
     const x = situacao.get(l.id)!
-    return f === 'x-aprovacao' ? x.aprovacao : f === 'x-enviar' ? x.enviar : f === 'x-followup' ? x.followup : f === 'x-pedidos' ? x.pedido : etapaDe(l) === f
+    return f === 'x-aprovacao' ? x.aprovacao : f === 'x-reprovada' ? l.status === 'rascunho' && l.aprovacao_status === 'reprovada'
+      : f === 'x-enviar' ? x.enviar : f === 'x-followup' ? x.followup : etapaDe(l) === f
   }
-  // período (data de criação) e consultor valem para a lista, as contagens e o funil
+  // período (data de criação), consultor e fase valem para a lista e as contagens
+  const daFase = (l: Linha) => {
+    const et = etapaDe(l)
+    if (et === 'perdida') return cfgFase.extras.includes('perdida') && faseDaPerdida(l) === fase
+    return cfgFase.etapas.includes(et) || cfgFase.extras.includes(et)
+  }
   const doPeriodo = useMemo(() => linhas.filter(l => {
     const d = l.created_at.slice(0, 10)
-    return d >= periodo.inicio && d <= periodo.fim && (!consultor || l.criado_por === consultor)
-  }), [linhas, periodo, consultor])
+    return d >= periodo.inicio && d <= periodo.fim && (!consultor || l.criado_por === consultor) && daFase(l)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [linhas, periodo, consultor, fase])
+  // sem filtro de etapa, mostra só o que está em andamento nesta fase (fechadas e perdidas ficam no filtro)
+  const ativa = (l: Linha) => cfgFase.etapas.includes(etapaDe(l))
   const contarFila = (f: string) => doPeriodo.filter(l => naFila(l, f)).length
 
   const lista = useMemo(() => {
     const t = busca.trim().toLowerCase()
     return doPeriodo.filter(l =>
-      (!status || naFila(l, status)) &&
+      (status ? naFila(l, status) : ativa(l)) &&
       (!t || l.numero.includes(t) || (l.cliente_nome ?? '').toLowerCase().includes(t) || (l.empresa_rural ?? '').toLowerCase().includes(t) || (l.cidade ?? '').toLowerCase().includes(t))
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -153,10 +193,8 @@ export default function CotacoesLista({ base }: { base: string }) {
   const cards = usePaginacao(lista, 24, chaveFiltro)
   const contagem = (e: string) => doPeriodo.filter(l => etapaDe(l) === e).length
   const totalEfetivado = doPeriodo.filter(l => l.status === 'efetivada').reduce((s, l) => s + l.venda, 0)
-  const filas: [string, string][] = [
-    ['x-aprovacao', admin ? 'Aguardando sua aprovação' : 'Na gestão para aprovar'], ['x-enviar', 'Aprovadas: enviar orçamento'], ['x-followup', 'Orçamento sem resposta / validade'],
-    ...(admin ? [['x-pedidos', 'Pedidos em andamento'] as [string, string]] : []),
-  ]
+  const filas: [string, string][] = cfgFase.filas.map(f => [f, ROTULO_FILA[f](admin)])
+  const emAndamento = doPeriodo.filter(ativa)
 
   async function excluirCotacao(id: string) {
     setErro('')
@@ -194,22 +232,20 @@ export default function CotacoesLista({ base }: { base: string }) {
 
       <div className="ui-page-header">
         <div>
-          <div className="ui-title">Cotações</div>
+          <div className="ui-title">{cfgFase.titulo}</div>
           <div className="ui-sub">
-            {carregando ? 'Carregando...' : `${doPeriodo.length} cotaç${doPeriodo.length !== 1 ? 'ões' : 'ão'} · ${contagem('efetivada')} virou pedido (${brl(totalEfetivado)}). Etapas: cotação → aprovação da gestão → orçamento ao cliente → cliente aprova → pedido.`}
+            {carregando ? 'Carregando...' : <>{emAndamento.length} em andamento · {brl(emAndamento.reduce((s, l) => s + l.venda, 0))}{fase === 'orcamentos' && contagem('efetivada') > 0 ? ` · ${contagem('efetivada')} viraram pedido (${brl(totalEfetivado)})` : ''}. {cfgFase.sub}</>}
           </div>
         </div>
         <div className="ui-header-actions">
-          <Link href={base.startsWith('/admin') ? '/admin/relatorios/cotacoes' : `${base}/acompanhamento`} className="ui-btn ui-btn-secondary">Acompanhamento por etapa</Link>
-          {admin && base.startsWith('/admin') && <button className="ui-btn ui-btn-ghost" onClick={() => { setConfigForm(config); setConfigAberta(true) }}><IconGear /> Configurações</button>}
-          {admin && base.startsWith('/admin') && <Link href="/admin/produtos" className="ui-btn ui-btn-secondary"><IconBox /> Produtos</Link>}
-          <Link href={`${base}/nova`} className="ui-btn ui-btn-primary"><IconPlus /> Nova cotação</Link>
+          {admin && base.startsWith('/admin') && fase === 'cotacoes' && <button className="ui-btn ui-btn-ghost" onClick={() => { setConfigForm(config); setConfigAberta(true) }}><IconGear /> Configurações</button>}
+          {admin && base.startsWith('/admin') && fase === 'cotacoes' && <Link href="/admin/produtos" className="ui-btn ui-btn-secondary"><IconBox /> Produtos</Link>}
+          {fase === 'cotacoes' && <Link href={`${base}/nova`} className="ui-btn ui-btn-primary"><IconPlus /> Nova cotação</Link>}
         </div>
       </div>
 
       {erro && <div className="ui-alert ui-alert-erro">{erro}</div>}
       <PeriodoSeletor inicio={periodo.inicio} fim={periodo.fim} onChange={(inicio, fim) => setPeriodo({ inicio, fim })} />
-      {!carregando && <FunilCotacoes cotacoes={doPeriodo} periodo={descreverPeriodo(periodo.inicio, periodo.fim)} onStatus={setStatus} />}
 
       <div className="cq-toolbar">
         <input className="ui-input cq-busca" placeholder="Buscar nº, cliente, fazenda ou cidade..." value={busca} onChange={e => setBusca(e.target.value)} />
@@ -220,19 +256,19 @@ export default function CotacoesLista({ base }: { base: string }) {
           </select>
         )}
         <select className="ui-select ui-select-sm" style={{ marginLeft: 'auto', width: 'auto' }} value={status.startsWith('x-') ? '' : status} onChange={e => setStatus(e.target.value)} aria-label="Filtrar por etapa">
-          <option value="">Todas as etapas ({doPeriodo.length})</option>
-          {Object.entries(ETAPAS).map(([k, v]) => <option key={k} value={k}>{v.label} ({contagem(k)})</option>)}
+          <option value="">Em andamento ({emAndamento.length})</option>
+          {[...cfgFase.etapas, ...cfgFase.extras].map(k => <option key={k} value={k}>{ETAPAS[k].label} ({contagem(k)})</option>)}
         </select>
         <SeletorVisao visao={visao} onChange={setVisao} />
       </div>
-      <div className="cq-filas">
+      {filas.length > 0 && <div className="cq-filas">
         <span className="cq-filas-l">Precisa de ação:</span>
         {filas.map(([k, label]) => (
           <button key={k} className={`cq-fila ${status === k ? 'ativo' : ''}`} onClick={() => setStatus(status === k ? '' : k)}>
             {label} <span className="ui-count">{carregando ? '·' : contarFila(k)}</span>
           </button>
         ))}
-      </div>
+      </div>}
 
       {configAberta && (
         <div className="ui-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setConfigAberta(false) }}>
@@ -304,9 +340,9 @@ export default function CotacoesLista({ base }: { base: string }) {
           vazio={
             <div className="ui-empty">
               <div className="ui-empty-icon"><IconDoc /></div>
-              <div className="ui-empty-title">{linhas.length === 0 ? 'Nenhuma cotação ainda' : 'Nenhuma cotação encontrada'}</div>
-              <div className="ui-empty-text">{linhas.length === 0 ? 'Crie a primeira cotação: o orçamento, o pedido e o resultado saem dela automaticamente.' : 'Ajuste a busca, o período ou os filtros.'}</div>
-              {linhas.length === 0 && <Link href={`${base}/nova`} className="ui-btn ui-btn-secondary ui-btn-sm"><IconPlus /> Nova cotação</Link>}
+              <div className="ui-empty-title">{busca || status ? 'Nada encontrado' : `Nada em ${cfgFase.titulo.toLowerCase()}`}</div>
+              <div className="ui-empty-text">{busca || status ? 'Ajuste a busca, o período ou os filtros.' : cfgFase.vazio}</div>
+              {fase === 'cotacoes' && !busca && !status && <Link href={`${base}/nova`} className="ui-btn ui-btn-secondary ui-btn-sm"><IconPlus /> Nova cotação</Link>}
             </div>
           }
           colunas={[

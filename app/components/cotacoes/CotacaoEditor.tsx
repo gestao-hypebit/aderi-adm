@@ -649,6 +649,11 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
     transportador: cab.transportador || null, obs_pedido: cab.obs_pedido || null, observacoes_cliente: cab.observacoes_cliente || null,
     observacoes: cab.observacoes || null, autor_nome: autor || null, autor_telefone: autorTel || null,
   }
+  // "voltar" leva para a fase em que a negociação está (cotações, aprovações, orçamentos ou pedidos)
+  const voltar = etapa === 'aguardando' && admin ? { href: `${raiz}/aprovacoes`, rotulo: 'Aprovações' }
+    : etapa === 'efetivada' && admin ? { href: `${raiz}/pedidos`, rotulo: 'Pedidos' }
+    : etapa === 'aprovada' || etapa === 'enviada' || etapa === 'efetivada' || (etapa === 'perdida' && cab.enviada_em) ? { href: `${raiz}/orcamentos`, rotulo: 'Orçamentos' }
+    : { href: base, rotulo: 'Cotações' }
   const preenchidos = itens.filter(i => i.produto_nome.trim()).length
   const corResultado = tot.resultado < 0 ? '#c0392b' : '#1e8a4c'
   const hoje = hojeISO()
@@ -660,7 +665,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
       <style>{EDITOR_CSS}</style>
 
       <div className="ui-breadcrumb">
-        <Link href={base}><Ic d={D.voltar} /> Cotações</Link>
+        <Link href={voltar.href}><Ic d={D.voltar} /> {voltar.rotulo}</Link>
         <span className="ui-breadcrumb-sep">/</span>
         <span className="ui-breadcrumb-atual">{cotacaoId ? cab.numero : 'Nova cotação'}</span>
       </div>

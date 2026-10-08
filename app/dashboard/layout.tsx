@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useContadoresVendas } from '@/lib/contadoresVendas'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -26,6 +27,12 @@ function IconLogout() {
 function IconDoc() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
 }
+function IconSend() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+}
+function IconFunil() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+}
 function IconMenu() {
   return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
 }
@@ -38,6 +45,8 @@ const links = [
   { href: '/dashboard/clientes', label: 'Clientes', Icon: IconUsers },
   { href: '/dashboard/visitas', label: 'Visitas', Icon: IconClipboard },
   { href: '/dashboard/cotacoes', label: 'Cotações', Icon: IconDoc },
+  { href: '/dashboard/orcamentos', label: 'Orçamentos', Icon: IconSend, contador: true },
+  { href: '/dashboard/cotacoes/acompanhamento', label: 'Acompanhamento', Icon: IconFunil },
   { href: '/dashboard/agendamento', label: 'Agenda', Icon: IconCalendar },
   { href: '/dashboard/km', label: 'Controle de KM', Icon: IconCar },
 ]
@@ -70,10 +79,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     carregarPerfil()
   }, [])
 
-  function isAtivo(href: string) {
-    if (href === '/dashboard') return pathname === '/dashboard'
-    return pathname.startsWith(href)
-  }
+  // ativo = o link mais específico que bate com a página (ex.: Acompanhamento, não Cotações)
+  const hrefAtivo = links.map(l => l.href)
+    .filter(h => (h === '/dashboard' ? pathname === '/dashboard' : pathname === h || pathname.startsWith(h + '/')))
+    .sort((a, b) => b.length - a.length)[0]
+  const isAtivo = (href: string) => href === hrefAtivo
+  const contadores = useContadoresVendas(pathname)
 
   return (
     <>
@@ -92,6 +103,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         .nav-label{font-size:.65rem;font-weight:600;color:rgba(255,255,255,.3);letter-spacing:.1em;padding:.5rem 1.5rem;margin-top:.5rem}
         .nav-link{display:flex;align-items:center;gap:.75rem;padding:.75rem 1.5rem;color:rgba(255,255,255,.6);text-decoration:none;font-size:.85rem;font-weight:600;transition:all .2s;border-left:3px solid transparent}
         .nav-link:hover{color:#fff;background:rgba(255,255,255,.05)}
+        .nav-contador{margin-left:auto;min-width:20px;height:20px;padding:0 .4rem;border-radius:999px;background:#E67E22;color:#fff;font-size:.66rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
         .nav-link.ativo{color:#fff;background:rgba(230,126,34,.12);border-left-color:#E67E22}
         .nav-link .icon{width:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
         .sidebar-footer{padding:1rem 1.5rem;border-top:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:.5rem}
@@ -134,7 +146,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <nav className="sidebar-nav">
             <div className="nav-label">MENU</div>
-            {links.map(({ href, label, Icon }) => (
+            {links.map(({ href, label, Icon, contador }) => (
               <Link
                 key={href}
                 href={href}
@@ -143,6 +155,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               >
                 <span className="icon"><Icon /></span>
                 {label}
+                {contador && contadores.orcamentos > 0 && <span className="nav-contador" title="Orçamentos para enviar ou sem resposta">{contadores.orcamentos}</span>}
               </Link>
             ))}
           </nav>
