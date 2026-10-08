@@ -11,7 +11,8 @@ import NumInput from './NumInput'
 import ProdutoPicker, { ProdutoCadastro } from './ProdutoPicker'
 import EntregasPedido from './EntregasPedido'
 import DocumentoCotacao, { DOC_CSS, type DadosDocumento, type TipoDocumento } from './Documento'
-import { elementoParaPdf, compartilharArquivo, baixarArquivo, podeCompartilharArquivo } from '@/lib/pdf'
+import { elementoParaPdf } from '@/lib/pdf'
+import EnvioPdfModal from '@/app/components/EnvioPdfModal'
 import {
   ItemCotacao, ParametrosCotacao, PARAMETROS_PADRAO, STATUS_COTACAO, ETAPAS, etapaDe, CalculoItem, MOTIVOS_PERDA, PEDIDO_STATUS, PAGAMENTO_STATUS,
   calcularTotais, itemVazio, itemDoBanco, parametrosDoBanco, brl, num, pct, dataCurta, precoMinimo, abaixoDoMinimo, menorMargem,
@@ -95,6 +96,8 @@ const D = {
   relogio: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
   caminhao: '<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
   seta: '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>',
+  baixo: '<polyline points="6 9 12 15 18 9"/>',
+  editar: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
   atualizar: '<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
   pdf: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/>',
 }
@@ -132,7 +135,9 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
   const [ok, setOk] = useState('')
   const [alterado, setAlterado] = useState(false)
   const [excluirAberto, setExcluirAberto] = useState(false)
-  const [imprimirAberto, setImprimirAberto] = useState(false)
+  const [maisAberto, setMaisAberto] = useState(false)
+  const [condAberto, setCondAberto] = useState(false)
+  const [corrigirAberto, setCorrigirAberto] = useState(false)
   const [editandoCliente, setEditandoCliente] = useState(true)
   const [fechados, setFechados] = useState<Set<number>>(new Set())
   const [abaObs, setAbaObs] = useState<'orcamento' | 'pedido' | 'interna'>('orcamento')
@@ -540,7 +545,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
   }
 
   async function imprimir(doc: string) {
-    setImprimirAberto(false)
+    setMaisAberto(false)
     if (doc !== 'orcamento' && !admin) return
     if (doc !== 'resultado' && !liberada) { setErro('O orçamento só pode ser gerado depois que a gestão aprovar a cotação.'); return }
     const id = alterado || !cotacaoId ? await salvar() : cotacaoId
@@ -583,21 +588,6 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
   }
 
   const textoPdf = () => `Olá, ${cab.cliente_nome.split(' ')[0]}! Segue em anexo o orçamento Nº ${cab.numero} da Aderi Agro${cab.validade ? `, válido até ${dataCurta(cab.validade)}` : ''}.`
-
-  async function compartilharPdf() {
-    if (!pdf?.arquivo) return
-    const r = await compartilharArquivo(pdf.arquivo, textoPdf())
-    if (r === 'ok') { setPdf(null); setOk('Orçamento em PDF enviado.') }
-    else if (r === 'erro') { baixarArquivo(pdf.arquivo); setPdf(null); setOk('PDF baixado. Anexe o arquivo na conversa com o cliente.') }
-  }
-
-  function baixarPdfZap() {
-    if (!pdf?.arquivo) return
-    baixarArquivo(pdf.arquivo)
-    window.open(`https://wa.me/${telZap(cab.contato)}?text=${encodeURIComponent(textoPdf())}`, '_blank')
-    setPdf(null)
-    setOk('PDF baixado. Na conversa do WhatsApp, anexe o arquivo que acabou de ser salvo.')
-  }
 
   function cobrarFollowup() {
     const texto = `Olá, ${cab.cliente_nome.split(' ')[0]}! Conseguiu avaliar o orçamento Nº ${cab.numero}? Fico à disposição para qualquer ajuste. ${linkPublico}`
@@ -653,7 +643,6 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
     return <div className="ui-card ui-card-pad"><div className="ui-skeleton" style={{ height: 18, width: 220, marginBottom: 12 }} /><div className="ui-skeleton" style={{ height: 160 }} /></div>
   }
 
-  const st = STATUS_COTACAO[cab.status] ?? STATUS_COTACAO.rascunho
   const dadosDoc: DadosDocumento = {
     numero: cab.numero, emissao: null, validade: cab.validade || null, cliente_nome: cab.cliente_nome, empresa_rural: cab.empresa_rural || null,
     cidade: cab.cidade || null, cpf_cnpj: cab.cpf_cnpj || null, inscricao_produtor: cab.inscricao_produtor || null, contato: cab.contato || null,
@@ -685,17 +674,33 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
           </div>
         </div>
         <div className="ui-header-actions">
-          <span className={`ui-badge ${ETAPAS[etapa].badge}`}>{ETAPAS[etapa].label}</span>
+          {alterado ? <span className="ce-pend">Alterações não salvas</span> : cotacaoId ? <span className="ce-salvo"><Ic d={D.check} /> Salvo</span> : null}
+          {cotacaoId && (
+            <div className="ce-mais">
+              <button className="ui-btn ui-btn-ghost" onClick={() => setMaisAberto(a => !a)} aria-expanded={maisAberto}>Mais ações <Ic d={D.baixo} size={12} /></button>
+              {maisAberto && (
+                <div className="ce-mais-menu" onMouseLeave={() => setMaisAberto(false)}>
+                  {liberada && <button onClick={() => imprimir('orcamento')}><Ic d={D.impr} /> Imprimir orçamento<kbd>{CTRL} P</kbd></button>}
+                  {admin && cab.status === 'efetivada' && <button onClick={() => imprimir('pedido')}><Ic d={D.impr} /> Imprimir pedido</button>}
+                  {admin && <button onClick={() => imprimir('resultado')}><Ic d={D.impr} /> Imprimir resultado (interno)</button>}
+                  <button onClick={() => { setMaisAberto(false); duplicar() }}><Ic d={D.copiar} /> Duplicar cotação</button>
+                  {admin && <button onClick={() => { setMaisAberto(false); setCorrigirAberto(true) }}><Ic d={D.editar} /> Corrigir etapa</button>}
+                  <hr />
+                  <button className="perigo" onClick={() => { setMaisAberto(false); setExcluirAberto(true) }}><Ic d={D.lixo} /> Excluir cotação</button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
-
-      <Trilha etapa={etapa} enviou={!!cab.enviada_em} />
 
       {erro && <div className="ui-alert ui-alert-erro"><Ic d={D.alerta} size={15} /> {erro}</div>}
       {ok && <div className="ui-alert ui-alert-ok"><Ic d={D.check} /> {ok}</div>}
 
       {/* ── O que fazer agora, conforme a etapa ── */}
       <div className={`ui-card ce-passo ${etapa}`}>
+        <Trilha etapa={etapa} enviou={!!cab.enviada_em} />
+        <div className="ce-passo-linha">
         <div className="ce-passo-txt">
           {etapa === 'elaboracao' && <>
             <b>{cab.aprovacao_status === 'reprovada' ? 'A gestão reprovou esta cotação' : '1. Monte a cotação'}</b>
@@ -748,24 +753,18 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
           {etapa === 'efetivada' && admin && <button className="ui-btn ui-btn-primary" onClick={() => setAba('pedido')}><Ic d={D.caminhao} /> Acompanhar pedido</button>}
           {etapa === 'perdida' && <button className="ui-btn ui-btn-secondary" onClick={reabrir} disabled={salvando}>Reabrir cotação</button>}
         </div>
+        </div>
+        {/* avisos da etapa, dentro do mesmo card */}
+        {!admin && cab.aprovacao_status === 'aprovada' && !coberta && etapa !== 'efetivada' && etapa !== 'perdida' && (
+          <div className="ce-aviso-linha"><Ic d={D.cadeado} size={13} /> Preço abaixo do que a gestão aprovou: ao salvar, a cotação volta para a gestão aprovar de novo.</div>
+        )}
+        {diasEnviada != null && diasEnviada >= config.dias_followup && (
+          <div className="ce-aviso-linha"><Ic d={D.relogio} size={13} /> Enviado há {diasEnviada} dias sem resposta. <button className="ce-link" onClick={cobrarFollowup}>Cobrar pelo WhatsApp</button></div>
+        )}
+        {diasValidade != null && diasValidade <= 2 && (
+          <div className={`ce-aviso-linha ${diasValidade < 0 ? 'erro' : ''}`}><Ic d={D.relogio} size={13} /> {diasValidade < 0 ? `Validade vencida há ${-diasValidade} dia${diasValidade === -1 ? '' : 's'}.` : diasValidade === 0 ? 'Validade vence hoje.' : `Validade vence em ${diasValidade} dia${diasValidade === 1 ? '' : 's'}.`} <button className="ce-link" onClick={() => mudarCab('validade', somarDias(hoje, config.validade_cotacao_dias))}>Renovar por {config.validade_cotacao_dias} dias</button></div>
+        )}
       </div>
-      {!admin && cab.aprovacao_status === 'aprovada' && !coberta && etapa !== 'efetivada' && etapa !== 'perdida' && (
-        <div className="ce-faixa alerta"><Ic d={D.cadeado} size={16} /><div><b>Preço abaixo do que a gestão aprovou</b><div>Ao salvar, a cotação volta para a gestão aprovar de novo.</div></div></div>
-      )}
-      {diasEnviada != null && diasEnviada >= config.dias_followup && (
-        <div className="ce-faixa alerta">
-          <Ic d={D.relogio} size={16} />
-          <div style={{ flex: 1 }}><b>Orçamento enviado há {diasEnviada} dias sem resposta</b><div>Faça um follow-up com o cliente ou registre a resposta acima.</div></div>
-          <button className="ui-btn ui-btn-success ui-btn-sm" onClick={cobrarFollowup}><Ic d={D.zap} /> Cobrar pelo WhatsApp</button>
-        </div>
-      )}
-      {diasValidade != null && diasValidade <= 2 && (
-        <div className={`ce-faixa ${diasValidade < 0 ? 'erro' : 'alerta'}`}>
-          <Ic d={D.relogio} size={16} />
-          <div style={{ flex: 1 }}><b>{diasValidade < 0 ? `Validade vencida há ${-diasValidade} dia${diasValidade === -1 ? '' : 's'}` : diasValidade === 0 ? 'Validade vence hoje' : `Validade vence em ${diasValidade} dia${diasValidade === 1 ? '' : 's'}`}</b><div>Confira os preços antes de renovar.</div></div>
-          <button className="ui-btn ui-btn-secondary ui-btn-sm" onClick={() => mudarCab('validade', somarDias(hoje, config.validade_cotacao_dias))}>Renovar por {config.validade_cotacao_dias} dias</button>
-        </div>
-      )}
 
       <div className="ce-abas" role="tablist" aria-label="Documentos da cotação">
         {([
@@ -778,7 +777,6 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
             <span className="ce-aba-t">{t}</span><span className="ce-aba-d">{d}</span>
           </button>
         ))}
-        <span className="ce-abas-dica">O orçamento sai da cotação automaticamente, sem custos nem margens. O pedido nasce quando o cliente aprova o orçamento.</span>
       </div>
 
       {aba !== 'cotacao' && (
@@ -932,20 +930,10 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
             </div>
           </section>
 
-          {cotacaoId && (
-            <div style={{ marginTop: '1.4rem', display: 'flex', gap: '.6rem' }}>
-              <button className="ui-btn ui-btn-ghost ui-btn-sm" onClick={duplicar}><Ic d={D.copiar} /> Duplicar cotação</button>
-              <button className="ui-btn ui-btn-danger ui-btn-sm" onClick={() => setExcluirAberto(true)}><Ic d={D.lixo} /> Excluir</button>
-            </div>
-          )}
         </div>
 
         <aside className="ce-aside">
           <div className="ui-card ce-resumo">
-            <div className="ce-resumo-top">
-              <span className={`ui-badge ${st.badge}`}>{st.label}</span>
-              {alterado ? <span className="ce-pend">Não salvo</span> : cotacaoId ? <span className="ce-salvo"><Ic d={D.check} /> Salvo</span> : null}
-            </div>
             <div className="ce-resumo-l">Total da venda</div>
             <div className="ce-resumo-total">{brl(tot.venda)}</div>
             <div className="ce-resumo-sub">{num(tot.quantidade, tot.quantidade % 1 ? 2 : 0)} un. · {preenchidos} produto{preenchidos !== 1 ? 's' : ''}</div>
@@ -967,31 +955,21 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
             )}
 
             <button className="ui-btn ui-btn-primary ce-salvar" onClick={() => salvar()} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar cotação'} <kbd>{CTRL} S</kbd></button>
-            <div className="ce-imprimir">
-              <button className="ui-btn ui-btn-secondary" style={{ width: '100%' }} onClick={() => setImprimirAberto(a => !a)} disabled={salvando}><Ic d={D.impr} /> Gerar documento</button>
-              {imprimirAberto && (
-                <div className="ce-imprimir-menu" onMouseLeave={() => setImprimirAberto(false)}>
-                  <button onClick={() => imprimir('orcamento')} disabled={!liberada}><span>Orçamento<small>{liberada ? 'Para enviar ao cliente' : 'Liberado depois da aprovação da gestão'}</small></span><kbd>{CTRL} P</kbd></button>
-                  {admin && cab.status === 'efetivada' && <button onClick={() => imprimir('pedido')}><span>Pedido do cliente<small>Pedido de compra Verde Agro</small></span><kbd>{CTRL} ⇧ P</kbd></button>}
-                  {admin && <button onClick={() => imprimir('resultado')}><span>Resultado<small>Custos e resultado (interno)</small></span></button>}
-                </div>
-              )}
-            </div>
           </div>
 
-          {admin && cotacaoId && (
-            <div className="ui-card ce-cond">
-              <div className="ce-cond-tit">Corrigir etapa</div>
-              <select className="ui-select" value={cab.status} onChange={e => mudarStatus(e.target.value)}>
-                {Object.entries(STATUS_COTACAO).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-              </select>
-              <div className="ce-cond-dica">Só para acertos. No dia a dia, use o botão de próximo passo no topo. Salve depois de trocar.</div>
-            </div>
-          )}
-
           <div className="ui-card ce-cond">
-            <div className="ce-cond-tit">Condições</div>
-            <div className="ce-ptax">
+            <button className="ce-cond-cab" onClick={() => setCondAberto(a => !a)} aria-expanded={condAberto}>
+              <span className="ce-cond-tit" style={{ margin: 0 }}>Condições</span>
+              <span className="ce-link" style={{ margin: 0 }}>{condAberto ? 'Fechar' : 'Editar'}</span>
+            </button>
+            {!condAberto ? (
+              <div className="ce-cond-resumo">
+                <div><span>PTAX</span><b>{num(param.ptax, 4)}{cab.ptax_modo === 'auto' ? ' (BC)' : ''}</b></div>
+                <div><span>Juros a.m.</span><b>{pct(param.juros_mes, 2)}</b></div>
+                <div><span>Validade</span><b>{cab.validade ? dataCurta(cab.validade) : '—'}</b></div>
+              </div>
+            ) : <>
+            <div className="ce-ptax" style={{ marginTop: '.7rem' }}>
               <div className="ui-segmented">
                 <button className={cab.ptax_modo === 'manual' ? 'ativo' : ''} onClick={() => mudarCab('ptax_modo', 'manual')}>PTAX manual</button>
                 <button className={cab.ptax_modo === 'auto' ? 'ativo' : ''} onClick={buscarPtax}>Automática (BC)</button>
@@ -1001,11 +979,6 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
                   {ptaxStatus === 'buscando' ? 'Consultando o Banco Central...' : ptaxStatus === 'erro' ? <span style={{ color: '#c0392b' }}>Não foi possível consultar. Digite manualmente.</span> : <>Venda de {dataCurta(cab.ptax_data)} · <button className="ce-link" style={{ margin: 0 }} onClick={buscarPtax}><Ic d={D.atualizar} size={11} /> atualizar</button></>}
                 </div>
               )}
-              <div className="ce-ptax-obs">
-                {cab.ptax_modo === 'auto'
-                  ? <>A <b>PTAX automática</b> busca no Banco Central a cotação oficial do dólar (valor de venda) do último dia útil e usa esse valor para converter o preço de tabela em reais. Ela é consultada quando você escolhe esta opção ou clica em atualizar; depois disso fica gravada na cotação e não muda sozinha. Digitar um valor volta para o modo manual.</>
-                  : <>Na <b>PTAX manual</b> você digita o valor do dólar. Use 1 quando o preço de tabela já está em reais. A opção automática busca a cotação oficial do Banco Central.</>}
-              </div>
             </div>
             <div className="ce-cond-grid">
               <label>PTAX<NumInput className="ui-input" valor={param.ptax} onChange={v => { mudarParam('ptax', v); if (cab.ptax_modo === 'auto') mudarCab('ptax_modo', 'manual') }} casas={4} /></label>
@@ -1016,14 +989,8 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
               </>}
               <label style={{ gridColumn: '1/-1' }}>Validade do orçamento<input type="date" className="ui-input" value={cab.validade} onChange={e => mudarCab('validade', e.target.value)} /></label>
             </div>
-            <div className="ce-cond-dica">PTAX 1 = preços já em reais · juros diário {pct(param.juros_mes / 30, 4)}</div>
-          </div>
-
-          <div className="ce-atalhos">
-            <div><kbd>{CTRL} S</kbd> salvar</div>
-            <div><kbd>Alt N</kbd> novo produto</div>
-            <div><kbd>Enter</kbd> próximo campo</div>
-            <div><kbd>{CTRL} P</kbd> orçamento</div>
+            <div className="ce-cond-dica">PTAX 1 = preço de tabela já em reais. &quot;Automática&quot; busca o dólar oficial de venda no Banco Central e grava na cotação. · Juros diário {pct(param.juros_mes / 30, 4)}</div>
+            </>}
           </div>
         </aside>
       </div>
@@ -1031,7 +998,6 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
 
       <div className="ce-barra-m">
         <div><small>Total</small><b>{brl(tot.venda)}</b></div>
-        <button className="ui-btn ui-btn-secondary" onClick={() => imprimir('orcamento')} disabled={salvando || !liberada} aria-label="Gerar orçamento"><Ic d={D.impr} /></button>
         <button className="ui-btn ui-btn-primary" onClick={() => salvar()} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar'}</button>
       </div>
 
@@ -1041,18 +1007,8 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
         </div>
       )}
       {pdf?.etapa === 'pronto' && pdf.arquivo && (
-        <div className="ui-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setPdf(null) }}>
-          <div className="ui-modal" style={{ maxWidth: 440 }}>
-            <div className="ui-title" style={{ fontSize: '1.1rem', marginBottom: '.3rem' }}>PDF do orçamento pronto</div>
-            <div className="ui-sub" style={{ marginBottom: '1.1rem' }}>{pdf.arquivo.name}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
-              {podeCompartilharArquivo(pdf.arquivo) && <button className="ui-btn ui-btn-success" onClick={compartilharPdf}><Ic d={D.zap} /> Enviar arquivo (WhatsApp, e-mail...)</button>}
-              <button className={`ui-btn ${podeCompartilharArquivo(pdf.arquivo) ? 'ui-btn-secondary' : 'ui-btn-success'}`} onClick={baixarPdfZap}><Ic d={D.zap} /> Baixar e abrir conversa no WhatsApp</button>
-              <button className="ui-btn ui-btn-ghost" onClick={() => { baixarArquivo(pdf.arquivo!); setPdf(null) }}><Ic d={D.pdf} /> Só baixar o PDF</button>
-            </div>
-            <div className="ui-hint" style={{ marginTop: '.8rem' }}>{podeCompartilharArquivo(pdf.arquivo) ? 'No celular, "Enviar arquivo" abre o WhatsApp com o PDF já anexado.' : 'No computador o WhatsApp não aceita anexo automático: o PDF é baixado e você anexa na conversa.'}</div>
-          </div>
-        </div>
+        <EnvioPdfModal titulo="PDF do orçamento pronto" arquivo={pdf.arquivo} texto={textoPdf()} telefone={cab.contato || null}
+          onFechar={() => setPdf(null)} onConcluido={setOk} />
       )}
 
       {perdaAberta && (
@@ -1090,6 +1046,22 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
       <ConfirmDialog aberto={confirmarPedido} titulo="O cliente aprovou o orçamento?" confirmarTexto="Sim, gerar pedido" onConfirmar={clienteAprovou} onCancelar={() => setConfirmarPedido(false)}>
         A cotação {cab.numero} vira pedido{admin ? ' e passa a ser acompanhada na aba Pedido (faturamento, entrega e pagamento)' : ' e a gestão passa a acompanhar faturamento e entrega'}.
       </ConfirmDialog>
+
+      {corrigirAberto && (
+        <div className="ui-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setCorrigirAberto(false) }}>
+          <div className="ui-modal" style={{ maxWidth: 420 }}>
+            <div className="ui-title" style={{ fontSize: '1.1rem', marginBottom: '.3rem' }}>Corrigir etapa</div>
+            <div className="ui-sub" style={{ marginBottom: '1rem' }}>Só para acertos. No dia a dia, use o botão de próximo passo.</div>
+            <select className="ui-select" value={cab.status} onChange={e => mudarStatus(e.target.value)}>
+              {Object.entries(STATUS_COTACAO).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '.6rem', marginTop: '1.2rem' }}>
+              <button className="ui-btn ui-btn-ghost" onClick={() => setCorrigirAberto(false)}>Cancelar</button>
+              <button className="ui-btn ui-btn-primary" onClick={async () => { if (await salvar()) setCorrigirAberto(false) }} disabled={salvando}>Salvar etapa</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConfirmDialog aberto={excluirAberto} titulo="Excluir esta cotação?" confirmarTexto="Excluir" perigo onConfirmar={excluir} onCancelar={() => setExcluirAberto(false)}>
         A cotação {cab.numero} e todos os seus produtos serão apagados. Essa ação não pode ser desfeita.
@@ -1420,20 +1392,37 @@ const EDITOR_CSS = `
   .ce-envio{display:flex;flex-wrap:wrap;gap:.4rem}
   .ce-envio .ui-btn{flex:1}
   .ce-envio .ce-envio-pdf{flex-basis:100%}
-  .ce-trilha{list-style:none;margin:0 0 1rem;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.4rem}
-  .ce-trilha li{display:flex;align-items:center;gap:.5rem;padding:.55rem .7rem;border-radius:10px;background:#fff;border:1px solid #eae5de;font-size:.74rem;font-weight:600;color:#8f978f;min-width:0}
+  .ce-trilha{list-style:none;margin:0 0 .9rem;padding:0 0 .8rem;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.3rem;border-bottom:1px solid #f2efea}
+  .ce-trilha li{display:flex;align-items:center;gap:.45rem;padding:.2rem 0;font-size:.72rem;font-weight:600;color:#b8bdb6;min-width:0;position:relative}
   .ce-trilha-n{width:22px;height:22px;border-radius:50%;background:#f2efea;color:#8f978f;display:flex;align-items:center;justify-content:center;font-size:.68rem;flex-shrink:0}
   .ce-trilha-t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ce-trilha li.feito{color:#1e8a4c}.ce-trilha li.feito .ce-trilha-n{background:#1e8a4c;color:#fff}
-  .ce-trilha li.atual{color:#162a1e;border-color:#E67E22;box-shadow:0 0 0 3px rgba(230,126,34,.12)}.ce-trilha li.atual .ce-trilha-n{background:#E67E22;color:#fff}
-  .ce-trilha li.recusado{color:#c0392b;border-color:#f6d3cf}.ce-trilha li.recusado .ce-trilha-n{background:#c0392b;color:#fff}
-  .ce-passo{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;padding:1rem 1.2rem;margin-bottom:1rem;border-left:4px solid #E67E22}
+  .ce-trilha li.atual{color:#162a1e}.ce-trilha li.atual .ce-trilha-n{background:#E67E22;color:#fff;box-shadow:0 0 0 3px rgba(230,126,34,.18)}
+  .ce-trilha li.recusado{color:#c0392b}.ce-trilha li.recusado .ce-trilha-n{background:#c0392b;color:#fff}
+  .ce-passo{padding:1rem 1.2rem;margin-bottom:1.1rem;border-left:4px solid #E67E22}
+  .ce-passo-linha{display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+  .ce-aviso-linha{display:flex;align-items:center;gap:.45rem;flex-wrap:wrap;margin-top:.7rem;padding-top:.6rem;border-top:1px dashed #f0ece6;font-size:.74rem;color:#8a4a0e}
+  .ce-aviso-linha.erro{color:#a93226}
+  .ce-aviso-linha .ce-link{margin:0}
+  .ce-mais{position:relative}
+  .ce-mais-menu{position:absolute;right:0;top:calc(100% + 6px);min-width:240px;background:#fff;border:1px solid #eae5de;border-radius:12px;box-shadow:0 16px 40px rgba(22,42,30,.16);padding:.35rem;z-index:200}
+  .ce-mais-menu button{display:flex;align-items:center;gap:.55rem;width:100%;text-align:left;border:none;background:none;padding:.55rem .7rem;border-radius:8px;font-family:inherit;font-size:.78rem;font-weight:600;color:#162a1e;cursor:pointer}
+  .ce-mais-menu button:hover{background:#f7f5f1}
+  .ce-mais-menu button kbd{margin-left:auto}
+  .ce-mais-menu button.perigo{color:#c0392b}
+  .ce-mais-menu button.perigo:hover{background:#fdeeec}
+  .ce-mais-menu hr{border:none;border-top:1px solid #f2efea;margin:.3rem 0}
+  .ce-cond-cab{display:flex;align-items:center;justify-content:space-between;width:100%;border:none;background:none;padding:0;cursor:pointer;font-family:inherit}
+  .ce-cond-resumo{display:flex;flex-direction:column;gap:.35rem;margin-top:.7rem;font-size:.76rem}
+  .ce-cond-resumo div{display:flex;justify-content:space-between}
+  .ce-cond-resumo span{color:#8f978f}
+  .ce-cond-resumo b{color:#162a1e;font-weight:600;font-variant-numeric:tabular-nums}
   .ce-passo.aguardando{border-left-color:#7a52b3}.ce-passo.aprovada{border-left-color:#2c5c9e}.ce-passo.efetivada{border-left-color:#1e8a4c}.ce-passo.perdida{border-left-color:#c0392b}
   .ce-passo-txt{flex:1;min-width:240px;display:flex;flex-direction:column;gap:.25rem}
   .ce-passo-txt b{font-size:.92rem;color:#162a1e}
   .ce-passo-txt span{font-size:.76rem;color:#5b6660;line-height:1.5}
   .ce-passo-acoes{display:flex;gap:.5rem;flex-wrap:wrap}
-  @media(max-width:800px){.ce-trilha{grid-template-columns:1fr 1fr}.ce-trilha li:not(.atual):not(.recusado){display:none}.ce-trilha li.atual,.ce-trilha li.recusado{grid-column:1/-1}.ce-passo-acoes{width:100%}.ce-passo-acoes .ui-btn{flex:1}}
+  @media(max-width:800px){.ce-trilha{grid-template-columns:1fr 1fr}.ce-trilha li:not(.atual):not(.recusado){display:none}.ce-trilha li.atual,.ce-trilha li.recusado{grid-column:1/-1}.ce-trilha{border-bottom:none;padding-bottom:0;margin-bottom:.5rem}.ce-passo-acoes{width:100%}.ce-passo-acoes .ui-btn{flex:1}}
   .pr-pdf{position:fixed;left:-10000px;top:0;width:210mm;pointer-events:none}
   .pr-pdf .pr-folha{width:210mm !important;min-height:297mm !important;padding:14mm 13mm !important;box-shadow:none !important}
   .pr-pdf .pr-duas{grid-template-columns:1.4fr 1fr !important}

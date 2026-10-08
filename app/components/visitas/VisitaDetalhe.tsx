@@ -10,6 +10,10 @@ import { type Checklist, checklistVazio } from '@/lib/checklist'
 import { STATUS_COTACAO } from '@/lib/cotacao'
 import ConfirmDialog from '@/app/admin/_ui/ConfirmDialog'
 import { RelatorioTecnicoEditor, RelatorioTecnicoVer } from './RelatorioTecnico'
+import RelatorioVisitaConteudo, { type VisitaPublica } from './RelatorioVisitaConteudo'
+import { DP_CSS } from '@/app/components/DocumentoPublico'
+import EnvioPdfModal from '@/app/components/EnvioPdfModal'
+import { elementoParaPdf } from '@/lib/pdf'
 
 type Visita = {
   id: string
@@ -107,6 +111,8 @@ export default function VisitaDetalhe({ visitaId, base, admin }: { visitaId: str
   const [cotacoes, setCotacoes] = useState<CotacaoVinculada[]>([])
   const [origem, setOrigem] = useState<{ id: string; data_visita: string } | null>(null)
   const [copiado, setCopiado] = useState(false)
+  const [pdf, setPdf] = useState<{ etapa: 'gerando' | 'pronto'; dados?: VisitaPublica; arquivo?: File } | null>(null)
+  const folhaPdf = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     async function carregar() {
@@ -173,6 +179,27 @@ export default function VisitaDetalhe({ visitaId, base, admin }: { visitaId: str
     await supabase.from('visitas').update({ status: novoStatus }).eq('id', visitaId)
     atualizarLocal({ status: novoStatus })
     setAtualizando(false)
+  }
+
+  // PDF do relatório: usa os mesmos dados do link do produtor (sem nada interno)
+  async function gerarPdfRelatorio() {
+    if (!visita) return
+    setErro('')
+    setPdf({ etapa: 'gerando' })
+    const { data } = await supabase.rpc('visita_publica', { token: visita.token_publico })
+    if (!data) { setPdf(null); setErro('Não foi possível montar o relatório.'); return }
+    setPdf({ etapa: 'gerando', dados: data as VisitaPublica })
+    await new Promise(r => setTimeout(r, 150))
+    try {
+      const folha = folhaPdf.current?.querySelector<HTMLElement>('.dp-folha')
+      if (!folha) throw new Error('sem folha')
+      const v = data as VisitaPublica
+      const nome = `Relatorio de visita ${v.data_visita.split('-').reverse().join('-')} - ${v.cliente.nome}`.replace(/[\\/:*?"<>|]/g, '').trim() + '.pdf'
+      setPdf({ etapa: 'pronto', dados: v, arquivo: await elementoParaPdf(folha, nome) })
+    } catch {
+      setPdf(null)
+      setErro('Não foi possível gerar o PDF. Use "Ver / PDF" e salve pelo navegador.')
+    }
   }
 
   async function confirmarFinalizacao() {
@@ -356,6 +383,22 @@ export default function VisitaDetalhe({ visitaId, base, admin }: { visitaId: str
       <ConfirmDialog aberto={!!fotoParaExcluir} titulo="Excluir esta foto?" confirmarTexto="Excluir foto" perigo carregando={excluindo} onConfirmar={deletarFoto} onCancelar={() => setFotoParaExcluir(null)}>
         A foto será removida da visita permanentemente.
       </ConfirmDialog>
+
+      {pdf?.dados && (
+        <div className="vd-pdf" ref={folhaPdf} aria-hidden="true">
+          <style>{`${DP_CSS}
+            .vd-pdf{position:fixed;left:-10000px;top:0;width:210mm;pointer-events:none;font-family:var(--font-poppins),'Poppins',sans-serif;color:#162a1e}
+            .vd-pdf .dp-folha{width:210mm !important;max-width:none !important;min-height:297mm !important;margin:0 !important;padding:13mm 12mm !important;box-shadow:none !important}
+            .vd-pdf .dp-fotos{grid-template-columns:repeat(3,1fr) !important}
+            .vd-pdf .dp-topo{flex-wrap:nowrap !important}`}</style>
+          <div className="dp-folha"><RelatorioVisitaConteudo v={pdf.dados} paraPdf /></div>
+        </div>
+      )}
+      {pdf?.etapa === 'pronto' && pdf.arquivo && (
+        <EnvioPdfModal titulo="PDF do relatório pronto" arquivo={pdf.arquivo} telefone={cli?.telefone ?? null}
+          texto={`Olá${cli?.nome ? `, ${cli.nome.split(' ')[0]}` : ''}! Segue em anexo o relatório da visita de ${data.toLocaleDateString('pt-BR')}${cli?.nome_fazenda ? ` na ${cli.nome_fazenda}` : ''}.`}
+          onFechar={() => setPdf(null)} onConcluido={setAviso} />
+      )}
 
       {modalAberto && (
         <div className="ui-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setModalAberto(false) }}>
@@ -557,8 +600,9 @@ export default function VisitaDetalhe({ visitaId, base, admin }: { visitaId: str
             <div className="ui-card">
               <div className="ui-card-header"><div className="ui-card-title">Enviar ao produtor</div></div>
               <div className="vd-pad vd-ck">
-                <div style={{ fontSize: '.76rem', color: '#8f978f', lineHeight: 1.6 }}>Resumo da visita com relatório técnico e fotos, sem dados internos. O produtor abre pelo link e pode salvar em PDF.</div>
-                <a className="ui-btn ui-btn-success" href={linkZap} target="_blank" rel="noreferrer"><Ic d={D.zap} /> Enviar por WhatsApp</a>
+                <div style={{ fontSize: '.76rem', color: '#8f978f', lineHeight: 1.6 }}>Resumo da visita com relatório técnico e fotos, sem dados internos. Vai como PDF pronto ou como link.</div>
+                <button className="ui-btn ui-btn-success" onClick={gerarPdfRelatorio} disabled={!!pdf}><Ic d={D.doc} /> {pdf?.etapa === 'gerando' ? 'Gerando PDF...' : 'Enviar relatório em PDF'}</button>
+                <a className="ui-btn ui-btn-secondary ui-btn-sm" href={linkZap} target="_blank" rel="noreferrer"><Ic d={D.zap} size={13} /> Enviar link pelo WhatsApp</a>
                 <div style={{ display: 'flex', gap: '.5rem' }}>
                   <button className="ui-btn ui-btn-secondary ui-btn-sm" style={{ flex: 1 }} onClick={() => { navigator.clipboard.writeText(linkPublico); setCopiado(true); setTimeout(() => setCopiado(false), 2000) }}><Ic d={D.link} size={13} /> {copiado ? 'Copiado!' : 'Copiar link'}</button>
                   <a className="ui-btn ui-btn-ghost ui-btn-sm" style={{ flex: 1 }} href={`/r/${visita.token_publico}`} target="_blank" rel="noreferrer"><Ic d={D.doc} size={13} /> Ver / PDF</a>

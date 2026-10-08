@@ -1,8 +1,9 @@
-// PDF dos documentos da cotação gerado no navegador, para mandar o arquivo direto ao cliente.
+// PDF dos documentos (orçamento, relatório de visita) gerado no navegador, para mandar o arquivo direto ao cliente.
 
 // Fotografa o elemento (uma folha A4 do documento) e monta o PDF, quebrando em páginas A4 se passar de uma.
 export async function elementoParaPdf(el: HTMLElement, nomeArquivo: string): Promise<File> {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas-pro'), import('jspdf')])
+  await esperarImagens(el)
   const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false })
   const pdf = new jsPDF({ unit: 'mm', format: 'a4', compress: true })
   const largura = 210
@@ -16,6 +17,17 @@ export async function elementoParaPdf(el: HTMLElement, nomeArquivo: string): Pro
     pdf.addImage(imagem, 'JPEG', 0, -y, largura, alturaImagem)
   }
   return new File([pdf.output('blob')], nomeArquivo, { type: 'application/pdf' })
+}
+
+// Fotos e logo precisam estar carregados antes da captura (cada uma espera no máximo 15 s)
+function esperarImagens(el: HTMLElement) {
+  const imgs = [...el.querySelectorAll('img')].filter(i => !i.complete)
+  return Promise.all(imgs.map(i => new Promise<void>(ok => {
+    const fim = () => ok()
+    i.addEventListener('load', fim, { once: true })
+    i.addEventListener('error', fim, { once: true })
+    setTimeout(fim, 15000)
+  })))
 }
 
 export const podeCompartilharArquivo = (arquivo: File) =>
