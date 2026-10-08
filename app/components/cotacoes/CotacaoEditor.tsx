@@ -14,7 +14,7 @@ import DocumentoCotacao, { DOC_CSS, type DadosDocumento, type TipoDocumento } fr
 import { elementoParaPdf } from '@/lib/pdf'
 import EnvioPdfModal from '@/app/components/EnvioPdfModal'
 import {
-  ItemCotacao, ParametrosCotacao, PARAMETROS_PADRAO, STATUS_COTACAO, ETAPAS, etapaDe, CalculoItem, MOTIVOS_PERDA, PEDIDO_STATUS, PAGAMENTO_STATUS,
+  ItemCotacao, ParametrosCotacao, PARAMETROS_PADRAO, STATUS_COTACAO, etapaDe, CalculoItem, MOTIVOS_PERDA, PEDIDO_STATUS, PAGAMENTO_STATUS,
   calcularTotais, itemVazio, itemDoBanco, parametrosDoBanco, brl, num, pct, dataCurta, precoMinimo, abaixoDoMinimo, menorMargem,
 } from '@/lib/cotacao'
 
@@ -1246,13 +1246,12 @@ const EDITOR_CSS = `
   .ce-aba-t{font-size:.82rem;font-weight:600;color:#162a1e}
   .ce-aba-d{font-size:.64rem;color:#8f978f}
   .ce-aba.ativo .ce-aba-t{color:#fff}.ce-aba.ativo .ce-aba-d{color:rgba(255,255,255,.65)}
-  .ce-abas-dica{align-self:center;margin-left:auto;font-size:.68rem;color:#8f978f;max-width:340px;line-height:1.5}
   .ce-doc{display:flex;flex-direction:column;gap:1rem}
   .ce-doc-barra{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;max-width:210mm;width:100%;margin:0 auto}
   .ce-doc-info{font-size:.76rem;color:#5b6660;flex:1;min-width:240px}
   .ce-doc-info b{color:#c0651a;font-weight:600}
   .ce-doc-acoes{display:flex;gap:.4rem;flex-wrap:wrap}
-  @media(max-width:700px){.ce-abas-dica{display:none}.ce-aba{min-width:0;flex:1}}
+  @media(max-width:700px){.ce-aba{min-width:0;flex:1}}
   .ce-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:1.3rem;align-items:start}
   .ce-aside{position:sticky;top:76px;display:flex;flex-direction:column;gap:1rem}
   .ce-faixa{display:flex;align-items:center;gap:.8rem;padding:.8rem 1rem;border-radius:12px;margin-bottom:.9rem;font-size:.78rem;line-height:1.5;flex-wrap:wrap}
@@ -1357,7 +1356,6 @@ const EDITOR_CSS = `
   .ce-status-btn.ativo{background:#fff;color:#162a1e;box-shadow:0 1px 3px rgba(22,42,30,.12)}
   .ce-status-btn.ativo.aprovada{color:#2c5c9e}.ce-status-btn.ativo.enviada{color:#c0651a}.ce-status-btn.ativo.efetivada{color:#1e8a4c}.ce-status-btn.ativo.perdida{color:#c0392b}
   .ce-resumo{padding:1.2rem}
-  .ce-resumo-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem}
   .ce-pend{font-size:.66rem;font-weight:600;color:#c0651a}
   .ce-salvo{font-size:.66rem;font-weight:600;color:#1e8a4c;display:inline-flex;align-items:center;gap:.25rem}
   .ce-resumo-l{font-size:.62rem;font-weight:600;color:#8f978f;text-transform:uppercase;letter-spacing:.08em}
@@ -1371,12 +1369,6 @@ const EDITOR_CSS = `
   .ce-res b{font-size:1rem}
   .ce-res-pct{font-size:.7rem;font-weight:600;text-align:right;margin-top:.1rem}
   .ce-salvar{width:100%;margin-bottom:.5rem;padding:.8rem}
-  .ce-imprimir{position:relative}
-  .ce-imprimir-menu{position:absolute;left:0;right:0;top:calc(100% + 6px);background:#fff;border:1px solid #eae5de;border-radius:12px;box-shadow:0 16px 40px rgba(22,42,30,.16);padding:.35rem;z-index:200}
-  .ce-imprimir-menu button{display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;border:none;background:none;padding:.6rem .7rem;border-radius:8px;font-family:inherit;font-size:.78rem;font-weight:600;color:#162a1e;cursor:pointer}
-  .ce-imprimir-menu button:hover:not(:disabled){background:#f7f5f1}
-  .ce-imprimir-menu button:disabled{opacity:.45;cursor:not-allowed}
-  .ce-imprimir-menu small{display:block;font-size:.64rem;color:#8f978f;font-weight:400;margin-top:.1rem}
   .ce-cond{padding:1rem 1.1rem}
   .ce-cond-tit{font-size:.62rem;font-weight:600;color:#8f978f;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.7rem}
   .ce-cond-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
@@ -1387,8 +1379,6 @@ const EDITOR_CSS = `
   .ce-ptax .ui-segmented{width:100%}
   .ce-ptax .ui-segmented button{flex:1;justify-content:center}
   .ce-ptax-info{font-size:.68rem;color:#8f978f;margin-top:.4rem;display:flex;align-items:center;gap:.3rem}
-  .ce-ptax-obs{font-size:.66rem;line-height:1.55;color:#5b6660;background:#faf8f5;border:1px solid #f2efea;border-radius:9px;padding:.55rem .65rem;margin-top:.5rem}
-  .ce-ptax-obs b{color:#162a1e;font-weight:600}
   .ce-envio{display:flex;flex-wrap:wrap;gap:.4rem}
   .ce-envio .ui-btn{flex:1}
   .ce-envio .ce-envio-pdf{flex-basis:100%}
@@ -1430,13 +1420,11 @@ const EDITOR_CSS = `
   .ce-motivos{display:flex;flex-wrap:wrap;gap:.4rem}
   .ce-motivo{border:1.5px solid #eae5de;background:#fff;border-radius:999px;padding:.4rem .85rem;font-family:inherit;font-size:.76rem;font-weight:600;color:#5b6660;cursor:pointer}
   .ce-motivo.on{background:#c0392b;border-color:#c0392b;color:#fff}
-  .ce-atalhos{display:grid;grid-template-columns:1fr 1fr;gap:.35rem .6rem;font-size:.64rem;color:#8f978f;padding:0 .3rem}
-  .ce-atalhos kbd{margin:0 .25rem 0 0;opacity:.8}
   .ce-barra-m{display:none}
   @media(max-width:1100px){
     .ce-layout{grid-template-columns:1fr}
     .ce-aside{position:static}
-    .ce-atalhos{display:none}
+
     .ce-barra-m{display:flex;align-items:center;gap:.5rem;position:sticky;bottom:.6rem;z-index:60;margin-top:1rem;padding:.65rem .8rem;background:#fff;border:1px solid #eae5de;border-radius:14px;box-shadow:0 -6px 24px rgba(22,42,30,.10)}
     .ce-barra-m div{flex:1;display:flex;flex-direction:column}
     .ce-barra-m small{font-size:.6rem;color:#8f978f;font-weight:600;text-transform:uppercase}
