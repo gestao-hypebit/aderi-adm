@@ -449,7 +449,9 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
         aprovacao_status: atual.aprovacao_status ?? '', aprovacao_margem: atual.aprovacao_margem != null ? Number(atual.aprovacao_margem) : null,
       }))
     }
-    setOk(aviso || 'Cotação salva.')
+    setOk(aviso || (atual?.status === 'rascunho' && atual.aprovacao_status !== 'pendente'
+      ? (admin ? 'Rascunho salvo. Quando estiver pronta, clique em "Aprovar cotação".' : 'Rascunho salvo. Para a gestão ver em Aprovações, clique em "Enviar para aprovação".')
+      : 'Cotação salva.'))
     return id ?? null
   }
 
@@ -959,7 +961,16 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
               </div>
             )}
 
-            <button className="ui-btn ui-btn-primary ce-salvar" onClick={() => salvar()} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar cotação'} <kbd>{CTRL} S</kbd></button>
+            {/* em elaboração, o passo principal é mandar para a gestão (ou aprovar, se for a gestão); salvar só guarda o rascunho */}
+            {etapa === 'elaboracao' ? <>
+              {admin
+                ? <button className="ui-btn ui-btn-primary ce-salvar" onClick={aprovarGestao} disabled={salvando}><Ic d={D.check} /> Aprovar cotação</button>
+                : <button className="ui-btn ui-btn-primary ce-salvar" onClick={solicitarAprovacao} disabled={salvando}><Ic d={D.seta} /> Enviar para aprovação</button>}
+              <button className="ui-btn ui-btn-secondary ce-salvar" onClick={() => salvar()} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar rascunho'} <kbd>{CTRL} S</kbd></button>
+              <div className="ce-cond-dica">{admin ? 'Como gestão, você aprova direto e a cotação vai para Orçamentos.' : 'Salvar só guarda o rascunho. A gestão só vê a cotação em Aprovações depois de "Enviar para aprovação".'}</div>
+            </> : (
+              <button className="ui-btn ui-btn-primary ce-salvar" onClick={() => salvar()} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar alterações'} <kbd>{CTRL} S</kbd></button>
+            )}
           </div>
 
           <div className="ui-card ce-cond">
