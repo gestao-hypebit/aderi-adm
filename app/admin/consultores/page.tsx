@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { calcRange, hojeISO } from '@/lib/dateUtils'
 import ConsultoresLista from './ConsultoresLista'
 
-type Perfil = { id: string; nome_completo: string | null; cargo: string | null; role: string; ativo: boolean | null; created_at: string | null }
+type Perfil = { id: string; nome_completo: string | null; cargo: string | null; telefone: string | null; role: string; ativo: boolean | null; created_at: string | null }
 
 type Resumo = {
   realizadas: number
@@ -32,7 +32,7 @@ export default async function AdminConsultoresPage() {
   const hoje = hojeISO()
 
   const [{ data: perfis }, { data: visitasMes }, { data: proximas }, { data: kms }, { data: recentes }, { data: atrasadas }] = await Promise.all([
-    supabase.from('profiles').select('id, nome_completo, cargo, role, ativo, created_at').order('nome_completo'),
+    supabase.from('profiles').select('id, nome_completo, cargo, telefone, role, ativo, created_at').order('nome_completo'),
     supabase.from('visitas').select('funcionario_id, status, cliente_id').gte('data_visita', inicio).lte('data_visita', fim),
     supabase.from('visitas').select('funcionario_id, data_visita').eq('status', 'agendada').gte('data_visita', hoje).order('data_visita'),
     supabase.from('km_diario').select('funcionario_id, km_inicial, km_final').gte('data', inicio).lte('data', fim),
@@ -104,7 +104,7 @@ export default async function AdminConsultoresPage() {
         <ConsultoresLista linhas={consultores.map(p => {
           const r = resumo.get(p.id)
           return {
-            id: p.id, nome: p.nome_completo || 'Sem nome', cargo: p.cargo || 'Consultor de campo',
+            id: p.id, nome: p.nome_completo || 'Sem nome', cargo: p.cargo || 'Consultor de campo', telefone: p.telefone,
             realizadas: r?.realizadas ?? 0, agendadas: r?.agendadas ?? 0, clientes: r?.clientes.size ?? 0, km: r?.km ?? 0,
             atrasadas: atrasadasPor.get(p.id) ?? 0, proxima: r?.proxima ?? null, ultimaAtividade: r?.ultimaAtividade ?? null,
           }

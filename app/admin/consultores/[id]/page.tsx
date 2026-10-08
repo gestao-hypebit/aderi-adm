@@ -9,6 +9,7 @@ import ConfirmDialog from '../../_ui/ConfirmDialog'
 import { ATALHO_PADRAO, calcRange, descreverPeriodo, hojeISO } from '@/lib/dateUtils'
 import { ETAPAS, etapaDe, calcularTotais, itemDoBanco, parametrosDoBanco, brl } from '@/lib/cotacao'
 import FunilCotacoes from '@/app/components/cotacoes/FunilCotacoes'
+import { linkWhatsApp } from '@/lib/contato'
 import PeriodoSeletor from '@/app/components/PeriodoSeletor'
 
 type Perfil = { id: string; nome_completo: string | null; cargo: string | null; telefone: string | null; role: string; ativo: boolean | null; created_at: string | null }
@@ -353,6 +354,10 @@ export default function AdminConsultorDetalhe() {
                 linhas={visitasFiltradas}
                 chave={v => v.id}
                 href={v => `/admin/visitas/${v.id}`}
+                acoes={v => [
+                  { rotulo: 'Abrir visita', icone: 'ver', href: `/admin/visitas/${v.id}` },
+                  { rotulo: 'Editar', icone: 'editar', href: `/admin/visitas/${v.id}/editar` },
+                ]}
                 porPagina={10}
                 reiniciar={filtroStatus}
                 rotulo="visitas"
@@ -387,6 +392,10 @@ export default function AdminConsultorDetalhe() {
                   linhas={cotacoesPeriodo}
                   chave={c => c.id}
                   href={c => `/admin/cotacoes/${c.id}`}
+                  acoes={c => [
+                    { rotulo: 'Abrir cotação', icone: 'ver', href: `/admin/cotacoes/${c.id}` },
+                    c.status === 'efetivada' && { rotulo: 'Pedido e cargas', icone: 'carga', href: `/admin/cotacoes/${c.id}?aba=pedido` },
+                  ]}
                   porPagina={10}
                   reiniciar={`${periodoCot.inicio}|${periodoCot.fim}`}
                   rotulo="cotações"
@@ -410,6 +419,12 @@ export default function AdminConsultorDetalhe() {
               linhas={carteira}
               chave={c => c.id}
               href={c => `/admin/clientes/${c.id}`}
+              acoes={c => [
+                { rotulo: 'Abrir ficha', icone: 'ver', href: `/admin/clientes/${c.id}` },
+                { rotulo: 'Editar', icone: 'editar', href: `/admin/clientes/${c.id}/editar` },
+                { rotulo: 'Agendar visita', icone: 'visita', href: `/admin/visitas/novo?cliente=${c.id}&funcionario=${id}` },
+                !!linkWhatsApp(c.telefone) && { rotulo: 'WhatsApp', icone: 'whatsapp', href: linkWhatsApp(c.telefone)!, novaAba: true },
+              ]}
               porPagina={10}
               rotulo="clientes"
               vazio={

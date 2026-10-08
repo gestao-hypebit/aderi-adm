@@ -213,6 +213,12 @@ a.ui-row:hover { background: #fcfaf7 }
 .ui-cel-mudo { color: var(--texto-4) }
 .ui-cel-ini { width: 34px; height: 34px; border-radius: 10px; background: var(--laranja-suave); color: var(--laranja); font-weight: 600; font-size: .82rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0 }
 .ui-cel-acoes { display: flex; gap: .35rem; justify-content: flex-end; white-space: nowrap }
+.ui-tb-th-acoes { width: 1% }
+.ui-tb-td-acoes { width: 1%; white-space: nowrap }
+.ui-tb-acoes { display: flex; gap: .15rem; justify-content: flex-end }
+.ui-tb-acao { width: 30px; height: 30px; border-radius: 8px; border: none; background: none; color: var(--texto-3); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; text-decoration: none; transition: background .12s, color .12s; flex-shrink: 0 }
+.ui-tb-acao:hover, .ui-tb-acao:focus-visible { background: var(--fundo-2); color: var(--texto) }
+.ui-tb-acao.perigo:hover, .ui-tb-acao.perigo:focus-visible { background: var(--erro-suave); color: #c0392b }
 
 /* Paginação */
 .ui-pag { display: flex; align-items: center; justify-content: space-between; gap: .8rem; flex-wrap: wrap; padding: .7rem 1.3rem; border-top: 1px solid var(--borda-suave); background: #faf8f5; font-size: .74rem; color: var(--texto-3) }

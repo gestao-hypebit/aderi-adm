@@ -339,6 +339,11 @@ export default function AcompanhamentoCotacoes({ base, voltar }: Props) {
         reiniciar={`${etapa}|${soParadas}|${consultor}|${busca}|${periodo.inicio}|${periodo.fim}`}
         rotulo="cotações"
         destaque={c => c.parada}
+        acoes={c => [
+          { rotulo: 'Abrir cotação', icone: 'ver', href: `${base}/${c.id}` },
+          (c.etapa === 'aprovada' || c.etapa === 'enviada' || c.etapa === 'efetivada') && { rotulo: 'Imprimir orçamento', icone: 'imprimir', href: `/imprimir/cotacao/${c.id}?doc=orcamento`, novaAba: true },
+          admin && c.etapa === 'efetivada' && { rotulo: 'Pedido e cargas', icone: 'carga', href: `${base}/${c.id}?aba=pedido` },
+        ]}
         vazio={<div className="ui-empty"><div className="ui-empty-title">Nenhuma cotação aqui</div><div className="ui-empty-text">Troque a etapa, o período ou limpe os filtros.</div></div>}
         colunas={[
           { id: 'num', titulo: 'Número', largura: '110px', ordenar: (a, b) => a.numero.localeCompare(b.numero), celula: c => <span className="ui-cel-forte ui-cel-num">{c.numero}</span> },

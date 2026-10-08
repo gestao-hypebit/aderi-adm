@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import NumInput from '@/app/components/cotacoes/NumInput'
 import Tabela from '@/app/components/Tabela'
-import ConfirmDialog from '../_ui/ConfirmDialog'
 import { brl } from '@/lib/cotacao'
 
 type Produto = {
@@ -39,7 +38,6 @@ export default function ProdutosPage() {
   const [form, setForm] = useState(VAZIO)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
-  const [excluir, setExcluir] = useState<Produto | null>(null)
 
   const [versao, setVersao] = useState(0)
   const carregar = () => setVersao(v => v + 1)
@@ -84,11 +82,17 @@ export default function ProdutosPage() {
     carregar()
   }
 
-  async function confirmarExclusao() {
-    if (!excluir) return
-    const { error } = await supabase.from('produtos').delete().eq('id', excluir.id)
-    setExcluir(null)
+  async function excluirProduto(p: Produto) {
+    setErro('')
+    const { error } = await supabase.from('produtos').delete().eq('id', p.id)
     if (error) { setErro('Não foi possível excluir. Desative o produto em vez disso.'); return }
+    carregar()
+  }
+
+  async function alternarAtivo(p: Produto) {
+    setErro('')
+    const { error } = await supabase.from('produtos').update({ ativo: !p.ativo, updated_at: new Date().toISOString() }).eq('id', p.id)
+    if (error) { setErro('Não foi possível alterar o produto.'); return }
     carregar()
   }
 
@@ -123,6 +127,14 @@ export default function ProdutosPage() {
         carregando={carregando}
         reiniciar={busca}
         rotulo="produtos"
+        acoes={p => [
+          { rotulo: 'Editar', icone: 'editar', onClick: () => abrir(p) },
+          p.ativo
+            ? { rotulo: 'Desativar (some das cotações)', icone: 'desativar', onClick: () => alternarAtivo(p) }
+            : { rotulo: 'Reativar', icone: 'concluir', onClick: () => alternarAtivo(p) },
+          { rotulo: 'Excluir', icone: 'excluir', perigo: true, onClick: () => excluirProduto(p),
+            confirmar: { titulo: `Excluir ${p.nome}?`, botao: 'Excluir', texto: 'O produto sai do cadastro. Cotações já feitas mantêm o nome do produto.' } },
+        ]}
         vazio={
           <div className="ui-empty">
             <div className="ui-empty-icon"><IconBox /></div>
@@ -140,13 +152,6 @@ export default function ProdutosPage() {
             celula: p => <span className="ui-cel-num ui-cel-forte">{brl(p.preco_tabela)}</span> },
           { id: 'status', titulo: 'Status', largura: '100px', ocultar: 'tablet', ordenar: (a, b) => Number(b.ativo) - Number(a.ativo),
             celula: p => <span className={`ui-badge ${p.ativo ? 'ui-badge-realizada' : 'ui-badge-neutro'}`}>{p.ativo ? 'Ativo' : 'Inativo'}</span> },
-          { id: 'acoes', titulo: '', alinhar: 'dir',
-            celula: p => (
-              <div className="ui-cel-acoes">
-                <button className="ui-btn ui-btn-secondary ui-btn-sm" onClick={() => abrir(p)}>Editar</button>
-                <button className="ui-btn ui-btn-ghost ui-btn-sm" onClick={() => setExcluir(p)}>Excluir</button>
-              </div>
-            ) },
         ]}
       />
 
@@ -173,9 +178,6 @@ export default function ProdutosPage() {
         </div>
       )}
 
-      <ConfirmDialog aberto={!!excluir} titulo="Excluir produto?" confirmarTexto="Excluir" perigo onConfirmar={confirmarExclusao} onCancelar={() => setExcluir(null)}>
-        {excluir?.nome} sai do cadastro. Cotações já feitas mantêm o nome do produto.
-      </ConfirmDialog>
     </>
   )
 }

@@ -8,6 +8,7 @@ import { useSearchParams } from 'next/navigation'
 import { baixarCsv, dataBR } from '@/lib/csv'
 import { SeletorVisao, useVisao } from '@/app/components/AlternarVisao'
 import Tabela, { Paginacao, usePaginacao } from '@/app/components/Tabela'
+import { linkWhatsApp } from '@/lib/contato'
 
 type Cliente = {
   id: string
@@ -95,6 +96,7 @@ function AdminClientesConteudo() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [stats, setStats] = useState<Map<string, Stat>>(new Map())
   const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState('')
   const [busca, setBusca] = useState('')
   const [ordem, setOrdem] = useState<Ordem>('nome')
   const [visao, setVisao] = useVisao('admin-clientes')
@@ -177,6 +179,13 @@ function AdminClientesConteudo() {
     )
   }
 
+  async function excluirCliente(id: string) {
+    setErro('')
+    const { error } = await supabase.from('clientes').delete().eq('id', id)
+    if (error) { setErro('Não foi possível excluir o cliente.'); return }
+    setClientes(l => l.filter(c => c.id !== id))
+  }
+
   const totalSemVisita = clientes.filter(c => !stats.get(c.id)?.ultima || diasDesde(stats.get(c.id)!.ultima!) > 60).length
   const totalComAgendada = clientes.filter(c => stats.get(c.id)?.proxima).length
 
@@ -206,6 +215,8 @@ function AdminClientesConteudo() {
           <Link href="/admin/clientes/novo" className="ui-btn ui-btn-primary"><IconPlus /> Novo cliente</Link>
         </div>
       </div>
+
+      {erro && <div className="ui-alert ui-alert-erro">{erro}</div>}
 
       <div className="cl-toolbar">
         <input
@@ -268,6 +279,19 @@ function AdminClientesConteudo() {
           carregando={carregando}
           reiniciar={`${busca}|${filtroConsultor}|${ordem}`}
           rotulo="clientes"
+          acoes={c => {
+            const n = stats.get(c.id)?.total ?? 0
+            return [
+              { rotulo: 'Abrir ficha', icone: 'ver', href: `/admin/clientes/${c.id}` },
+              { rotulo: 'Editar', icone: 'editar', href: `/admin/clientes/${c.id}/editar` },
+              { rotulo: 'Agendar visita', icone: 'visita', href: `/admin/visitas/novo?cliente=${c.id}` },
+              { rotulo: 'Nova cotação', icone: 'cotacao', href: `/admin/cotacoes/nova?cliente=${c.id}` },
+              !!linkWhatsApp(c.telefone) && { rotulo: 'WhatsApp', icone: 'whatsapp', href: linkWhatsApp(c.telefone)!, novaAba: true },
+              { rotulo: 'Excluir', icone: 'excluir', perigo: true, onClick: () => excluirCliente(c.id),
+                confirmar: { titulo: `Excluir ${c.nome}?`, botao: n ? `Excluir cliente e ${n} visita${n > 1 ? 's' : ''}` : 'Excluir cliente',
+                  texto: n ? <>Este cliente tem <b>{n} visita{n > 1 ? 's' : ''}</b>, que serão apagadas junto. Cotações ficam guardadas sem o vínculo.</> : 'O cadastro será apagado permanentemente.' } },
+            ]
+          }}
           vazio={
             <div className="ui-empty">
               <div className="ui-empty-icon"><IconUsers /></div>

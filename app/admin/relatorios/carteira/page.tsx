@@ -127,6 +127,10 @@ export default function RelatorioCarteira() {
           </div>
         }>
         <Tabela linhas={exibidas} chave={l => l.id} carregando={carregando} rotulo="clientes" href={l => `/admin/clientes/${l.id}`}
+          acoes={l => [
+            { rotulo: 'Abrir ficha', icone: 'ver', href: `/admin/clientes/${l.id}` },
+            { rotulo: 'Agendar visita', icone: 'visita', href: `/admin/visitas/novo?cliente=${l.id}` },
+          ]}
           reiniciar={`${faixa}|${filtros.funcionarioId}`} ordemInicial={{ coluna: 'dias', direcao: 'desc' }}
           colunas={[
             { id: 'nome', titulo: 'Cliente', ordenar: (a, b) => a.nome.localeCompare(b.nome),

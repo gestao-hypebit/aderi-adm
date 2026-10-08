@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Tabela from '@/app/components/Tabela'
-import ConfirmDialog from '@/app/admin/_ui/ConfirmDialog'
 
 type LinhaKm = { id: string; data: string; funcionario_id: string; km_inicial: number | null; km_final: number | null }
 type LinhaAbast = { id: string; data: string; funcionario_id: string; litros: number; valor_total: number; km: number }
@@ -36,9 +35,6 @@ type Props = {
 const dataBR = (d: string) => d.split('-').reverse().join('/')
 const brl = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
-function IconTrash() {
-  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-}
 function IconCar() {
   return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 17h14M5 17a2 2 0 0 1-2-2v-2a2 2 0 0 1 .5-1.32L5.5 9a2 2 0 0 1 1.5-.68h10a2 2 0 0 1 1.5.68l2 2.68A2 2 0 0 1 21 13v2a2 2 0 0 1-2 2"/><circle cx="7.5" cy="17" r="1.5"/><circle cx="16.5" cy="17" r="1.5"/></svg>
 }
@@ -48,8 +44,6 @@ export default function LancamentosKm({ inicio, fim, funcionarioId, mostrarConsu
   const [linhas, setLinhas] = useState<Lancamento[]>([])
   const [carregando, setCarregando] = useState(true)
   const [tipo, setTipo] = useState<'todos' | 'km' | 'abastecimento'>('todos')
-  const [excluir, setExcluir] = useState<Lancamento | null>(null)
-  const [excluindo, setExcluindo] = useState(false)
   const [erro, setErro] = useState('')
   const [recarregar, setRecarregar] = useState(0)
 
@@ -88,14 +82,10 @@ export default function LancamentosKm({ inicio, fim, funcionarioId, mostrarConsu
 
   const exibidas = useMemo(() => (tipo === 'todos' ? linhas : linhas.filter(l => l.tipo === tipo)), [linhas, tipo])
 
-  async function confirmarExclusao() {
-    if (!excluir) return
-    setExcluindo(true)
+  async function excluirLancamento(l: Lancamento) {
     setErro('')
-    const tabela = excluir.tipo === 'km' ? 'km_diario' : 'abastecimentos'
-    const { error, count } = await supabase.from(tabela).delete({ count: 'exact' }).eq('id', excluir.id)
-    setExcluindo(false)
-    setExcluir(null)
+    const tabela = l.tipo === 'km' ? 'km_diario' : 'abastecimentos'
+    const { error, count } = await supabase.from(tabela).delete({ count: 'exact' }).eq('id', l.id)
     if (error || count === 0) { setErro('Não foi possível excluir o lançamento. Verifique se você tem permissão.'); return }
     setRecarregar(r => r + 1)
     onMudou?.()
@@ -121,6 +111,15 @@ export default function LancamentosKm({ inicio, fim, funcionarioId, mostrarConsu
         carregando={carregando}
         reiniciar={`${tipo}|${inicio}|${fim}|${funcionarioId ?? ''}`}
         rotulo="lançamentos"
+        acoes={l => [
+          { rotulo: 'Excluir lançamento', icone: 'excluir', perigo: true, onClick: () => excluirLancamento(l),
+            confirmar: {
+              titulo: l.tipo === 'km' ? 'Excluir KM do dia?' : 'Excluir abastecimento?', botao: 'Excluir',
+              texto: l.tipo === 'km'
+                ? <>O KM de {dataBR(l.data)}{mostrarConsultor ? ` de ${l.consultor}` : ''} ({l.kmInicial ?? '—'} → {l.kmFinal ?? 'pendente'}) será apagado. Essa ação não pode ser desfeita.</>
+                : <>O abastecimento de {dataBR(l.data)}{mostrarConsultor ? ` de ${l.consultor}` : ''} ({l.litros.toLocaleString('pt-BR')} L · {brl(l.valor)}) será apagado. Essa ação não pode ser desfeita.</>,
+            } },
+        ]}
         vazio={
           <div className="ui-empty">
             <div className="ui-empty-icon"><IconCar /></div>
@@ -144,28 +143,9 @@ export default function LancamentosKm({ inicio, fim, funcionarioId, mostrarConsu
             celula: l => l.rodado != null ? <span className="ui-cel-num ui-cel-forte">{l.rodado.toLocaleString('pt-BR')} km</span> : <span className="ui-cel-mudo">—</span> },
           { id: 'valor', titulo: 'Valor', alinhar: 'dir', ordenar: (a, b) => a.valor - b.valor,
             celula: l => l.tipo === 'abastecimento' ? <span className="ui-cel-num ui-cel-forte">{brl(l.valor)}</span> : <span className="ui-cel-mudo">—</span> },
-          { id: 'acoes', titulo: '', alinhar: 'dir', largura: '60px',
-            celula: l => (
-              <div className="ui-cel-acoes">
-                <button className="ui-btn ui-btn-ghost ui-btn-icon" onClick={() => setExcluir(l)} title="Excluir lançamento" aria-label="Excluir lançamento"><IconTrash /></button>
-              </div>
-            ) },
         ]}
       />
 
-      <ConfirmDialog
-        aberto={!!excluir}
-        titulo={excluir?.tipo === 'km' ? 'Excluir KM do dia?' : 'Excluir abastecimento?'}
-        confirmarTexto="Excluir"
-        perigo
-        carregando={excluindo}
-        onConfirmar={confirmarExclusao}
-        onCancelar={() => setExcluir(null)}
-      >
-        {excluir && (excluir.tipo === 'km'
-          ? <>O KM de {dataBR(excluir.data)}{mostrarConsultor ? ` de ${excluir.consultor}` : ''} ({excluir.kmInicial ?? '—'} → {excluir.kmFinal ?? 'pendente'}) será apagado. Essa ação não pode ser desfeita.</>
-          : <>O abastecimento de {dataBR(excluir.data)}{mostrarConsultor ? ` de ${excluir.consultor}` : ''} ({excluir.litros.toLocaleString('pt-BR')} L · {brl(excluir.valor)}) será apagado. Essa ação não pode ser desfeita.</>)}
-      </ConfirmDialog>
     </>
   )
 }

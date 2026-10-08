@@ -81,6 +81,7 @@ function AdminVisitasLista() {
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([])
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState('')
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'agendada' | 'atrasada' | 'realizada' | 'cancelada'>(() => {
     const st = searchParams.get('status')
     return st === 'agendada' || st === 'atrasada' || st === 'realizada' || st === 'cancelada' ? st : 'todas'
@@ -120,6 +121,21 @@ function AdminVisitasLista() {
 
   const hoje = hojeISO()
   const ehAtrasada = (v: Visita) => v.status === 'agendada' && v.data_visita < hoje
+
+  async function cancelarVisita(id: string) {
+    setErro('')
+    const { error } = await supabase.from('visitas').update({ status: 'cancelada' }).eq('id', id)
+    if (error) { setErro('Não foi possível cancelar a visita.'); return }
+    setVisitas(l => l.map(v => (v.id === id ? { ...v, status: 'cancelada' } : v)))
+  }
+
+  async function excluirVisita(id: string) {
+    setErro('')
+    const { error } = await supabase.from('visitas').delete().eq('id', id)
+    if (error) { setErro('Não foi possível excluir a visita.'); return }
+    setVisitas(l => l.filter(v => v.id !== id))
+  }
+
   const termo = busca.trim().toLowerCase()
   const visitasBusca = termo
     ? visitas.filter(v =>
@@ -206,6 +222,7 @@ function AdminVisitasLista() {
         />
       </div>
 
+      {erro && <div className="ui-alert ui-alert-erro">{erro}</div>}
       <Tabela
         linhas={visitasExibidas}
         chave={v => v.id}
@@ -214,6 +231,14 @@ function AdminVisitasLista() {
         reiniciar={`${filtroStatus}|${busca}|${filtros.dataInicio}|${filtros.dataFim}|${filtros.funcionarioId}|${filtros.clienteId}`}
         rotulo={`visitas · ${descreverPeriodo(filtros.dataInicio, filtros.dataFim)}`}
         destaque={ehAtrasada}
+        acoes={v => [
+          { rotulo: 'Abrir visita', icone: 'ver', href: `/admin/visitas/${v.id}` },
+          { rotulo: 'Editar', icone: 'editar', href: `/admin/visitas/${v.id}/editar` },
+          v.status === 'agendada' && { rotulo: 'Cancelar visita', icone: 'cancelar', onClick: () => cancelarVisita(v.id),
+            confirmar: { titulo: 'Cancelar esta visita?', botao: 'Cancelar visita', texto: <>A visita de {dataBR(v.data_visita)} com {v.cliente?.nome ?? 'o cliente'} fica marcada como cancelada. Ela continua no histórico.</> } },
+          { rotulo: 'Excluir', icone: 'excluir', perigo: true, onClick: () => excluirVisita(v.id),
+            confirmar: { titulo: 'Excluir esta visita?', botao: 'Excluir visita', texto: <>A visita de {dataBR(v.data_visita)} com {v.cliente?.nome ?? 'o cliente'} será apagada, com fotos e observações. Para manter o histórico, prefira cancelar.</> } },
+        ]}
         vazio={
           <div className="ui-empty">
             <div className="ui-empty-icon"><IconClipboard /></div>

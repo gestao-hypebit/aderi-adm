@@ -101,6 +101,10 @@ export default function RelatorioEquipe() {
 
       <Secao titulo="Placar por consultor" sub="Clique no cabeçalho para ordenar por qualquer indicador">
         <Tabela linhas={exibidas} chave={l => l.id} carregando={carregando} rotulo="consultores" href={l => `/admin/consultores/${l.id}`}
+          acoes={l => [
+            { rotulo: 'Abrir ficha', icone: 'ver', href: `/admin/consultores/${l.id}` },
+            { rotulo: 'Ver agenda', icone: 'agenda', href: `/admin/agenda?func=${l.id}` },
+          ]}
           ordemInicial={{ coluna: 'real', direcao: 'desc' }}
           colunas={[
             { id: 'nome', titulo: 'Consultor', ordenar: (a, b) => a.nome.localeCompare(b.nome),

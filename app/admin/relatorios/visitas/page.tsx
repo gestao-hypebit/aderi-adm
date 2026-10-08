@@ -104,6 +104,7 @@ export default function RelatorioVisitas() {
       <div className="rl-duas">
         <Secao titulo="Por consultor" sub="Ordenado por visitas realizadas">
           <Tabela linhas={r.consultores} chave={c => c.id} carregando={carregando} porPagina={10} rotulo="consultores" href={c => `/admin/consultores/${c.id}`}
+            acoes={c => [{ rotulo: 'Abrir ficha', icone: 'ver', href: `/admin/consultores/${c.id}` }]}
             colunas={[
               { id: 'nome', titulo: 'Consultor', ordenar: (a, b) => a.nome.localeCompare(b.nome), celula: c => <span className="ui-cel-titulo">{c.nome}</span> },
               { id: 'total', titulo: 'Total', ordenar: (a, b) => a.total - b.total, celula: c => <Barra valor={c.total} max={maxConsultor} cor="#162a1e" texto={num(c.total)} /> },
@@ -141,7 +142,11 @@ export default function RelatorioVisitas() {
       </Secao>
 
       <Secao titulo="Lista de visitas" sub="Todas as visitas do período, com os filtros aplicados">
-        <Tabela linhas={visitas} chave={v => v.id} carregando={carregando} rotulo="visitas" href={v => `/admin/visitas/${v.id}`} reiniciar={`${filtros.dataInicio}|${filtros.dataFim}|${filtros.funcionarioId}`}
+        <Tabela linhas={visitas} chave={v => v.id} carregando={carregando} rotulo="visitas" href={v => `/admin/visitas/${v.id}`}
+          acoes={v => [
+            { rotulo: 'Abrir visita', icone: 'ver', href: `/admin/visitas/${v.id}` },
+            { rotulo: 'Editar', icone: 'editar', href: `/admin/visitas/${v.id}/editar` },
+          ]} reiniciar={`${filtros.dataInicio}|${filtros.dataFim}|${filtros.funcionarioId}`}
           destaque={v => statusDe(v) === 'atrasada'}
           colunas={[
             { id: 'data', titulo: 'Data', largura: '110px', ordenar: (a, b) => a.data_visita.localeCompare(b.data_visita), celula: v => <span className="ui-cel-num ui-cel-forte">{dataBR(v.data_visita)}</span> },

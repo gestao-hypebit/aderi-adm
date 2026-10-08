@@ -1,13 +1,18 @@
 'use client'
 
 import Link from 'next/link'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import Tabela, { Paginacao, usePaginacao } from '@/app/components/Tabela'
+import { linkWhatsApp } from '@/lib/contato'
 import { SeletorVisao, useVisao } from '@/app/components/AlternarVisao'
 
 export type LinhaConsultor = {
   id: string
   nome: string
   cargo: string
+  telefone: string | null
   realizadas: number
   agendadas: number
   clientes: number
@@ -15,13 +20,6 @@ export type LinhaConsultor = {
   atrasadas: number
   proxima: string | null
   ultimaAtividade: string | null
-}
-
-function IconPlus() {
-  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-}
-function IconCalendar() {
-  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
 }
 
 const fmt = (d: string) => d.split('-').reverse().slice(0, 2).join('/')
@@ -44,6 +42,15 @@ function Taxa({ c }: { c: LinhaConsultor }) {
 export default function ConsultoresLista({ linhas }: { linhas: LinhaConsultor[] }) {
   const [visao, setVisao] = useVisao('admin-consultores')
   const cards = usePaginacao(linhas, 24)
+  const router = useRouter()
+  const [erro, setErro] = useState('')
+
+  async function desativar(id: string) {
+    setErro('')
+    const { error } = await createClient().from('profiles').update({ ativo: false }).eq('id', id)
+    if (error) { setErro('Não foi possível desativar o acesso.'); return }
+    router.refresh()
+  }
 
   return (
     <>
@@ -62,6 +69,7 @@ export default function ConsultoresLista({ linhas }: { linhas: LinhaConsultor[] 
         .col-atrasada{display:inline-flex;font-size:.64rem;font-weight:600;color:#c0392b;background:#fdeeec;border-radius:999px;padding:.15rem .5rem;margin-top:.25rem}
       `}</style>
 
+      {erro && <div className="ui-alert ui-alert-erro">{erro}</div>}
       <div className="col-barra"><SeletorVisao visao={visao} onChange={setVisao} /></div>
 
       {visao === 'cards' ? (
@@ -104,6 +112,16 @@ export default function ConsultoresLista({ linhas }: { linhas: LinhaConsultor[] 
           chave={c => c.id}
           href={c => `/admin/consultores/${c.id}`}
           rotulo="consultores"
+          acoes={c => [
+            { rotulo: 'Abrir ficha', icone: 'ver', href: `/admin/consultores/${c.id}` },
+            { rotulo: 'Editar', icone: 'editar', href: `/admin/consultores/${c.id}/editar` },
+            { rotulo: 'Ver agenda', icone: 'agenda', href: `/admin/agenda?func=${c.id}` },
+            { rotulo: 'Agendar visita', icone: 'visita', href: `/admin/visitas/novo?funcionario=${c.id}` },
+            !!linkWhatsApp(c.telefone) && { rotulo: 'WhatsApp', icone: 'whatsapp', href: linkWhatsApp(c.telefone)!, novaAba: true },
+            { rotulo: 'Desativar acesso', icone: 'desativar', perigo: true, onClick: () => desativar(c.id),
+              confirmar: { titulo: `Desativar o acesso de ${c.nome}?`, botao: 'Desativar acesso',
+                texto: 'A pessoa não consegue mais entrar no sistema e deixa de aparecer para novos agendamentos. Visitas, clientes e histórico são mantidos. Dá para reativar na ficha.' } },
+          ]}
           colunas={[
             { id: 'nome', titulo: 'Consultor', ordenar: (a, b) => a.nome.localeCompare(b.nome),
               celula: c => (
@@ -124,13 +142,6 @@ export default function ConsultoresLista({ linhas }: { linhas: LinhaConsultor[] 
               celula: c => c.proxima ? <span className="ui-cel-num" style={{ color: '#E67E22', fontWeight: 600 }}>{fmt(c.proxima)}</span> : <span className="ui-cel-mudo">Nada agendado</span> },
             { id: 'ult', titulo: 'Última atividade', ocultar: 'tablet', ordenar: (a, b) => (a.ultimaAtividade ?? '').localeCompare(b.ultimaAtividade ?? ''),
               celula: c => <span className="ui-cel-num">{c.ultimaAtividade ? fmt(c.ultimaAtividade) : '—'}</span> },
-            { id: 'acoes', titulo: '', alinhar: 'dir', ocultar: 'celular',
-              celula: c => (
-                <div className="ui-cel-acoes">
-                  <Link href={`/admin/agenda?func=${c.id}`} className="ui-btn ui-btn-ghost ui-btn-sm"><IconCalendar /> Agenda</Link>
-                  <Link href={`/admin/visitas/novo?funcionario=${c.id}`} className="ui-btn ui-btn-secondary ui-btn-sm"><IconPlus /> Agendar</Link>
-                </div>
-              ) },
           ]}
         />
       )}

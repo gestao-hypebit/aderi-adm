@@ -39,6 +39,7 @@ export default function VisitasPage() {
   const [carregando, setCarregando] = useState(true)
   const [filtros, setFiltros] = useState<Filtros>(() => defaultFiltros())
   const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>('todas')
+  const [erro, setErro] = useState('')
 
   useEffect(() => {
     supabase.from('clientes').select('id, nome').order('nome').then(({ data }) => setClientes(data || []))
@@ -67,6 +68,20 @@ export default function VisitasPage() {
     realizada: visitas.filter(v => v.status === 'realizada').length,
     cancelada: visitas.filter(v => v.status === 'cancelada').length,
   }), [visitas, hoje])
+
+  async function cancelarVisita(id: string) {
+    setErro('')
+    const { error } = await supabase.from('visitas').update({ status: 'cancelada' }).eq('id', id)
+    if (error) { setErro('Não foi possível cancelar a visita.'); return }
+    setVisitas(l => l.map(v => (v.id === id ? { ...v, status: 'cancelada' } : v)))
+  }
+
+  async function excluirVisita(id: string) {
+    setErro('')
+    const { error } = await supabase.from('visitas').delete().eq('id', id)
+    if (error) { setErro('Não foi possível excluir a visita.'); return }
+    setVisitas(l => l.filter(v => v.id !== id))
+  }
 
   const exibidas = filtroStatus === 'todas' ? visitas
     : filtroStatus === 'atrasada' ? visitas.filter(ehAtrasada)
@@ -98,6 +113,7 @@ export default function VisitasPage() {
         </div>
       </div>
 
+      {erro && <div className="ui-alert ui-alert-erro">{erro}</div>}
       <Tabela
         linhas={exibidas}
         chave={v => v.id}
@@ -106,6 +122,15 @@ export default function VisitasPage() {
         reiniciar={`${filtroStatus}|${filtros.dataInicio}|${filtros.dataFim}|${filtros.clienteId}`}
         rotulo={`visitas · ${descreverPeriodo(filtros.dataInicio, filtros.dataFim)}`}
         destaque={ehAtrasada}
+        acoes={v => [
+          { rotulo: 'Abrir visita', icone: 'ver', href: `/dashboard/visitas/${v.id}` },
+          v.status === 'agendada' && { rotulo: 'Finalizar visita', icone: 'concluir', href: `/dashboard/visitas/${v.id}` },
+          v.cliente && { rotulo: 'Nova cotação para o cliente', icone: 'cotacao', href: `/dashboard/cotacoes/nova?visita=${v.id}` },
+          v.status === 'agendada' && { rotulo: 'Cancelar visita', icone: 'cancelar', onClick: () => cancelarVisita(v.id),
+            confirmar: { titulo: 'Cancelar esta visita?', botao: 'Cancelar visita', texto: <>A visita de {dataBR(v.data_visita)} com {v.cliente?.nome ?? 'o cliente'} fica marcada como cancelada. Ela continua no histórico.</> } },
+          v.status !== 'realizada' && { rotulo: 'Excluir', icone: 'excluir', perigo: true, onClick: () => excluirVisita(v.id),
+            confirmar: { titulo: 'Excluir esta visita?', botao: 'Excluir visita', texto: <>A visita de {dataBR(v.data_visita)} com {v.cliente?.nome ?? 'o cliente'} será apagada.</> } },
+        ]}
         vazio={
           <div className="ui-empty">
             <div className="ui-empty-icon"><IconClipboard /></div>

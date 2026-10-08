@@ -90,6 +90,7 @@ export default function CotacoesLista({ base }: { base: string }) {
   const [configAberta, setConfigAberta] = useState(false)
   const [configForm, setConfigForm] = useState<Config>(config)
   const [salvandoConfig, setSalvandoConfig] = useState(false)
+  const [erro, setErro] = useState('')
 
   useEffect(() => {
     async function carregar() {
@@ -157,6 +158,13 @@ export default function CotacoesLista({ base }: { base: string }) {
     ...(admin ? [['x-pedidos', 'Pedidos em andamento'] as [string, string]] : []),
   ]
 
+  async function excluirCotacao(id: string) {
+    setErro('')
+    const { error } = await supabase.from('cotacoes').delete().eq('id', id)
+    if (error) { setErro('Não foi possível excluir a cotação.'); return }
+    setLinhas(l => l.filter(c => c.id !== id))
+  }
+
   async function salvarConfig() {
     setSalvandoConfig(true)
     const { error } = await supabase.from('configuracoes').update({ ...configForm, updated_at: new Date().toISOString() }).eq('id', 1)
@@ -199,6 +207,7 @@ export default function CotacoesLista({ base }: { base: string }) {
         </div>
       </div>
 
+      {erro && <div className="ui-alert ui-alert-erro">{erro}</div>}
       <PeriodoSeletor inicio={periodo.inicio} fim={periodo.fim} onChange={(inicio, fim) => setPeriodo({ inicio, fim })} />
       {!carregando && <FunilCotacoes cotacoes={doPeriodo} periodo={descreverPeriodo(periodo.inicio, periodo.fim)} onStatus={setStatus} />}
 
@@ -282,6 +291,16 @@ export default function CotacoesLista({ base }: { base: string }) {
           carregando={carregando}
           reiniciar={chaveFiltro}
           rotulo="cotações"
+          acoes={l => {
+            const et = etapaDe(l)
+            return [
+              { rotulo: 'Abrir cotação', icone: 'ver', href: `${base}/${l.id}` },
+              (et === 'aprovada' || et === 'enviada' || et === 'efetivada') && { rotulo: 'Imprimir orçamento', icone: 'imprimir', href: `/imprimir/cotacao/${l.id}?doc=orcamento`, novaAba: true },
+              admin && et === 'efetivada' && { rotulo: 'Pedido e cargas', icone: 'carga', href: `${base}/${l.id}?aba=pedido` },
+              (admin || et !== 'efetivada') && { rotulo: 'Excluir', icone: 'excluir', perigo: true, onClick: () => excluirCotacao(l.id),
+                confirmar: { titulo: `Excluir a cotação ${l.numero}?`, botao: 'Excluir cotação', texto: et === 'efetivada' ? 'Esta cotação já virou pedido: o pedido e as cargas registradas também serão apagados.' : 'A cotação e seus produtos serão apagados. Essa ação não pode ser desfeita.' } },
+            ]
+          }}
           vazio={
             <div className="ui-empty">
               <div className="ui-empty-icon"><IconDoc /></div>

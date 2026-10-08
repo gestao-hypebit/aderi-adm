@@ -28,6 +28,11 @@ export default function EquipeTabela({ linhas }: { linhas: LinhaEquipe[] }) {
       linhas={linhas}
       chave={c => c.id}
       href={c => `/admin/consultores/${c.id}`}
+      acoes={c => [
+        { rotulo: 'Abrir ficha', icone: 'ver', href: `/admin/consultores/${c.id}` },
+        { rotulo: 'Ver agenda', icone: 'agenda', href: `/admin/agenda?func=${c.id}` },
+        { rotulo: 'Agendar visita', icone: 'visita', href: `/admin/visitas/novo?funcionario=${c.id}` },
+      ]}
       rotulo="consultores"
       porPagina={10}
       ordemInicial={{ coluna: 'real', direcao: 'desc' }}

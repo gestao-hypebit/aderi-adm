@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { SeletorVisao, useVisao } from '@/app/components/AlternarVisao'
 import Tabela, { Paginacao, usePaginacao } from '@/app/components/Tabela'
+import { linkWhatsApp } from '@/lib/contato'
 
 type Cliente = {
   id: string
@@ -15,6 +16,7 @@ type Cliente = {
   cultura_principal: string | null
   hectares: number | null
   telefone: string | null
+  criado_por: string | null
   created_at: string
 }
 
@@ -38,11 +40,14 @@ export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [busca, setBusca] = useState('')
   const [carregando, setCarregando] = useState(true)
+  const [uid, setUid] = useState('')
+  const [erro, setErro] = useState('')
   const [visao, setVisao] = useVisao('dashboard-clientes')
   const supabase = createClient()
 
   useEffect(() => {
-    supabase.from('clientes').select('id, nome, cidade, estado, nome_fazenda, cultura_principal, hectares, telefone, created_at').order('nome').then(({ data }) => {
+    supabase.auth.getUser().then(({ data }) => setUid(data.user?.id ?? ''))
+    supabase.from('clientes').select('id, nome, cidade, estado, nome_fazenda, cultura_principal, hectares, telefone, criado_por, created_at').order('nome').then(({ data }) => {
       setClientes(data || [])
       setCarregando(false)
     })
@@ -56,6 +61,13 @@ export default function ClientesPage() {
   }, [clientes, busca])
 
   const cards = usePaginacao(filtrados, 24, busca)
+
+  async function excluirCliente(id: string) {
+    setErro('')
+    const { error } = await supabase.from('clientes').delete().eq('id', id)
+    if (error) { setErro('Não foi possível excluir o cliente.'); return }
+    setClientes(l => l.filter(c => c.id !== id))
+  }
   const totalHa = clientes.reduce((s, c) => s + (Number(c.hectares) || 0), 0)
 
   const vazio = (
@@ -88,6 +100,7 @@ export default function ClientesPage() {
         </div>
       </div>
 
+      {erro && <div className="ui-alert ui-alert-erro">{erro}</div>}
       <div className="dc-toolbar">
         <input className="ui-input dc-busca" placeholder="Buscar por nome, fazenda ou cidade..." value={busca} onChange={e => setBusca(e.target.value)} />
         <div style={{ marginLeft: 'auto' }}><SeletorVisao visao={visao} onChange={setVisao} /></div>
@@ -126,6 +139,15 @@ export default function ClientesPage() {
           reiniciar={busca}
           rotulo="clientes"
           vazio={vazio}
+          acoes={c => [
+            { rotulo: 'Abrir ficha', icone: 'ver', href: `/dashboard/clientes/${c.id}` },
+            { rotulo: 'Editar', icone: 'editar', href: `/dashboard/clientes/${c.id}/editar` },
+            { rotulo: 'Agendar visita', icone: 'visita', href: `/dashboard/visitas/novo?cliente=${c.id}` },
+            { rotulo: 'Nova cotação', icone: 'cotacao', href: `/dashboard/cotacoes/nova?cliente=${c.id}` },
+            !!linkWhatsApp(c.telefone) && { rotulo: 'WhatsApp', icone: 'whatsapp', href: linkWhatsApp(c.telefone)!, novaAba: true },
+            c.criado_por === uid && { rotulo: 'Excluir', icone: 'excluir', perigo: true, onClick: () => excluirCliente(c.id),
+              confirmar: { titulo: `Excluir ${c.nome}?`, botao: 'Excluir cliente', texto: 'O cadastro será apagado junto com as visitas dele. Cotações ficam guardadas sem o vínculo.' } },
+          ]}
           colunas={[
             { id: 'cliente', titulo: 'Cliente', ordenar: (a, b) => a.nome.localeCompare(b.nome),
               celula: c => (
