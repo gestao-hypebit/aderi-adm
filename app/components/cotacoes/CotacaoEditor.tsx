@@ -755,7 +755,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
           </>}
           {etapa === 'aprovada' && <>
             <b>3. Aprovada pela gestão: envie o orçamento ao cliente</b>
-            <span>O orçamento é o documento que o cliente recebe, só com produtos, quantidades, preços e vencimentos. Ao enviar, a etapa muda para &quot;Orçamento enviado&quot;.</span>
+            <span>O orçamento é o documento que o cliente recebe, só com produtos, quantidades, preços e vencimentos. Ao enviar, a etapa muda para &quot;Orçamento enviado&quot;. Se o cliente já fechou, gere o pedido direto.</span>
           </>}
           {etapa === 'enviada' && <>
             <b>4. Orçamento enviado{cab.enviada_em ? ` em ${dataCurta(cab.enviada_em.slice(0, 10))}` : ''}: o cliente aprovou?</b>
@@ -781,6 +781,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
           {etapa === 'aprovada' && <>
             <button className="ui-btn ui-btn-success" onClick={gerarPdf} disabled={!liberada || salvando || !!pdf}><Ic d={D.pdf} /> {pdf?.etapa === 'gerando' ? 'Gerando PDF...' : 'Enviar orçamento em PDF'}</button>
             <button className="ui-btn ui-btn-secondary" onClick={() => enviarCliente('whatsapp')} disabled={!liberada || salvando}><Ic d={D.zap} /> Enviar link</button>
+            <button className="ui-btn ui-btn-secondary" onClick={() => setConfirmarPedido(true)} disabled={!liberada || salvando}><Ic d={D.check} /> Gerar pedido sem enviar</button>
             <button className="ui-btn ui-btn-ghost" onClick={() => setAba('orcamento')}>Ver orçamento</button>
           </>}
           {etapa === 'enviada' && <>
