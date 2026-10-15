@@ -272,9 +272,9 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
   const tot = useMemo(() => calcularTotais(itens, param), [itens, param])
 
   // Aprovação da gestão: obrigatória antes do orçamento ir para o cliente (o banco também barra).
-  // Continua valendo enquanto o preço não cair abaixo do que a gestão aprovou.
+  // Por enquanto a margem não trava: depois de aprovada, baixar o preço não devolve para a gestão.
   const minMargem = useMemo(() => menorMargem(itens, param), [itens, param])
-  const coberta = cab.aprovacao_status === 'aprovada' && (minMargem == null || cab.aprovacao_margem == null || minMargem >= cab.aprovacao_margem - 0.000001)
+  const coberta = cab.aprovacao_status === 'aprovada'
   const liberada = admin || coberta
   const etapa = etapaDe(cab)
   const linkPublico = typeof window !== 'undefined' && cab.token_publico ? `${window.location.origin}/o/${cab.token_publico}` : ''
@@ -360,19 +360,10 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
   async function salvar(statusForcado?: string, extra: Partial<Cabecalho> = {}): Promise<string | null> {
     setErro(''); setOk('')
     const cab = { ...cabAtual, ...extra }
-    let aviso = ''
     if (!cab.cliente_nome.trim()) { setErro('Informe o cliente da cotação.'); setEditandoCliente(true); return null }
     const validos = itens.filter(i => i.produto_nome.trim())
     if (validos.length === 0) { setErro('Adicione ao menos um produto.'); return null }
-    let statusDesejado = statusForcado ?? cab.status
-    // consultor baixou o preço depois da aprovação: volta para a gestão aprovar de novo
-    if (!admin && !coberta && cab.aprovacao_status === 'aprovada' && (statusDesejado === 'aprovada' || statusDesejado === 'enviada')) {
-      statusDesejado = 'rascunho'
-      cab.status = 'rascunho'
-      cab.aprovacao_status = 'pendente'
-      setCab(c => ({ ...c, status: 'rascunho', aprovacao_status: 'pendente' }))
-      aviso = 'O preço ficou abaixo do aprovado: a cotação voltou para a gestão aprovar de novo.'
-    }
+    const statusDesejado = statusForcado ?? cab.status
     const semQtd = validos.find(i => !(i.quantidade > 0))
     if (semQtd && (['aprovada', 'enviada', 'efetivada'].includes(statusDesejado) || extra.aprovacao_status === 'pendente')) {
       setErro(`Informe a quantidade de "${semQtd.produto_nome}" antes de seguir.`)
@@ -453,7 +444,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
         aprovacao_status: atual.aprovacao_status ?? '', aprovacao_margem: atual.aprovacao_margem != null ? Number(atual.aprovacao_margem) : null,
       }))
     }
-    setOk(aviso || (atual?.status === 'rascunho' && atual.aprovacao_status !== 'pendente'
+    setOk((atual?.status === 'rascunho' && atual.aprovacao_status !== 'pendente'
       ? (admin ? 'Rascunho salvo. Quando estiver pronta, clique em "Aprovar cotação".' : 'Rascunho salvo. Para a gestão ver em Aprovações, clique em "Enviar para aprovação".')
       : 'Cotação salva.'))
     return id ?? null
@@ -794,9 +785,6 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
         </div>
         </div>
         {/* avisos da etapa, dentro do mesmo card */}
-        {!admin && cab.aprovacao_status === 'aprovada' && !coberta && etapa !== 'efetivada' && etapa !== 'perdida' && (
-          <div className="ce-aviso-linha"><Ic d={D.cadeado} size={13} /> Preço abaixo do que a gestão aprovou: ao salvar, a cotação volta para a gestão aprovar de novo.</div>
-        )}
         {diasEnviada != null && diasEnviada >= config.dias_followup && (
           <div className="ce-aviso-linha"><Ic d={D.relogio} size={13} /> Enviado há {diasEnviada} dias sem resposta. <button className="ce-link" onClick={cobrarFollowup}>Cobrar pelo WhatsApp</button></div>
         )}

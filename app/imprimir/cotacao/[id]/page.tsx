@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { ItemCotacao, ParametrosCotacao, itemDoBanco, parametrosDoBanco, menorMargem } from '@/lib/cotacao'
+import { ItemCotacao, ParametrosCotacao, itemDoBanco, parametrosDoBanco } from '@/lib/cotacao'
 import DocumentoCotacao, { DOC_CSS, TITULO_DOC, type DadosDocumento, type TipoDocumento } from '@/app/components/cotacoes/Documento'
 
 type Carregado = { dados: DadosDocumento; itens: ItemCotacao[]; param: ParametrosCotacao; bloqueado: boolean }
@@ -28,9 +28,8 @@ function Conteudo() {
       const ehAdmin = perfil?.role === 'admin'
       const itens = (its ?? []).map(itemDoBanco)
       const param = parametrosDoBanco(cot)
-      // mesma regra do editor: consultor só gera o orçamento depois da aprovação da gestão (e sem baixar o preço aprovado)
-      const minM = menorMargem(itens, param)
-      const coberta = cot.aprovacao_status === 'aprovada' && (minM == null || cot.aprovacao_margem == null || minM >= Number(cot.aprovacao_margem) - 0.000001)
+      // mesma regra do editor: consultor só gera o orçamento depois da aprovação da gestão (a margem não trava por enquanto)
+      const coberta = cot.aprovacao_status === 'aprovada'
       const autor = Array.isArray(cot.autor) ? cot.autor[0] : cot.autor
       setAdmin(ehAdmin)
       setC({
