@@ -67,6 +67,8 @@ const CAB_VAZIO: Cabecalho = {
 
 const CONFIG_PADRAO: Config = { margem_minima: 0, validade_cotacao_dias: 7, dias_followup: 3 }
 const PRAZOS = [30, 60, 90, 120, 180, 270, 360]
+// vencimento: atalhos em dias a partir do início do prazo (ou de hoje); a data fixa continua no campo
+const VENCIMENTOS = [30, 60, 90, 120]
 
 let seq = 0
 const novaChave = () => ++seq
@@ -169,8 +171,8 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
       const conf = cfg ? { margem_minima: Number(cfg.margem_minima), validade_cotacao_dias: cfg.validade_cotacao_dias, dias_followup: cfg.dias_followup } : CONFIG_PADRAO
       setConfig(conf)
       setAdmin(perfil?.role === 'admin')
-      // pedido e resultado são só da gestão
-      if (perfil?.role !== 'admin') setAba(a => (a === 'pedido' || a === 'resultado' ? 'cotacao' : a))
+      // resultado (custos) é só da gestão; o pedido o consultor acompanha sem editar
+      if (perfil?.role !== 'admin') setAba(a => (a === 'resultado' ? 'cotacao' : a))
       setProdutos((prods ?? []).map(p => ({ ...p, preco_tabela: Number(p.preco_tabela) })))
       const listaClientes = (clis ?? []) as ClienteOpcao[]
       setClientes(listaClientes)
@@ -570,7 +572,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
 
   async function imprimir(doc: string) {
     setMaisAberto(false)
-    if (doc !== 'orcamento' && !admin) return
+    if (doc === 'resultado' && !admin) return
     if (doc !== 'resultado' && !liberada) { setErro('O orçamento só pode ser gerado depois que a gestão aprovar a cotação.'); return }
     const id = alterado || !cotacaoId ? await salvar() : cotacaoId
     if (id) window.open(`/imprimir/cotacao/${id}?doc=${doc}`, '_blank')
@@ -654,7 +656,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
       const mod = e.ctrlKey || e.metaKey
       const k = e.key.toLowerCase()
       if (mod && k === 's') { e.preventDefault(); atalhos.current.salvar() }
-      else if (mod && k === 'p') { e.preventDefault(); atalhos.current.imprimir(e.shiftKey && atalhos.current.admin ? 'pedido' : 'orcamento') }
+      else if (mod && k === 'p') { e.preventDefault(); atalhos.current.imprimir(e.shiftKey ? 'pedido' : 'orcamento') }
       else if (e.altKey && k === 'n') { e.preventDefault(); atalhos.current.adicionarItem() }
     }
     window.addEventListener('keydown', onKey)
@@ -675,8 +677,8 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
   }
   // "voltar" leva para a fase em que a negociação está (cotações, aprovações, orçamentos ou pedidos)
   const voltar = etapa === 'aguardando' && admin ? { href: `${raiz}/aprovacoes`, rotulo: 'Aprovações' }
-    : etapa === 'efetivada' && admin ? { href: `${raiz}/pedidos`, rotulo: 'Pedidos' }
-    : etapa === 'aprovada' || etapa === 'enviada' || etapa === 'efetivada' || (etapa === 'perdida' && cab.enviada_em) ? { href: `${raiz}/orcamentos`, rotulo: 'Orçamentos' }
+    : etapa === 'efetivada' ? { href: `${raiz}/pedidos`, rotulo: 'Pedidos' }
+    : etapa === 'aprovada' || etapa === 'enviada' || (etapa === 'perdida' && cab.enviada_em) ? { href: `${raiz}/orcamentos`, rotulo: 'Orçamentos' }
     : { href: base, rotulo: 'Cotações' }
   const preenchidos = itens.filter(i => i.produto_nome.trim()).length
   const corResultado = tot.resultado < 0 ? '#c0392b' : '#1e8a4c'
@@ -710,7 +712,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
               {maisAberto && (
                 <div className="ce-mais-menu" onMouseLeave={() => setMaisAberto(false)}>
                   {liberada && <button onClick={() => imprimir('orcamento')}><Ic d={D.impr} /> Imprimir orçamento<kbd>{CTRL} P</kbd></button>}
-                  {admin && cab.status === 'efetivada' && <button onClick={() => imprimir('pedido')}><Ic d={D.impr} /> Imprimir pedido</button>}
+                  {cab.status === 'efetivada' && <button onClick={() => imprimir('pedido')}><Ic d={D.impr} /> Imprimir pedido</button>}
                   {admin && <button onClick={() => imprimir('resultado')}><Ic d={D.impr} /> Imprimir resultado (interno)</button>}
                   <button onClick={() => { setMaisAberto(false); duplicar() }}><Ic d={D.copiar} /> Duplicar cotação</button>
                   {admin && <button onClick={() => { setMaisAberto(false); setCorrigirAberto(true) }}><Ic d={D.editar} /> Corrigir etapa</button>}
@@ -754,7 +756,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
           </>}
           {etapa === 'efetivada' && <>
             <b>5. Cliente aprovou: pedido gerado</b>
-            <span>{admin ? 'Acompanhe faturamento, entrega e pagamento na aba Pedido.' : 'A gestão acompanha o faturamento e a entrega do pedido.'}</span>
+            <span>{admin ? 'Acompanhe faturamento, entrega e pagamento na aba Pedido.' : 'A gestão registra faturamento e cargas; acompanhe a entrega na aba Pedido.'}</span>
           </>}
           {etapa === 'perdida' && <>
             <b>Perdida</b>
@@ -780,7 +782,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
             <button className="ui-btn ui-btn-danger" onClick={() => mudarStatus('perdida')} disabled={salvando}>Cliente não aprovou</button>
             <button className="ui-btn ui-btn-ghost" onClick={gerarPdf} disabled={!liberada || salvando || !!pdf}><Ic d={D.pdf} /> Reenviar PDF</button>
           </>}
-          {etapa === 'efetivada' && admin && <button className="ui-btn ui-btn-primary" onClick={() => setAba('pedido')}><Ic d={D.caminhao} /> Acompanhar pedido</button>}
+          {etapa === 'efetivada' && <button className="ui-btn ui-btn-primary" onClick={() => setAba('pedido')}><Ic d={D.caminhao} /> Acompanhar pedido</button>}
           {etapa === 'perdida' && <button className="ui-btn ui-btn-secondary" onClick={reabrir} disabled={salvando}>Reabrir cotação</button>}
         </div>
         </div>
@@ -797,7 +799,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
         {([
           ['cotacao', 'Cotação', 'Interna: custos e preços'],
           ['orcamento', 'Orçamento', 'O que o cliente recebe'],
-          ...(admin && (cab.status === 'efetivada' || cab.pedido_status) ? [['pedido', 'Pedido', 'Depois que o cliente aprova']] : []),
+          ...(cab.status === 'efetivada' || cab.pedido_status ? [['pedido', 'Pedido', 'Depois que o cliente aprova']] : []),
           ...(admin ? [['resultado', 'Resultado', 'Custos (interno)']] : []),
         ] as [typeof aba, string, string][]).map(([k, t, d]) => (
           <button key={k} role="tab" aria-selected={aba === k} className={`ce-aba ${aba === k ? 'ativo' : ''}`} onClick={() => setAba(k)}>
@@ -825,7 +827,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
             </div>
           </div>
           {aba === 'pedido' && cotacaoId && (cab.status === 'efetivada' || cab.pedido_status) && (
-            <EntregasPedido cotacaoId={cotacaoId} itens={itens} onMudou={recarregarPedido} />
+            <EntregasPedido cotacaoId={cotacaoId} itens={itens} onMudou={recarregarPedido} somenteLeitura={!admin} />
           )}
           {aba === 'pedido' && (cab.status === 'efetivada' || cab.pedido_status) && (() => {
             const pago = cab.pagamento_status === 'pago'
@@ -837,6 +839,22 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
                 <span className="ce-sec-tit">Faturamento e recebimento</span>
                 {cab.pedido_status && <span className={`ui-badge ${cab.pedido_status === 'entregue' ? 'ui-badge-realizada' : cab.pedido_status === 'cancelado' ? 'ui-badge-cancelada' : cab.pedido_status === 'parcial' ? 'ui-badge-aprovada' : 'ui-badge-agendada'}`} style={{ marginLeft: 'auto' }}>{PEDIDO_STATUS[cab.pedido_status]}</span>}
               </div>
+              {!admin ? (
+              <div className="ce-sec-body">
+                <div className="ce-ped-resumo">
+                  <div><span>Nota fiscal</span><b>{cab.nota_fiscal ? `NF ${cab.nota_fiscal}` : 'Não faturado'}</b></div>
+                  <div><span>Faturado em</span><b>{cab.faturado_em ? dataCurta(cab.faturado_em) : '—'}</b></div>
+                  <div><span>Entregue em</span><b>{cab.entregue_em ? dataCurta(cab.entregue_em) : '—'}</b></div>
+                </div>
+                <div className="ce-ped-resumo">
+                  <div><span>Total do pedido</span><b>{brl(tot.venda)}</b></div>
+                  <div><span>Pagamento</span><b>{PAGAMENTO_STATUS[cab.pagamento_status || 'em_aberto']}</b></div>
+                  <div><span>Falta receber</span><b style={{ color: falta > 0.005 ? '#c0651a' : '#1a7f4b' }}>{falta > 0.005 ? brl(falta) : 'Nada'}</b></div>
+                </div>
+                {cab.pedido_obs && <div className="ui-hint">Obs.: {cab.pedido_obs}</div>}
+                <div className="ui-hint">Faturamento, cargas e recebimento são registrados pela gestão.</div>
+              </div>
+              ) : (
               <div className="ce-sec-body">
                 <div className="ce-ped-bloco">
                   <div className="ce-ped-tit">Faturamento</div>
@@ -878,6 +896,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
                   <button className="ui-btn ui-btn-primary" onClick={salvarPedido} disabled={!pedidoAlterado || salvandoPedido}>{salvandoPedido ? 'Salvando...' : 'Salvar faturamento e recebimento'}</button>
                 </div>
               </div>
+              )}
             </section>
             )
           })()}
@@ -1269,6 +1288,12 @@ function ItemCard({ it, idx, c, admin, produtos, aberto, minimo, abaixo, histori
             <label className="ce-venc">
               Vencimento
               <input type="date" className="ui-input" value={it.vencimento ?? it.data_final ?? ''} onChange={e => onMudar({ vencimento: e.target.value || null })} {...nav} />
+              <div className="ce-chips" role="group" aria-label="Vencimento em dias">
+                {VENCIMENTOS.map(d => {
+                  const data = somarDias(it.data_inicial || hojeISO(), d)
+                  return <button key={d} type="button" className={(it.vencimento ?? it.data_final) === data ? 'ativo' : ''} onClick={e => { e.preventDefault(); onMudar({ vencimento: data }) }} title={`Vence em ${dataCurta(data)}`}>{d}d</button>
+                })}
+              </div>
             </label>
             <div className="ce-total"><span>Total</span><b>{brl(c.total)}</b></div>
           </div>
@@ -1385,6 +1410,7 @@ const EDITOR_CSS = `
   .ce-pc .ui-input{font-size:.95rem;font-weight:600;text-align:right;border-color:#f5d9bd}
   .ce-pc .ui-input.abaixo{border-color:#f0b4ab;background:#fffafa}
   .ce-venc .ui-input{padding:.6rem .5rem;font-size:.78rem}
+  .ce-venc .ce-chips{margin-top:.3rem}
   .ce-total{text-align:right;display:flex;flex-direction:column;gap:.15rem;align-self:end}
   .ce-total span{font-size:.64rem;font-weight:600;color:#8f978f}
   .ce-total b{font-size:1.15rem;color:#162a1e;white-space:nowrap}

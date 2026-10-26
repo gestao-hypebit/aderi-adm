@@ -132,7 +132,7 @@ export default function PedidosLista({ base }: { base: string }) {
       <div className="ui-page-header">
         <div>
           <div className="ui-title">Pedidos</div>
-          <div className="ui-sub">Orçamentos que o cliente aprovou: faturamento, cargas entregues, saldo a entregar e pagamento. Para registrar uma carga, abra o pedido.</div>
+          <div className="ui-sub">Orçamentos que o cliente aprovou: faturamento, cargas entregues, saldo a entregar e pagamento. {admin ? 'Para registrar uma carga, abra o pedido.' : 'Abra o pedido para acompanhar as cargas; quem registra é a gestão.'}</div>
         </div>
         <div className="ui-header-actions">
           <button className="ui-btn ui-btn-secondary" onClick={exportar} disabled={carregando || !lista.length}>Exportar CSV</button>
@@ -207,7 +207,7 @@ export default function PedidosLista({ base }: { base: string }) {
         rotulo="pedidos"
         acoes={p => [
           { rotulo: 'Abrir pedido', icone: 'ver', href: `${base}/${p.id}?aba=pedido` },
-          p.pedido_status !== 'cancelado' && p.saldos.some(s => s.saldo > 0.0001) && { rotulo: 'Registrar carga', icone: 'carga', href: `${base}/${p.id}?aba=pedido` },
+          admin && p.pedido_status !== 'cancelado' && p.saldos.some(s => s.saldo > 0.0001) && { rotulo: 'Registrar carga', icone: 'carga', href: `${base}/${p.id}?aba=pedido` },
           { rotulo: 'Imprimir pedido', icone: 'imprimir', href: `/imprimir/cotacao/${p.id}?doc=pedido`, novaAba: true },
         ]}
         vazio={<div className="ui-empty"><div className="ui-empty-title">{pedidos.length ? 'Nenhum pedido encontrado' : 'Nenhum pedido ainda'}</div><div className="ui-empty-text">Quando o cliente aprova um orçamento, ele aparece aqui como pedido.</div></div>}

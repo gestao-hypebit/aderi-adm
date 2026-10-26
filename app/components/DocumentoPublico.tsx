@@ -14,15 +14,17 @@ export const DP_CSS = `
         .dp-doc{margin-left:auto;text-align:right;font-size:8.5pt;color:#5b6660}
         .dp-doc-t{font-size:13pt;font-weight:600;color:#E67E22;text-transform:uppercase;letter-spacing:.04em}
         .dp-sec{margin-top:14px}
+        .dp-fat{background:#000;color:#fff;padding:8px 10px;border-radius:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        .dp-fat .dp-sec-t{color:#fff}
         .dp-sec-t{font-size:8pt;font-weight:600;color:#E67E22;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
         .dp-dados{width:100%;border-collapse:collapse;font-size:9.5pt}
         .dp-dados th{text-align:left;color:#5b6660;font-weight:600;padding:3px 10px 3px 0;white-space:nowrap;width:1%}
         .dp-dados td{padding:3px 12px 3px 0;border-bottom:1px solid #eee;font-weight:600}
         .dp-itens{width:100%;border-collapse:collapse;font-size:9.5pt}
-        .dp-itens th{background:#162a1e;color:#fff;text-align:left;padding:6px 7px;font-size:7.5pt;text-transform:uppercase;letter-spacing:.04em}
+        .dp-itens th{background:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact;color:#fff;text-align:left;padding:6px 7px;font-size:7.5pt;text-transform:uppercase;letter-spacing:.04em}
         .dp-itens td{padding:6px 7px;border-bottom:1px solid #e6e2db}
         .dp-itens .n{text-align:right;white-space:nowrap}
-        .dp-itens tfoot td{font-weight:600;border-top:2px solid #162a1e;background:#fdf3e9}
+        .dp-itens tfoot td{font-weight:600;border-top:2px solid #000;background:#fdf3e9}
         .dp-texto{white-space:pre-wrap;line-height:1.65;font-size:9.5pt}
         .dp-fotos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
         .dp-fotos figure{margin:0;border:1px solid #eee;border-radius:8px;overflow:hidden;break-inside:avoid}

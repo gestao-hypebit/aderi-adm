@@ -71,7 +71,7 @@ export default async function OrcamentoPublicoPage({ params }: { params: Promise
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 18 }}>
         <section className="dp-sec"><div className="dp-sec-t">Observações</div><div className="dp-texto">{o.observacoes_cliente || '—'}</div></section>
-        <section className="dp-sec"><div className="dp-sec-t">Faturamento</div><div className="dp-texto">{VERDE.join('\n')}</div></section>
+        <section className="dp-sec dp-fat"><div className="dp-sec-t">Faturamento</div><div className="dp-texto">{VERDE.join('\n')}</div></section>
       </div>
 
       <div className="dp-rodape">

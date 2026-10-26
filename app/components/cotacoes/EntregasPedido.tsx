@@ -19,9 +19,10 @@ const CAMINHAO = '<rect x="1" y="3" width="15" height="13"/><polygon points="16 
 const LIXO = '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>'
 const EDITAR = '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>'
 
-type Props = { cotacaoId: string; itens: ItemCotacao[]; onMudou: () => void }
+// somenteLeitura: consultor acompanha as cargas, mas quem registra é a gestão
+type Props = { cotacaoId: string; itens: ItemCotacao[]; onMudou: () => void; somenteLeitura?: boolean }
 
-export default function EntregasPedido({ cotacaoId, itens, onMudou }: Props) {
+export default function EntregasPedido({ cotacaoId, itens, onMudou, somenteLeitura = false }: Props) {
   const [entregas, setEntregas] = useState<Entrega[]>([])
   const [carregando, setCarregando] = useState(true)
   const [form, setForm] = useState<(Form & { id?: string }) | null>(null)
@@ -124,7 +125,7 @@ export default function EntregasPedido({ cotacaoId, itens, onMudou }: Props) {
       <div className="ce-sec-head">
         <span className="ce-step" style={{ background: '#1a7f4b' }}><Ic d={CAMINHAO} size={12} /></span>
         <span className="ce-sec-tit">Entregas (cargas)</span>
-        <button className="ui-btn ui-btn-primary ui-btn-sm" style={{ marginLeft: 'auto' }} onClick={() => novaCarga()} disabled={!saldos.length}><Ic d={CAMINHAO} /> Registrar carga</button>
+        {!somenteLeitura && <button className="ui-btn ui-btn-primary ui-btn-sm" style={{ marginLeft: 'auto' }} onClick={() => novaCarga()} disabled={!saldos.length}><Ic d={CAMINHAO} /> Registrar carga</button>}
       </div>
       <div className="ce-sec-body">
         <div className="en-top">
@@ -141,7 +142,7 @@ export default function EntregasPedido({ cotacaoId, itens, onMudou }: Props) {
               const p = s.pedido ? Math.min(1, s.entregue / s.pedido) : 0
               return (
                 <tr key={s.chave}>
-                  <td><div className="forte">{s.produto}</div>{s.saldo > 0.0001 && <button className="en-btn-prod" onClick={() => novaCarga(s.produto)}>+ carga deste produto</button>}</td>
+                  <td><div className="forte">{s.produto}</div>{!somenteLeitura && s.saldo > 0.0001 && <button className="en-btn-prod" onClick={() => novaCarga(s.produto)}>+ carga deste produto</button>}</td>
                   <td className="n">{qtd(s.pedido)} {s.unidade}</td>
                   <td className="n">{qtd(s.entregue)} {s.unidade}<div style={{ fontSize: '.66rem', color: '#8f978f' }}>{s.cargas} carga{s.cargas !== 1 ? 's' : ''}</div></td>
                   <td className="n">{s.saldo > 0.0001 ? <span className="en-saldo">{qtd(s.saldo)} {s.unidade}</span> : <span className="en-ok">Entregue</span>}</td>
@@ -155,7 +156,7 @@ export default function EntregasPedido({ cotacaoId, itens, onMudou }: Props) {
         <div className="en-cargas">
           <div className="en-cargas-t">Cargas enviadas</div>
           {carregando ? <div className="ui-skeleton" style={{ height: 40 }} />
-            : entregas.length === 0 ? <div className="en-vazio">Nenhuma carga registrada ainda. A cada caminhão que sair, clique em &quot;Registrar carga&quot;.</div>
+            : entregas.length === 0 ? <div className="en-vazio">{somenteLeitura ? 'Nenhuma carga saiu ainda. As cargas aparecem aqui quando a gestão registra.' : <>Nenhuma carga registrada ainda. A cada caminhão que sair, clique em &quot;Registrar carga&quot;.</>}</div>
             : entregas.map(e => (
               <div key={e.id} className="en-carga">
                 <span className="en-carga-ico"><Ic d={CAMINHAO} /></span>
@@ -164,8 +165,10 @@ export default function EntregasPedido({ cotacaoId, itens, onMudou }: Props) {
                   <small>{[e.nota_fiscal && `NF ${e.nota_fiscal}`, e.transportador, e.motorista && `Motorista: ${e.motorista}`, e.placa && `Placa ${e.placa}`].filter(Boolean).join(' · ') || 'Sem nota / transportador'}</small>
                   {e.observacao && <small>{e.observacao}</small>}
                 </div>
+                {!somenteLeitura && <>
                 <button className="en-acao" title="Editar carga" onClick={() => { setErro(''); setForm({ id: e.id, produto_nome: e.produto_nome, quantidade: e.quantidade, data: e.data, nota_fiscal: e.nota_fiscal ?? '', transportador: e.transportador ?? '', motorista: e.motorista ?? '', placa: e.placa ?? '', observacao: e.observacao ?? '' }) }}><Ic d={EDITAR} size={13} /></button>
                 <button className="en-acao" title="Excluir carga" onClick={() => setExcluir(e)}><Ic d={LIXO} size={13} /></button>
+                </>}
               </div>
             ))}
         </div>
