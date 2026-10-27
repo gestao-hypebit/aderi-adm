@@ -56,6 +56,10 @@ function IconClose() {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
 }
 
+function IconUpload() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+}
+
 const grupos = [
   {
     titulo: 'Visão geral',
@@ -82,6 +86,16 @@ const grupos = [
       { href: '/admin/pedidos', label: 'Pedidos', Icon: IconCart },
       { href: '/admin/relatorios/cotacoes', label: 'Acompanhamento', Icon: IconFunil },
       { href: '/admin/produtos', label: 'Produtos', Icon: IconBox },
+    ],
+  },
+  {
+    titulo: 'Metas',
+    links: [
+      { href: '/admin/metas', label: 'Painel de metas', Icon: IconBarChart },
+      { href: '/admin/metas/vendas', label: 'Vendas', Icon: IconCart },
+      { href: '/admin/metas/importar', label: 'Importar vendas', Icon: IconUpload },
+      { href: '/admin/metas/cadastro', label: 'Cadastro de metas', Icon: IconClipboard },
+      { href: '/admin/metas/configuracoes', label: 'Configurações', Icon: IconBox },
     ],
   },
   {
@@ -116,6 +130,13 @@ const titulos: [string, string][] = [
   ['/admin/relatorios/carteira', 'Relatório · Cobertura da carteira'],
   ['/admin/relatorios/vendas', 'Relatório · Cotações e vendas'],
   ['/admin/relatorios/km', 'Relatório · KM e combustível'],
+  ['/admin/metas/importar', 'Importar vendas'],
+  ['/admin/metas/cadastro', 'Cadastro de metas'],
+  ['/admin/metas/configuracoes', 'Configurações de metas'],
+  ['/admin/metas/vendas/nova', 'Nova venda'],
+  ['/admin/metas/vendas/', 'Venda'],
+  ['/admin/metas/vendas', 'Vendas'],
+  ['/admin/metas', 'Painel de metas'],
   ['/admin/relatorios', 'Relatórios'],
 ]
 
