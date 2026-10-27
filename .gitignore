@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# planilhas do cliente (dados financeiros)
+/docs/planilhas/
