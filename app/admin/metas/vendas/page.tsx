@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import Tabela from '@/app/components/Tabela'
 import { brl } from '@/lib/cotacao'
-import { baixarCsv, dataBR } from '@/lib/csv'
+import { dataBR } from '@/lib/csv'
+import { baixarXlsx, type ColunaExcel } from '@/lib/metas/excel'
 import { calcularVenda, resumirVendas } from '@/lib/metas/calculo'
 import { carregarCadastros, type DadosCadastro } from '@/lib/metas/cadastros'
 import { MODALIDADES, TIPOS } from '@/lib/metas/nomes'
@@ -55,18 +56,23 @@ export default function VendasPage() {
   const grupo = (id: number) => dados?.grupos.find(g => g.id === id)?.nome ?? ''
   const consultoresFiltro = (dados?.consultores ?? []).filter(c => !filtros.unidade || c.unidade_id === Number(filtros.unidade))
 
-  function exportar() {
-    baixarCsv(`vendas-${filtros.de}-a-${filtros.ate}`,
-      ['Data', 'Mês ref.', 'DAV', 'Cliente', 'Produto', 'Qtd', 'Unitário', 'Faturamento', 'Grupo', 'Consultor', 'Unidade', 'Modalidade', 'Tipo', 'Toneladas',
-        'Custo unit.', 'Frete unit.', 'Desc. unit.', 'Custo total', 'Custo financeiro', 'Imposto', 'Comissão', 'Lucro', 'Margem líquida', 'Situação'],
-      vendas.map(v => {
+  async function exportar() {
+    const col = (titulo: string, formato?: ColunaExcel['formato']): ColunaExcel => ({ titulo, formato })
+    await baixarXlsx(`vendas-${filtros.de}-a-${filtros.ate}`, [{
+      nome: 'Vendas',
+      colunas: [col('Data', 'data'), col('Mês ref.'), col('DAV'), col('Cliente'), col('Produto'), col('Qtd', 'num'), col('Unitário', 'brl'), col('Faturamento', 'brl'),
+        col('Grupo'), col('Consultor'), col('Unidade'), col('Modalidade'), col('Tipo'), col('Toneladas', 'num'), col('Custo unit.', 'brl'), col('Frete unit.', 'brl'),
+        col('Desc. unit.', 'brl'), col('Custo total', 'brl'), col('Custo financeiro', 'brl'), col('Imposto', 'brl'), col('Comissão', 'brl'), col('Lucro', 'brl'),
+        col('Margem líquida', 'pct'), col('Situação')],
+      linhas: vendas.map(v => {
         const c = calcularVenda(v)
-        const n = (x: number | null) => (x == null ? '' : x.toLocaleString('pt-BR', { maximumFractionDigits: 4 }))
-        return [dataBR(v.data), competenciaBR(v.competencia), v.dav, v.cliente, v.produto, n(v.quantidade), n(v.preco_unitario), n(v.faturamento),
-          grupo(v.grupo_id), consultor(v.consultor_id), unidade(v.unidade_id), MODALIDADE_ROTULO[v.modalidade], v.tipo, n(v.toneladas),
-          n(v.custo_unitario), n(v.frete_unitario), n(v.desconto_unitario), n(c.custo_total), n(c.custo_financeiro), n(c.imposto), n(c.comissao), n(c.lucro),
-          n(c.margem_liquida), v.cancelada ? 'Cancelada' : c.custo_pendente ? 'Custo pendente' : '']
-      }))
+        return [v.data, competenciaBR(v.competencia), v.dav, v.cliente, v.produto, v.quantidade, v.preco_unitario, v.faturamento,
+          grupo(v.grupo_id), consultor(v.consultor_id), unidade(v.unidade_id), MODALIDADE_ROTULO[v.modalidade], v.tipo, v.toneladas,
+          v.custo_unitario, v.frete_unitario, v.desconto_unitario, c.custo_total, c.custo_financeiro, c.imposto, c.comissao, c.lucro,
+          c.margem_liquida, v.cancelada ? 'Cancelada' : c.custo_pendente ? 'Custo pendente' : '']
+      }),
+      total: ['Total', null, null, null, null, null, null, resumo.realizado, null, null, null, null, null, null, null, null, null, null, null, resumo.imposto, resumo.comissao, resumo.lucro, resumo.margem_liquida, null],
+    }])
   }
 
   return (
@@ -77,7 +83,7 @@ export default function VendasPage() {
           <div className="ui-sub">Vendas faturadas, um registro por item. É o realizado das metas.</div>
         </div>
         <div className="ui-header-actions">
-          <button className="ui-btn ui-btn-ghost" onClick={exportar} disabled={!vendas.length}><IconDownload /> Exportar</button>
+          <button className="ui-btn ui-btn-ghost" onClick={exportar} disabled={!vendas.length}><IconDownload /> Excel</button>
           <Link href="/admin/metas/importar" className="ui-btn ui-btn-secondary"><IconUpload /> Importar</Link>
           <Link href="/admin/metas/vendas/nova" className="ui-btn ui-btn-primary"><IconPlus /> Nova venda</Link>
         </div>

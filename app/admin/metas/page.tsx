@@ -1,10 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { brl } from '@/lib/cotacao'
 import { carregarCadastros, type DadosCadastro } from '@/lib/metas/cadastros'
+import { baixarXlsx } from '@/lib/metas/excel'
+import { abasPainel } from '@/lib/metas/painelExcel'
+import { baixarArquivo, elementoParaPdf } from '@/lib/pdf'
 import { faixaAtingimento, montarPainel, type Faixa, type LinhaMeta, type ValorMensal } from '@/lib/metas/painel'
 import { buscarTodas, MESES_CURTOS, vendaDoBanco, type VendaRow } from '@/lib/metas/vendas'
 import { Kpi, pct } from './Comum'
@@ -41,6 +44,8 @@ export default function PainelMetasPage() {
   const [anos, setAnos] = useState<number[]>([anoAtual])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
+  const [exportando, setExportando] = useState<'' | 'pdf' | 'excel'>('')
+  const conteudoRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     carregarCadastros(supabase).then(setDados).catch(() => setErro('Não foi possível carregar os cadastros.'))
@@ -109,6 +114,18 @@ export default function PainelMetasPage() {
   const mesSeguinte = MESES_CURTOS[Math.min(12, mesRef + 1) - 1]
   const consultoresFiltro = (dados?.consultores ?? []).filter(c => !unidade || c.unidade_id === Number(unidade))
 
+  const sufixo = `${ano}-${String(mesRef).padStart(2, '0')}`
+  async function exportarPdf() {
+    if (!conteudoRef.current) return
+    setExportando('pdf')
+    try { baixarArquivo(await elementoParaPdf(conteudoRef.current, `painel-metas-${sufixo}.pdf`)) } finally { setExportando('') }
+  }
+  async function exportarExcel() {
+    if (!painel) return
+    setExportando('excel')
+    try { await baixarXlsx(`painel-metas-${sufixo}`, abasPainel(painel, ano, mesRef)) } finally { setExportando('') }
+  }
+
   if (erro) return <div className="ui-alert ui-alert-erro">{erro}</div>
 
   const t = painel?.total
@@ -136,7 +153,9 @@ export default function PainelMetasPage() {
           <div className="ui-sub">Realizado = vendas faturadas por mês de referência, de janeiro até {mesNome}/{ano}.</div>
         </div>
         <div className="ui-header-actions">
-          <Link href="/admin/metas/vendas" className="ui-btn ui-btn-secondary">Vendas</Link>
+          <button className="ui-btn ui-btn-ghost" onClick={exportarExcel} disabled={!painel || !!exportando}>{exportando === 'excel' ? 'Gerando...' : 'Excel'}</button>
+          <button className="ui-btn ui-btn-ghost" onClick={exportarPdf} disabled={!painel || !!exportando}>{exportando === 'pdf' ? 'Gerando...' : 'PDF'}</button>
+          <Link href="/admin/metas/cadastro" className="ui-btn ui-btn-secondary">Cadastrar metas</Link>
         </div>
       </div>
 
@@ -180,7 +199,14 @@ export default function PainelMetasPage() {
       </div>
 
       {carregando || !painel || !t ? <div className="ui-skeleton" style={{ height: 420 }} /> : (
-        <>
+        <div ref={conteudoRef} style={{ background: 'var(--fundo)' }}>
+          <div className="ui-hint" style={{ margin: '0 0 .75rem' }}>
+            Aderi Agro · Metas {ano} · referência {mesNome}
+            {unidade && ` · unidade ${dados?.unidades.find(u => u.id === Number(unidade))?.codigo}`}
+            {consultor && ` · ${dados?.consultores.find(c => c.id === consultor)?.nome}`}
+            {grupo && ` · ${dados?.grupos.find(g => g.id === Number(grupo))?.nome}`}
+            {' · gerado em '}{new Date().toLocaleDateString('pt-BR')}
+          </div>
           <div className="ui-kpis">
             <Kpi rotulo={`Meta ${ano}`} valor={brl(t.meta_ano)} sub={`ciclo jan–${mesNome}: ${brl(t.meta_ciclo)}`} />
             <Kpi rotulo={`Realizado até ${mesNome}`} valor={brl(t.realizado)} sub={`${pct(t.pct)} da meta do ano`} cor={FAIXA[faixa(t.pct) ?? 'vermelho'].cor} />
@@ -242,7 +268,7 @@ export default function PainelMetasPage() {
             <TabelaResultado titulo="Resultado por consultor" linhas={painel.resultadoPorConsultor} />
             <TabelaResultado titulo="Resultado por grupo" linhas={painel.resultadoPorGrupo} />
           </div>
-        </>
+        </div>
       )}
     </>
   )

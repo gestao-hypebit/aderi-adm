@@ -94,6 +94,8 @@ const grupos = [
       { href: '/admin/metas', label: 'Painel de metas', Icon: IconBarChart },
       { href: '/admin/metas/vendas', label: 'Vendas', Icon: IconCart },
       { href: '/admin/metas/importar', label: 'Importar vendas', Icon: IconUpload },
+      { href: '/admin/metas/cadastro', label: 'Cadastro de metas', Icon: IconClipboard },
+      { href: '/admin/metas/configuracoes', label: 'Configurações', Icon: IconBox },
     ],
   },
   {
@@ -129,6 +131,8 @@ const titulos: [string, string][] = [
   ['/admin/relatorios/vendas', 'Relatório · Cotações e vendas'],
   ['/admin/relatorios/km', 'Relatório · KM e combustível'],
   ['/admin/metas/importar', 'Importar vendas'],
+  ['/admin/metas/cadastro', 'Cadastro de metas'],
+  ['/admin/metas/configuracoes', 'Configurações de metas'],
   ['/admin/metas/vendas/nova', 'Nova venda'],
   ['/admin/metas/vendas/', 'Venda'],
   ['/admin/metas/vendas', 'Vendas'],
