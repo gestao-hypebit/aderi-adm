@@ -47,10 +47,12 @@ export const PARAMETROS_VENDA_PADRAO: ParametrosVenda = { taxa_juros_mensal: 0.0
 // Divisão por zero retorna vazio, não erro
 const div = (a: number | null, b: number | null) => (a == null || !b ? null : a / b)
 
+// Pode ser negativo: recebimento antes do pagamento ao fornecedor vira custo financeiro
+// negativo (ganho), como na planilha [T = S − R]. Decidido em 2026-10-27 seguir a planilha.
 export function diasEntre(inicio: string | null, fim: string | null) {
   if (!inicio || !fim) return 0
   const d = Math.round((new Date(fim + 'T12:00').getTime() - new Date(inicio + 'T12:00').getTime()) / 86400000)
-  return Number.isFinite(d) ? Math.max(0, d) : 0
+  return Number.isFinite(d) ? d : 0
 }
 
 // Custo zerado na planilha é custo não preenchido (não há venda com custo zero de verdade)

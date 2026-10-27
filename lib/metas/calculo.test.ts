@@ -59,10 +59,12 @@ describe('calcularVenda: fórmulas', () => {
     expect(c.percentual_comissao).toBeCloseTo(c.margem_liquida! * 0.05, 10)
   })
 
-  it('recebimento antes do pagamento não gera dias negativos', () => {
+  it('recebimento antes do pagamento: dias e custo financeiro negativos (como a planilha)', () => {
     const c = calcularVenda({ ...casoReal, data_pagamento_compra: '2026-09-30', data_recebimento: '2026-09-09' })
-    expect(c.dias_financiamento).toBe(0)
-    expect(c.custo_financeiro).toBe(0)
+    expect(c.dias_financiamento).toBe(-21)
+    expect(r2(c.custo_financeiro)).toBe(-637.68)
+    expect(r2(c.custo_total)).toBe(r2(41408 - 637.68))
+    expect(c.lucro!).toBeGreaterThan(calcularVenda(casoReal).lucro!)
   })
 
   it('sem datas não há custo financeiro', () => {
