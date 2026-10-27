@@ -99,6 +99,18 @@ describe('calcularVenda: fórmulas', () => {
   })
 })
 
+describe('calcularVenda: faturamento informado', () => {
+  it('usa o valor da planilha quando vier', () => {
+    expect(calcularVenda({ ...casoReal, faturamento: 43000 }).faturamento).toBe(43000)
+  })
+  it('quantidade zero com valor (relatório de venda direta): conta no realizado, custo pendente', () => {
+    const c = calcularVenda({ ...casoReal, quantidade: 0, preco_unitario: 53296.6, faturamento: 53296.6 })
+    expect(c.faturamento).toBe(53296.6)
+    expect(c.custo_pendente).toBe(true)
+    expect(c.lucro).toBeNull()
+  })
+})
+
 describe('diasEntre', () => {
   it('conta dias corridos', () => expect(diasEntre('2026-01-30', '2026-08-30')).toBe(212))
   it('data inválida vira zero', () => expect(diasEntre('xx', '2026-01-01')).toBe(0))

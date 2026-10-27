@@ -12,6 +12,7 @@ export type ParametrosVenda = {
 export type VendaCalculavel = ParametrosVenda & {
   quantidade: number                   // [E]
   preco_unitario: number               // [F]
+  faturamento?: number | null          // [G] informado (importação); vazio = qtd × unitário
   custo_unitario: number | null        // [M] nulo = custo pendente
   frete_unitario: number | null        // [N]
   desconto_unitario: number | null     // [O]
@@ -59,9 +60,10 @@ export function calcularVenda(v: VendaCalculavel): ResultadoVenda {
   const q = v.quantidade || 0
   const frete = v.frete_unitario || 0
   const desconto = v.desconto_unitario || 0
-  const faturamento = q * (v.preco_unitario || 0)                                    // [G]
+  const faturamento = v.faturamento ?? q * (v.preco_unitario || 0)                   // [G]
   const dias = diasEntre(v.data_pagamento_compra, v.data_recebimento)
-  const pendente = custoPendente(v.custo_unitario)
+  // Sem quantidade (relatório de venda direta lançado só pelo valor) não há como calcular o custo
+  const pendente = custoPendente(v.custo_unitario) || !(q > 0)
 
   if (pendente) {
     return {
