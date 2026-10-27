@@ -10,6 +10,7 @@ import { carregarCadastros, cadastrosImportacao, type DadosCadastro } from '@/li
 import { MODALIDADES, TIPOS, type TipoMapeamento } from '@/lib/metas/nomes'
 import { LAYOUTS, lerWorkbook } from '@/lib/metas/importacao/planilhaAd'
 import { chaveDuplicidade, conciliar, resolverLeitura, type LinhaValida } from '@/lib/metas/importacao/resolver'
+import { Kpi } from '../Comum'
 import type { LeituraPlanilha } from '@/lib/metas/importacao/tipos'
 
 type Historico = { id: string; arquivo: string; created_at: string; linhas_importadas: number; linhas_ignoradas: number; relatorio: { conciliacao?: { total_planilha: number | null; importado: number; diferenca: number | null } } | null }
@@ -316,17 +317,5 @@ export default function ImportarVendasPage() {
         </>
       )}
     </>
-  )
-}
-
-function Kpi({ rotulo, valor, sub }: { rotulo: string; valor: string; sub?: string }) {
-  return (
-    <div className="ui-kpi">
-      <div className="ui-kpi-body">
-        <div className="ui-kpi-label">{rotulo}</div>
-        <div className="ui-kpi-num" style={{ fontSize: '1.25rem' }}>{valor}</div>
-        {sub && <div className="ui-kpi-sub">{sub}</div>}
-      </div>
-    </div>
   )
 }
