@@ -91,6 +91,7 @@ const grupos = [
   {
     titulo: 'Metas',
     links: [
+      { href: '/admin/metas', label: 'Painel de metas', Icon: IconBarChart },
       { href: '/admin/metas/vendas', label: 'Vendas', Icon: IconCart },
       { href: '/admin/metas/importar', label: 'Importar vendas', Icon: IconUpload },
     ],
@@ -131,6 +132,7 @@ const titulos: [string, string][] = [
   ['/admin/metas/vendas/nova', 'Nova venda'],
   ['/admin/metas/vendas/', 'Venda'],
   ['/admin/metas/vendas', 'Vendas'],
+  ['/admin/metas', 'Painel de metas'],
   ['/admin/relatorios', 'Relatórios'],
 ]
 
