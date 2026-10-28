@@ -50,7 +50,7 @@ export type Resolucao = {
 export const chaveDuplicidade = (v: { dav: string | null; produto: string; quantidade: number; preco_unitario: number }) =>
   [normalizar(v.dav), normalizar(v.produto), Number(v.quantidade), Number(v.preco_unitario)].join('|')
 
-const ROTULO_TIPO: Record<TipoMapeamento, string> = { consultor: 'Consultor', grupo: 'Grupo', modalidade: 'Modalidade', tipo: 'D/C' }
+const ROTULO_TIPO: Record<TipoMapeamento, string> = { consultor: 'Consultor', grupo: 'Grupo', modalidade: 'Modalidade', tipo: 'D/C', vendedor: 'Vendedor (ERP)' }
 
 // competencia: mês de referência escolhido na importação (padrão: o da planilha; sem ele, o mês da data)
 export function resolverLeitura(leitura: LeituraPlanilha, cad: Cadastros, padrao: ParametrosVenda, competencia = leitura.competencia): Resolucao {
@@ -61,7 +61,7 @@ export function resolverLeitura(leitura: LeituraPlanilha, cad: Cadastros, padrao
   const vistas = new Map<string, number>()
   const fertilizantes = cad.grupos.find(g => normalizar(g.rotulo) === 'FERTILIZANTES')?.valor
 
-  const opcoes: Record<TipoMapeamento, Opcao[]> = { consultor: cad.consultores, grupo: cad.grupos, modalidade: MODALIDADES, tipo: TIPOS }
+  const opcoes: Record<TipoMapeamento, Opcao[]> = { consultor: cad.consultores, grupo: cad.grupos, modalidade: MODALIDADES, tipo: TIPOS, vendedor: cad.consultores }
 
   for (const l of leitura.linhas) {
     if (l.ignorada) { ignoradas.push(l); continue }

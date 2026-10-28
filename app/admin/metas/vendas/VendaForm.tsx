@@ -59,7 +59,7 @@ export default function VendaForm({ dados, venda }: { dados: DadosCadastro; vend
   const [modalidade, setModalidade] = useState<string>(venda?.modalidade ?? 'VERDE_AGRO')
   const [observacao, setObservacao] = useState(venda?.observacao ?? '')
   const [itens, setItens] = useState<Item[]>(() => venda ? [{
-    chave: ++seq, produto: venda.produto, produto_id: venda.produto_id, grupo_id: String(venda.grupo_id), tipo: venda.tipo,
+    chave: ++seq, produto: venda.produto, produto_id: venda.produto_id, grupo_id: venda.grupo_id == null ? '' : String(venda.grupo_id), tipo: venda.tipo ?? '',
     quantidade: venda.quantidade, preco_unitario: venda.preco_unitario,
     faturamento_fixo: Math.abs(venda.faturamento - venda.quantidade * venda.preco_unitario) > 0.005 ? venda.faturamento : null,
     custo_unitario: venda.custo_unitario ?? 0, frete_unitario: venda.frete_unitario, desconto_unitario: venda.desconto_unitario,

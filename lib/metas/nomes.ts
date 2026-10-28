@@ -1,7 +1,7 @@
 // Resolução dos nomes digitados nas planilhas ("GILVAM", "FOLIAR", "CV"...) para o cadastro.
 // Primeiro compara com o próprio cadastro (normalizado); depois com o mapeamento salvo.
 
-export type TipoMapeamento = 'consultor' | 'grupo' | 'modalidade' | 'tipo'
+export type TipoMapeamento = 'consultor' | 'grupo' | 'modalidade' | 'tipo' | 'vendedor'
 export type Mapeamento = { tipo: TipoMapeamento; texto_original: string; valor: string }
 export type Opcao = { valor: string; rotulo: string; sinonimos?: string[] }
 

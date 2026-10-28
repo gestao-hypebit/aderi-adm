@@ -10,12 +10,14 @@ import { carregarCadastros, cadastrosImportacao, type DadosCadastro } from '@/li
 import { MODALIDADES, TIPOS, type TipoMapeamento } from '@/lib/metas/nomes'
 import { LAYOUTS, lerWorkbook } from '@/lib/metas/importacao/planilhaAd'
 import { chaveDuplicidade, conciliar, resolverLeitura, type LinhaValida } from '@/lib/metas/importacao/resolver'
+import { decodificarCsv, lerEdpe, type LeituraErp } from '@/lib/metas/importacao/erpEdpe'
 import { Kpi } from '../Comum'
+import ImportarErp from './ImportarErp'
 import type { LeituraPlanilha } from '@/lib/metas/importacao/tipos'
 
 type Historico = { id: string; arquivo: string; created_at: string; linhas_importadas: number; linhas_ignoradas: number; relatorio: { conciliacao?: { total_planilha: number | null; importado: number; diferenca: number | null } } | null }
 
-const ROTULO_TIPO: Record<TipoMapeamento, string> = { consultor: 'Consultor', grupo: 'Grupo', modalidade: 'Modalidade', tipo: 'D/C' }
+const ROTULO_TIPO: Record<TipoMapeamento, string> = { consultor: 'Consultor', grupo: 'Grupo', modalidade: 'Modalidade', tipo: 'D/C', vendedor: 'Vendedor (ERP)' }
 
 function IconArrowLeft() {
   return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
@@ -31,6 +33,7 @@ export default function ImportarVendasPage() {
   const [dados, setDados] = useState<DadosCadastro | null>(null)
   const [layoutId, setLayoutId] = useState(LAYOUTS[0].id)
   const [leitura, setLeitura] = useState<LeituraPlanilha | null>(null)
+  const [leituraErp, setLeituraErp] = useState<LeituraErp | null>(null)
   const [competencia, setCompetencia] = useState('') // AAAA-MM
   const [lendo, setLendo] = useState(false)
   const [erro, setErro] = useState('')
@@ -68,8 +71,15 @@ export default function ImportarVendasPage() {
   const nomeGrupo = (id: number) => dados?.grupos.find(g => g.id === id)?.nome ?? id
 
   async function abrirArquivo(f: File) {
-    setErro(''); setOk(''); setLeitura(null); setMapear({}); setLendo(true)
+    setErro(''); setOk(''); setLeitura(null); setLeituraErp(null); setMapear({}); setLendo(true)
     try {
+      if (/\.csv$/i.test(f.name)) {
+        const l = lerEdpe(decodificarCsv(await f.arrayBuffer()), f.name)
+        if (!l.pedidos.length) throw new Error('Nenhum pedido encontrado. O CSV deve ser o relatório EDPE010 do ERP (pedido em uma linha, itens nas linhas de baixo).')
+        setLeituraErp(l)
+        setLendo(false)
+        return
+      }
       const ExcelJS = (await import('exceljs')).default
       const wb = new ExcelJS.Workbook()
       await wb.xlsx.load(await f.arrayBuffer())
@@ -147,7 +157,7 @@ export default function ImportarVendasPage() {
       <div className="ui-page-header">
         <div>
           <div className="ui-title">Importar vendas</div>
-          <div className="ui-sub">Planilha no layout da planilha mensal AD. Confira a prévia antes de gravar.</div>
+          <div className="ui-sub">Relatório do ERP (EDPE010, .csv) ou planilha mensal AD (.xlsx). Confira a prévia antes de gravar.</div>
         </div>
       </div>
 
@@ -157,20 +167,33 @@ export default function ImportarVendasPage() {
       <div className="ui-card ui-card-pad" style={{ marginBottom: '1.25rem' }}>
         <div className="ui-grid-2">
           <div className="ui-field">
-            <label className="ui-label">Layout</label>
+            <label className="ui-label">Layout da planilha (.xlsx)</label>
             <select className="ui-select" value={layoutId} onChange={e => setLayoutId(e.target.value)}>
               {LAYOUTS.map(l => <option key={l.id} value={l.id}>{l.nome}</option>)}
             </select>
           </div>
           <div className="ui-field">
-            <label className="ui-label">Arquivo (.xlsx)</label>
+            <label className="ui-label">Arquivo (.csv do ERP ou .xlsx)</label>
             <label className="ui-btn ui-btn-secondary" style={{ cursor: 'pointer', justifyContent: 'center' }}>
               <IconUpload /> {lendo ? 'Lendo...' : 'Escolher arquivo'}
-              <input type="file" accept=".xlsx" hidden disabled={lendo || !dados} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) abrirArquivo(f) }} />
+              <input type="file" accept=".xlsx,.csv" hidden disabled={lendo || !dados} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) abrirArquivo(f) }} />
             </label>
           </div>
         </div>
+        <div className="ui-hint">
+          O relatório do ERP preenche data, DAV, cliente, produto, quantidade e preço, e sugere consultor, grupo e D/C pelo histórico.
+          As vendas entram &quot;a completar&quot; e você termina (custo, frete, datas) na tela de <Link href="/admin/metas/lancamentos">Lançamentos</Link>.
+        </div>
       </div>
+
+      {leituraErp && dados && (
+        <ImportarErp
+          leitura={leituraErp}
+          dados={dados}
+          onCancelar={() => setLeituraErp(null)}
+          onRecarregarCadastros={async () => setDados(await carregarCadastros(supabase))}
+        />
+      )}
 
       {leitura && res && conc && (
         <>
@@ -296,7 +319,7 @@ export default function ImportarVendasPage() {
         </>
       )}
 
-      {!leitura && (
+      {!leitura && !leituraErp && (
         <>
           <div className="ui-section-label" style={{ marginTop: '.5rem' }}>Importações anteriores</div>
           <Tabela

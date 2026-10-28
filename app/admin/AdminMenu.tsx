@@ -56,6 +56,9 @@ function IconClose() {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
 }
 
+function IconGrid() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+}
 function IconUpload() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
 }
@@ -92,6 +95,7 @@ const grupos = [
     titulo: 'Metas',
     links: [
       { href: '/admin/metas', label: 'Painel de metas', Icon: IconBarChart },
+      { href: '/admin/metas/lancamentos', label: 'Lançamentos', Icon: IconGrid },
       { href: '/admin/metas/vendas', label: 'Vendas', Icon: IconCart },
       { href: '/admin/metas/importar', label: 'Importar vendas', Icon: IconUpload },
       { href: '/admin/metas/cadastro', label: 'Cadastro de metas', Icon: IconClipboard },
@@ -131,6 +135,7 @@ const titulos: [string, string][] = [
   ['/admin/relatorios/vendas', 'Relatório · Cotações e vendas'],
   ['/admin/relatorios/km', 'Relatório · KM e combustível'],
   ['/admin/metas/importar', 'Importar vendas'],
+  ['/admin/metas/lancamentos', 'Lançamentos do mês'],
   ['/admin/metas/cadastro', 'Cadastro de metas'],
   ['/admin/metas/configuracoes', 'Configurações de metas'],
   ['/admin/metas/vendas/nova', 'Nova venda'],

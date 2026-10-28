@@ -14,11 +14,12 @@ export type VendaRow = {
   quantidade: number
   preco_unitario: number
   faturamento: number
-  grupo_id: number
-  consultor_id: string
-  unidade_id: number
-  modalidade: 'VERDE_AGRO' | 'VENDA_DIRETA'
-  tipo: 'DIF' | 'CONV'
+  // nulos = venda "a completar" (veio do relatório do ERP sem classificação)
+  grupo_id: number | null
+  consultor_id: string | null
+  unidade_id: number | null
+  modalidade: 'VERDE_AGRO' | 'VENDA_DIRETA' | null
+  tipo: 'DIF' | 'CONV' | null
   cancelada: boolean
   custo_unitario: number | null
   frete_unitario: number
@@ -33,8 +34,19 @@ export type VendaRow = {
   importacao_id: string | null
   linha_origem: number | null
   observacao: string | null
+  cliente_codigo: string | null
+  produto_codigo: string | null
+  vendedor_codigo: string | null
   created_at: string
 }
+
+export type VendaCompleta = VendaRow & { grupo_id: number; consultor_id: string; unidade_id: number; modalidade: 'VERDE_AGRO' | 'VENDA_DIRETA'; tipo: 'DIF' | 'CONV' }
+
+// O que falta para a venda contar no painel de metas
+export function faltandoNaVenda(v: Pick<VendaRow, 'grupo_id' | 'consultor_id' | 'modalidade' | 'tipo'>): string[] {
+  return [v.consultor_id == null && 'consultor', v.grupo_id == null && 'grupo', v.modalidade == null && 'modalidade', v.tipo == null && 'D/C'].filter((x): x is string => !!x)
+}
+export const vendaCompleta = (v: VendaRow): v is VendaCompleta => faltandoNaVenda(v).length === 0 && v.unidade_id != null
 
 const NUMERICOS = ['quantidade', 'preco_unitario', 'faturamento', 'custo_unitario', 'frete_unitario', 'desconto_unitario', 'toneladas', 'taxa_juros_mensal', 'aliquota_imposto', 'fator_comissao'] as const
 
@@ -73,6 +85,7 @@ export type FiltrosVendas = {
   tipo: string
   cliente: string
   custoPendente: boolean
+  aCompletar: boolean
   canceladas: boolean
 }
 
@@ -97,5 +110,7 @@ export async function buscarVendas(supabase: SupabaseClient, f: FiltrosVendas): 
     if (!f.canceladas) q = q.eq('cancelada', false)
     return q.order('data', { ascending: false }).order('dav', { ascending: false }).order('id').range(de, ate)
   })
-  return linhas.map(vendaDoBanco)
+  // filtrado aqui: dois .or() na mesma consulta não combinam bem no PostgREST
+  const vendas = linhas.map(vendaDoBanco)
+  return f.aCompletar ? vendas.filter(v => !vendaCompleta(v)) : vendas
 }

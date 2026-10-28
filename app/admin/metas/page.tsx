@@ -9,7 +9,7 @@ import { baixarXlsx } from '@/lib/metas/excel'
 import { abasPainel } from '@/lib/metas/painelExcel'
 import { baixarArquivo, elementoParaPdf } from '@/lib/pdf'
 import { faixaAtingimento, montarPainel, type Faixa, type LinhaMeta, type ValorMensal } from '@/lib/metas/painel'
-import { buscarTodas, MESES_CURTOS, vendaDoBanco, type VendaRow } from '@/lib/metas/vendas'
+import { buscarTodas, competenciaBR, MESES_CURTOS, vendaCompleta, vendaDoBanco, type VendaCompleta, type VendaRow } from '@/lib/metas/vendas'
 import { Kpi, pct } from './Comum'
 import { EvolucaoMensal, ToneladasMes } from './GraficosMetas'
 
@@ -39,7 +39,8 @@ export default function PainelMetasPage() {
 
   const [metas, setMetas] = useState<ValorMensal[]>([])
   const [anterior, setAnterior] = useState<ValorMensal[]>([])
-  const [vendas, setVendas] = useState<VendaRow[]>([])
+  const [vendas, setVendas] = useState<VendaCompleta[]>([])
+  const [aCompletar, setACompletar] = useState<VendaRow[]>([])
   const [pedidos, setPedidos] = useState<EmPedido[]>([])
   const [anos, setAnos] = useState<number[]>([anoAtual])
   const [carregando, setCarregando] = useState(true)
@@ -73,10 +74,13 @@ export default function PainelMetasPage() {
       // Ano anterior: totais importados; sem eles, as vendas lançadas daquele ano
       if (h.data?.length) setAnterior(num(h.data))
       else {
-        const va = (await vendasDoAno(ano - 1)).map(vendaDoBanco)
+        const va = (await vendasDoAno(ano - 1)).map(vendaDoBanco).filter(vendaCompleta)
         if (vivo) setAnterior(va.map(x => ({ unidade_id: x.unidade_id, grupo_id: x.grupo_id, mes: Number(x.competencia.slice(5, 7)), valor: x.faturamento })))
       }
-      setVendas(v.map(vendaDoBanco))
+      // Venda sem consultor/grupo/modalidade/D/C (veio do ERP) só conta depois de completada
+      const todas = v.map(vendaDoBanco)
+      setVendas(todas.filter(vendaCompleta))
+      setACompletar(todas.filter(x => !vendaCompleta(x)))
       const usadas = new Set((vinculadas.data ?? []).map(x => x.cotacao_id as string))
       setPedidos((c.data ?? []).filter(p => !usadas.has(p.id)).map(p => ({
         id: p.id, numero: p.numero, cliente: p.cliente_nome ?? '',
@@ -158,6 +162,15 @@ export default function PainelMetasPage() {
           <Link href="/admin/metas/cadastro" className="ui-btn ui-btn-secondary">Cadastrar metas</Link>
         </div>
       </div>
+
+      {aCompletar.length > 0 && (
+        <div className="ui-alert ui-alert-erro">
+          {aCompletar.length} venda(s) de {ano} somando {brl(aCompletar.reduce((s, v) => s + v.faturamento, 0))} ainda estão a completar (sem consultor, grupo, modalidade ou D/C) e não entram no painel.{' '}
+          {[...new Set(aCompletar.map(v => v.competencia))].sort().map(c => (
+            <Link key={c} href={`/admin/metas/lancamentos?mes=${c.slice(0, 7)}&filtro=completar`} style={{ marginRight: '.5rem', textDecoration: 'underline' }}>{competenciaBR(c)}</Link>
+          ))}
+        </div>
+      )}
 
       <div className="ui-card ui-card-pad" style={{ marginBottom: '1.25rem', paddingBottom: '.25rem' }}>
         <div className="mt-filtros">

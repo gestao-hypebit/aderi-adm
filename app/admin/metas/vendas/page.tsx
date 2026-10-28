@@ -11,7 +11,7 @@ import { calcularVenda, resumirVendas } from '@/lib/metas/calculo'
 import { carregarCadastros, type DadosCadastro } from '@/lib/metas/cadastros'
 import { MODALIDADES, TIPOS } from '@/lib/metas/nomes'
 import { Kpi, pct } from '../Comum'
-import { buscarVendas, competenciaBR, MODALIDADE_ROTULO, type FiltrosVendas, type VendaRow } from '@/lib/metas/vendas'
+import { buscarVendas, competenciaBR, faltandoNaVenda, MODALIDADE_ROTULO, type FiltrosVendas, type VendaRow } from '@/lib/metas/vendas'
 
 function IconPlus() {
   return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -29,7 +29,7 @@ export default function VendasPage() {
   const supabase = createClient()
   const [dados, setDados] = useState<DadosCadastro | null>(null)
   const [filtros, setFiltros] = useState<FiltrosVendas>(() => ({
-    de: mesAtual().slice(0, 4) + '-01', ate: mesAtual(), unidade: '', consultor: '', grupo: '', modalidade: '', tipo: '', cliente: '', custoPendente: false, canceladas: false,
+    de: mesAtual().slice(0, 4) + '-01', ate: mesAtual(), unidade: '', consultor: '', grupo: '', modalidade: '', tipo: '', cliente: '', custoPendente: false, aCompletar: false, canceladas: false,
   }))
   const [vendas, setVendas] = useState<VendaRow[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -51,9 +51,9 @@ export default function VendasPage() {
 
   const f = <K extends keyof FiltrosVendas>(k: K, v: FiltrosVendas[K]) => setFiltros(x => ({ ...x, [k]: v }))
   const resumo = useMemo(() => resumirVendas(vendas), [vendas])
-  const consultor = (id: string) => dados?.consultores.find(c => c.id === id)?.nome ?? ''
-  const unidade = (id: number) => dados?.unidades.find(u => u.id === id)?.codigo ?? ''
-  const grupo = (id: number) => dados?.grupos.find(g => g.id === id)?.nome ?? ''
+  const consultor = (id: string | null) => dados?.consultores.find(c => c.id === id)?.nome ?? ''
+  const unidade = (id: number | null) => dados?.unidades.find(u => u.id === id)?.codigo ?? ''
+  const grupo = (id: number | null) => dados?.grupos.find(g => g.id === id)?.nome ?? ''
   const consultoresFiltro = (dados?.consultores ?? []).filter(c => !filtros.unidade || c.unidade_id === Number(filtros.unidade))
 
   async function exportar() {
@@ -67,9 +67,9 @@ export default function VendasPage() {
       linhas: vendas.map(v => {
         const c = calcularVenda(v)
         return [v.data, competenciaBR(v.competencia), v.dav, v.cliente, v.produto, v.quantidade, v.preco_unitario, v.faturamento,
-          grupo(v.grupo_id), consultor(v.consultor_id), unidade(v.unidade_id), MODALIDADE_ROTULO[v.modalidade], v.tipo, v.toneladas,
+          grupo(v.grupo_id), consultor(v.consultor_id), unidade(v.unidade_id), MODALIDADE_ROTULO[v.modalidade ?? ''] ?? '', v.tipo, v.toneladas,
           v.custo_unitario, v.frete_unitario, v.desconto_unitario, c.custo_total, c.custo_financeiro, c.imposto, c.comissao, c.lucro,
-          c.margem_liquida, v.cancelada ? 'Cancelada' : c.custo_pendente ? 'Custo pendente' : '']
+          c.margem_liquida, v.cancelada ? 'Cancelada' : faltandoNaVenda(v).length ? `A completar: ${faltandoNaVenda(v).join(', ')}` : c.custo_pendente ? 'Custo pendente' : '']
       }),
       total: ['Total', null, null, null, null, null, null, resumo.realizado, null, null, null, null, null, null, null, null, null, null, null, resumo.imposto, resumo.comissao, resumo.lucro, resumo.margem_liquida, null],
     }])
@@ -85,6 +85,7 @@ export default function VendasPage() {
         <div className="ui-header-actions">
           <button className="ui-btn ui-btn-ghost" onClick={exportar} disabled={!vendas.length}><IconDownload /> Excel</button>
           <Link href="/admin/metas/importar" className="ui-btn ui-btn-secondary"><IconUpload /> Importar</Link>
+          <Link href={`/admin/metas/lancamentos?mes=${filtros.ate || mesAtual()}`} className="ui-btn ui-btn-secondary">Lançamentos do mês</Link>
           <Link href="/admin/metas/vendas/nova" className="ui-btn ui-btn-primary"><IconPlus /> Nova venda</Link>
         </div>
       </div>
@@ -146,6 +147,9 @@ export default function VendasPage() {
             <input type="checkbox" checked={filtros.custoPendente} onChange={e => f('custoPendente', e.target.checked)} /> Só custo pendente
           </label>
           <label style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
+            <input type="checkbox" checked={filtros.aCompletar} onChange={e => f('aCompletar', e.target.checked)} /> Só a completar
+          </label>
+          <label style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
             <input type="checkbox" checked={filtros.canceladas} onChange={e => f('canceladas', e.target.checked)} /> Mostrar canceladas
           </label>
         </div>
@@ -171,13 +175,14 @@ export default function VendasPage() {
           { id: 'data', titulo: 'Data', celula: v => <>{dataBR(v.data)}{v.data.slice(0, 7) !== v.competencia.slice(0, 7) && <div className="ui-cel-sub">ref. {competenciaBR(v.competencia)}</div>}</>, largura: '100px', ordenar: (a, b) => a.data.localeCompare(b.data) },
           { id: 'dav', titulo: 'DAV', celula: v => v.dav ?? '—', ocultar: 'celular', largura: '100px' },
           { id: 'cliente', titulo: 'Cliente', celula: v => <span className="ui-cel-txt">{v.cliente}</span>, ocultar: 'tablet', ordenar: (a, b) => a.cliente.localeCompare(b.cliente) },
-          { id: 'produto', titulo: 'Produto', celula: v => <><span className="ui-cel-txt">{v.produto}</span><div className="ui-cel-sub">{grupo(v.grupo_id)} · {v.tipo} · {MODALIDADE_ROTULO[v.modalidade]}</div></> },
-          { id: 'consultor', titulo: 'Consultor', celula: v => <>{consultor(v.consultor_id)}<div className="ui-cel-sub">Unidade {unidade(v.unidade_id)}</div></>, ocultar: 'celular' },
+          { id: 'produto', titulo: 'Produto', celula: v => <><span className="ui-cel-txt">{v.produto}</span><div className="ui-cel-sub">{[grupo(v.grupo_id), v.tipo, v.modalidade && MODALIDADE_ROTULO[v.modalidade]].filter(Boolean).join(' · ') || '—'}</div></> },
+          { id: 'consultor', titulo: 'Consultor', celula: v => (v.consultor_id ? <>{consultor(v.consultor_id)}<div className="ui-cel-sub">Unidade {unidade(v.unidade_id)}</div></> : <span className="ui-cel-mudo">—</span>), ocultar: 'celular' },
           { id: 'qtd', titulo: 'Qtd', celula: v => v.quantidade.toLocaleString('pt-BR'), alinhar: 'dir', ocultar: 'tablet' },
           { id: 'fat', titulo: 'Faturamento', celula: v => brl(v.faturamento), alinhar: 'dir', ordenar: (a, b) => a.faturamento - b.faturamento },
           { id: 'lucro', titulo: 'Lucro', alinhar: 'dir', ocultar: 'celular', celula: v => {
             const c = calcularVenda(v)
             if (v.cancelada) return <span className="ui-badge ui-badge-cancelada">Cancelada</span>
+            if (faltandoNaVenda(v).length) return <span className="ui-badge ui-badge-agendada" title={`Falta: ${faltandoNaVenda(v).join(', ')}`}>A completar</span>
             if (c.custo_pendente) return <span className="ui-badge ui-badge-aguardando">Custo pendente</span>
             return <>{brl(c.lucro ?? 0)}<div className="ui-cel-sub">{pct(c.lucro_pct)}</div></>
           } },
