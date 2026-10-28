@@ -9,13 +9,14 @@ import { dataBR } from '@/lib/csv'
 import { carregarCadastros, cadastrosImportacao, type DadosCadastro } from '@/lib/metas/cadastros'
 import { MODALIDADES, TIPOS, type TipoMapeamento } from '@/lib/metas/nomes'
 import { LAYOUTS, lerWorkbook } from '@/lib/metas/importacao/planilhaAd'
+import { buscarTodas, competenciaBR } from '@/lib/metas/vendas'
 import { chaveDuplicidade, conciliar, resolverLeitura, type LinhaValida } from '@/lib/metas/importacao/resolver'
 import { decodificarCsv, lerEdpe, type LeituraErp } from '@/lib/metas/importacao/erpEdpe'
 import { Kpi } from '../Comum'
 import ImportarErp from './ImportarErp'
 import type { LeituraPlanilha } from '@/lib/metas/importacao/tipos'
 
-type Historico = { id: string; arquivo: string; created_at: string; linhas_importadas: number; linhas_ignoradas: number; relatorio: { conciliacao?: { total_planilha: number | null; importado: number; diferenca: number | null } } | null }
+type Historico = { id: string; arquivo: string; layout: string; created_at: string; linhas_importadas: number; linhas_ignoradas: number; relatorio: { competencia?: string | null; conciliacao?: { total_planilha: number | null; importado: number; diferenca: number | null } } | null }
 
 const ROTULO_TIPO: Record<TipoMapeamento, string> = { consultor: 'Consultor', grupo: 'Grupo', modalidade: 'Modalidade', tipo: 'D/C', vendedor: 'Vendedor (ERP)' }
 
@@ -43,12 +44,28 @@ export default function ImportarVendasPage() {
   const [pularDuplicadas, setPularDuplicadas] = useState(true)
   const [gravando, setGravando] = useState(false)
   const [historico, setHistorico] = useState<Historico[]>([])
+  const [noSistema, setNoSistema] = useState<Record<string, { qtd: number; valor: number }>>({})
   const [versao, setVersao] = useState(0)
 
   useEffect(() => {
     carregarCadastros(supabase).then(setDados).catch(() => setErro('Não foi possível carregar os cadastros de metas.'))
-    supabase.from('importacoes').select('id, arquivo, created_at, linhas_importadas, linhas_ignoradas, relatorio').order('created_at', { ascending: false }).limit(20)
-      .then(({ data }) => setHistorico((data ?? []) as Historico[]))
+    supabase.from('importacoes').select('id, arquivo, layout, created_at, linhas_importadas, linhas_ignoradas, relatorio').order('created_at', { ascending: false }).limit(50)
+      .then(async ({ data }) => {
+        const hs = (data ?? []) as Historico[]
+        setHistorico(hs)
+        // quanto de cada importação ainda está no sistema (linhas podem ter sido excluídas depois)
+        const ids = hs.map(h => h.id)
+        if (!ids.length) { setNoSistema({}); return }
+        const vs = await buscarTodas<{ importacao_id: string; faturamento: number }>((de, ate) =>
+          supabase.from('vendas').select('importacao_id, faturamento').in('importacao_id', ids).order('id').range(de, ate)).catch(() => [])
+        const m: Record<string, { qtd: number; valor: number }> = {}
+        for (const v of vs) {
+          const x = (m[v.importacao_id] ??= { qtd: 0, valor: 0 })
+          x.qtd++
+          x.valor += Number(v.faturamento)
+        }
+        setNoSistema(m)
+      })
   }, [versao])
 
   const res = useMemo(() => {
@@ -91,6 +108,17 @@ export default function ImportarVendasPage() {
       setErro(e instanceof Error ? e.message : 'Não foi possível ler o arquivo.')
     }
     setLendo(false)
+  }
+
+  // Desfaz uma importação: apaga as vendas que vieram dela (mesmo se editadas depois) e o registro
+  async function excluirImportacao(h: Historico) {
+    setErro(''); setOk('')
+    const { error: e1 } = await supabase.from('vendas').delete().eq('importacao_id', h.id)
+    if (e1) { setErro(`Não foi possível excluir as vendas da importação. (${e1.message})`); return }
+    const { error: e2 } = await supabase.from('importacoes').delete().eq('id', h.id)
+    if (e2) { setErro(`As vendas foram excluídas, mas o registro da importação não. (${e2.message})`); return }
+    setOk(`Importação de ${h.arquivo} excluída, com ${noSistema[h.id]?.qtd ?? 0} venda(s).`)
+    setVersao(v => v + 1)
   }
 
   async function salvarMapeamentos() {
@@ -328,10 +356,21 @@ export default function ImportarVendasPage() {
             rotulo="importações"
             paginar={false}
             vazio="Nenhuma importação ainda."
+            acoes={h => [
+              !!h.relatorio?.competencia && { rotulo: 'Abrir lançamentos do mês', icone: 'ver', href: `/admin/metas/lancamentos?mes=${h.relatorio!.competencia!.slice(0, 7)}` },
+              {
+                rotulo: 'Excluir importação', icone: 'excluir', perigo: true, onClick: () => excluirImportacao(h),
+                confirmar: {
+                  titulo: `Excluir a importação de ${h.arquivo}?`,
+                  texto: `${noSistema[h.id]?.qtd ?? 0} venda(s) que vieram deste arquivo (${brl(noSistema[h.id]?.valor ?? 0)}) saem do sistema, inclusive as que foram editadas depois. Não dá para desfazer; para trazer de volta, importe o arquivo de novo.`,
+                  botao: 'Excluir',
+                },
+              },
+            ]}
             colunas={[
               { id: 'quando', titulo: 'Quando', celula: h => new Date(h.created_at).toLocaleString('pt-BR'), largura: '160px' },
-              { id: 'arquivo', titulo: 'Arquivo', celula: h => <span className="ui-cel-txt">{h.arquivo}</span> },
-              { id: 'qtd', titulo: 'Vendas', celula: h => h.linhas_importadas, alinhar: 'dir' },
+              { id: 'arquivo', titulo: 'Arquivo', celula: h => <><span className="ui-cel-txt">{h.arquivo}</span><div className="ui-cel-sub">{h.layout === 'erp-edpe010' ? 'Relatório do ERP' : 'Planilha AD'}{h.relatorio?.competencia ? ` · ${competenciaBR(h.relatorio.competencia.slice(0, 7) + '-01')}` : ''}</div></> },
+              { id: 'qtd', titulo: 'Vendas', celula: h => <>{h.linhas_importadas}{(noSistema[h.id]?.qtd ?? 0) !== h.linhas_importadas && <div className="ui-cel-sub">{noSistema[h.id]?.qtd ?? 0} no sistema</div>}</>, alinhar: 'dir' },
               { id: 'imp', titulo: 'Importado', celula: h => (h.relatorio?.conciliacao ? brl(h.relatorio.conciliacao.importado) : '—'), alinhar: 'dir', ocultar: 'celular' },
               { id: 'pl', titulo: 'Total planilha', celula: h => (h.relatorio?.conciliacao?.total_planilha != null ? brl(h.relatorio.conciliacao.total_planilha) : '—'), alinhar: 'dir', ocultar: 'tablet' },
               { id: 'dif', titulo: 'Diferença', celula: h => (h.relatorio?.conciliacao?.diferenca != null ? brl(h.relatorio.conciliacao.diferenca) : '—'), alinhar: 'dir' },

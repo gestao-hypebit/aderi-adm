@@ -206,6 +206,8 @@ export default function Planilha({ dados, mesInicial, filtroInicial }: { dados: 
   const [selecao, setSelecao] = useState<Set<string>>(new Set())
   const [excluir, setExcluir] = useState<VendaRow[] | null>(null)
   const [excluindo, setExcluindo] = useState(false)
+  const [excluirMes, setExcluirMes] = useState(false)
+  const [ok, setOk] = useState('')
   const [lote, setLote] = useState<Partial<Record<'grupo_id' | 'consultor_id' | 'modalidade' | 'tipo' | 'data_pagamento_compra' | 'data_recebimento', string>>>({})
   const [clientes, setClientes] = useState<string[]>([])
   const [produtos, setProdutos] = useState<string[]>([])
@@ -373,6 +375,28 @@ export default function Planilha({ dados, mesInicial, filtroInicial }: { dados: 
     setLote({})
   }
 
+  // Importação que ficou sem nenhuma venda não tem mais o que mostrar: sai do histórico também
+  async function limparImportacoesVazias(ids: string[]) {
+    for (const id of new Set(ids)) {
+      const { count } = await supabase.from('vendas').select('id', { count: 'exact', head: true }).eq('importacao_id', id)
+      if (count === 0) await supabase.from('importacoes').delete().eq('id', id)
+    }
+  }
+
+  async function confirmarExclusaoMes() {
+    setExcluindo(true); setErro(''); setOk('')
+    const importacoes = vendas.map(v => v.importacao_id).filter((x): x is string => !!x)
+    const { error } = await supabase.from('vendas').delete().gte('competencia', `${mes}-01`).lte('competencia', ultimoDia(mes))
+    if (error) { setExcluindo(false); setErro(`Não foi possível excluir os lançamentos do mês. (${error.message})`); return }
+    await limparImportacoesVazias(importacoes)
+    pendentes.current.clear()
+    setOk(`${vendas.length} lançamento(s) de ${competenciaBR(`${mes}-01`)} excluído(s).`)
+    setVendas([])
+    setSelecao(new Set())
+    setExcluindo(false)
+    setExcluirMes(false)
+  }
+
   async function confirmarExclusao() {
     if (!excluir) return
     setExcluindo(true)
@@ -381,6 +405,7 @@ export default function Planilha({ dados, mesInicial, filtroInicial }: { dados: 
     setExcluindo(false)
     if (error) { setErro('Não foi possível excluir.'); return }
     ids.forEach(id => pendentes.current.delete(id))
+    await limparImportacoesVazias(excluir.map(v => v.importacao_id).filter((x): x is string => !!x))
     setVendas(vs => vs.filter(v => !ids.includes(v.id)))
     setSelecao(new Set())
     setExcluir(null)
@@ -520,6 +545,7 @@ export default function Planilha({ dados, mesInicial, filtroInicial }: { dados: 
       </div>
 
       {erro && <div className="ui-alert ui-alert-erro">{erro}</div>}
+      {ok && <div className="ui-alert ui-alert-ok">{ok}</div>}
       {comErro > 0 && <div className="ui-alert ui-alert-erro">{comErro} linha(s) não foram salvas (marcadas em vermelho). Edite de novo para tentar outra vez, ou recarregue a página.</div>}
 
       <div className="lc-barra">
@@ -529,6 +555,11 @@ export default function Planilha({ dados, mesInicial, filtroInicial }: { dados: 
           <button onClick={() => mudarMes(somarMes(mes, 1))} aria-label="Próximo mês"><IconChevron dir="dir" /></button>
         </div>
         <span className="ui-hint" style={{ margin: 0 }}>{carregando ? 'Carregando...' : salvando ? 'Salvando...' : 'Tudo salvo'}</span>
+        {!carregando && vendas.length > 0 && (
+          <button className="ui-btn ui-btn-ghost ui-btn-sm" style={{ marginLeft: 'auto', color: '#c0392b' }} onClick={() => setExcluirMes(true)}>
+            <IconTrash /> Excluir lançamentos do mês
+          </button>
+        )}
       </div>
 
       <div className="ui-kpis">
@@ -585,7 +616,7 @@ export default function Planilha({ dados, mesInicial, filtroInicial }: { dados: 
           <label title="Pagamento da compra">Pgto comp. <input type="date" className="ui-input ui-input-sm" value={lote.data_pagamento_compra ?? ''} onChange={e => setLote(l => ({ ...l, data_pagamento_compra: e.target.value }))} /></label>
           <label title="Recebimento do cliente">Receb. <input type="date" className="ui-input ui-input-sm" value={lote.data_recebimento ?? ''} onChange={e => setLote(l => ({ ...l, data_recebimento: e.target.value }))} /></label>
           <button className="ui-btn ui-btn-primary ui-btn-sm" onClick={aplicarLote} disabled={!Object.values(lote).some(Boolean)}>Aplicar</button>
-          <button className="ui-btn ui-btn-ghost ui-btn-sm" onClick={() => setExcluir(vendas.filter(v => selecao.has(v.id)))}>Excluir</button>
+          <button className="ui-btn ui-btn-ghost ui-btn-sm" style={{ color: '#c0392b' }} onClick={() => setExcluir(vendas.filter(v => selecao.has(v.id)))}><IconTrash /> Excluir selecionadas</button>
           <button className="ui-btn ui-btn-ghost ui-btn-sm" onClick={() => { setSelecao(new Set()); setLote({}) }}>Limpar seleção</button>
         </div>
       )}
@@ -669,7 +700,21 @@ export default function Planilha({ dados, mesInicial, filtroInicial }: { dados: 
         onConfirmar={confirmarExclusao}
         onCancelar={() => setExcluir(null)}
       >
-        A venda sai do sistema. Para manter o histórico, prefira cancelar (o ícone de bloqueio na linha).
+        {excluir && excluir.length > 1 ? `${excluir.length} linhas (${brl(excluir.reduce((s, v) => s + v.faturamento, 0))}) saem do sistema.` : 'A venda sai do sistema.'}{' '}
+        Para manter o histórico, prefira cancelar (o ícone de bloqueio na linha).
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        aberto={excluirMes}
+        titulo={`Excluir todos os lançamentos de ${competenciaBR(`${mes}-01`)}?`}
+        confirmarTexto={`Excluir ${vendas.length} lançamentos`}
+        perigo
+        carregando={excluindo}
+        onConfirmar={confirmarExclusaoMes}
+        onCancelar={() => setExcluirMes(false)}
+      >
+        {vendas.length} linha(s) somando {brl(vendas.reduce((s, v) => s + v.faturamento, 0))} saem do sistema, inclusive custos e ajustes feitos à mão,
+        e o mês some do painel de metas. Não dá para desfazer; para refazer, importe a planilha ou o relatório do ERP de novo.
       </ConfirmDialog>
     </>
   )
