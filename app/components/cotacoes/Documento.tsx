@@ -54,8 +54,6 @@ export const DOC_CSS = `
   .pr-itens .neg{color:#c0392b}
   .pr-itens.preto th{background:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .pr-itens.preto tfoot td{border-top-color:#000}
-  .pr-fat{background:#000;color:#fff;padding:8px 10px;border-radius:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .pr-fat .pr-rot{color:#fff}
   .pr-rodape{margin-top:6px;margin-bottom:10px}
   .pr-rot{font-weight:600;font-size:8pt;text-transform:uppercase;color:#E67E22;letter-spacing:.05em;margin-bottom:4px}
   .pr-obs{white-space:pre-line;font-size:8.5pt;line-height:1.6}
@@ -96,7 +94,6 @@ export default function DocumentoCotacao({ tipo, dados, itens, param, embutida =
           <div className="pr-doc-tit">{TITULO_DOC[tipo]}</div>
           <div className="pr-doc-num">Nº {dados.numero || '(será gerado ao salvar)'}</div>
           <div>{tipo === 'pedido' ? 'Data de emissão: ' : 'Piumhi - MG, '}{emissao}</div>
-          {tipo === 'orcamento' && dados.validade && <div>Válido até {dataCurta(dados.validade)}</div>}
         </div>
       </header>
 
@@ -176,7 +173,7 @@ export default function DocumentoCotacao({ tipo, dados, itens, param, embutida =
       {tipo === 'orcamento' && (
         <div className="pr-duas pr-rodape">
           <div><div className="pr-rot">Observação:</div><div className="pr-obs">{dados.observacoes_cliente || '—'}</div></div>
-          <div className="pr-fat"><div className="pr-rot">Faturamento:</div><div className="pr-obs">{VERDE.join('\n')}</div></div>
+          <div><div className="pr-rot">Faturamento:</div><div className="pr-obs">{VERDE.join('\n')}</div></div>
         </div>
       )}
       {tipo === 'pedido' && dados.observacoes_cliente && (

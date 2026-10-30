@@ -32,8 +32,6 @@ export default async function OrcamentoPublicoPage({ params }: { params: Promise
 
   const total = o.itens.reduce((s, i) => s + Number(i.quantidade) * Number(i.preco), 0)
   const totalQtd = o.itens.reduce((s, i) => s + Number(i.quantidade), 0)
-  const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
-  const vencido = o.validade != null && o.validade < hoje && o.status !== 'efetivada'
 
   return (
     <DocumentoPublico titulo={`Orçamento ${o.numero}`}>
@@ -44,7 +42,6 @@ export default async function OrcamentoPublicoPage({ params }: { params: Promise
           <div className="dp-doc-t">Orçamento</div>
           <div style={{ fontSize: '11pt', fontWeight: 600, color: '#162a1e' }}>Nº {o.numero}</div>
           <div>Emitido em {dataBR(o.created_at)}</div>
-          {o.validade && <div style={{ color: vencido ? '#c0392b' : undefined, fontWeight: vencido ? 600 : undefined }}>{vencido ? 'Vencido em' : 'Válido até'} {dataBR(o.validade)}</div>}
         </div>
       </header>
 
