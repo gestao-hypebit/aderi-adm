@@ -10,7 +10,7 @@ type OrcamentoPublico = {
   cliente_nome: string | null; empresa_rural: string | null; cidade: string | null; cpf_cnpj: string | null
   inscricao_produtor: string | null; contato: string | null; observacoes_cliente: string | null
   consultor: { nome: string | null; telefone: string | null }
-  itens: { produto: string; quantidade: number; unidade: string | null; preco: number; vencimento: string | null }[]
+  itens: { produto: string; quantidade: number; unidade: string | null; preco: number; vencimento: string | null; vencimento_obs?: boolean }[]
 }
 
 export const metadata: Metadata = { title: 'Orçamento · Aderi Agro', robots: { index: false } }
@@ -59,7 +59,7 @@ export default async function OrcamentoPublicoPage({ params }: { params: Promise
           <thead><tr><th>Produto</th><th className="n">Qtd.</th><th>Unid.</th><th className="n">R$ unit.</th><th className="n">R$ total</th><th>Vencimento</th></tr></thead>
           <tbody>
             {o.itens.map((i, k) => (
-              <tr key={k}><td>{i.produto}</td><td className="n">{qtd(Number(i.quantidade))}</td><td>{i.unidade}</td><td className="n">{brl(Number(i.preco))}</td><td className="n">{brl(Number(i.quantidade) * Number(i.preco))}</td><td>{dataBR(i.vencimento)}</td></tr>
+              <tr key={k}><td>{i.produto}</td><td className="n">{qtd(Number(i.quantidade))}</td><td>{i.unidade}</td><td className="n">{brl(Number(i.preco))}</td><td className="n">{brl(Number(i.quantidade) * Number(i.preco))}</td><td>{i.vencimento_obs ? 'Vide OBS' : dataBR(i.vencimento)}</td></tr>
             ))}
           </tbody>
           <tfoot><tr><td>Total</td><td className="n">{qtd(totalQtd)}</td><td /><td /><td className="n">{brl(total)}</td><td /></tr></tfoot>

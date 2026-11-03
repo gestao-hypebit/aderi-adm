@@ -24,6 +24,7 @@ export type ItemCotacao = {
   comissao: number      // [N] fração
   preco_cliente: number // [R]
   vencimento: string | null   // [T] (padrão: data final)
+  vencimento_obs: boolean     // "Vide OBS": pagamento em parcelas descritas na observação
 }
 
 export const PARAMETROS_PADRAO: ParametrosCotacao = { ptax: 1, juros_mes: 0.022, aliquota_icms: 0.05, aliquota_ir: 0.3 }
@@ -32,7 +33,7 @@ export function itemVazio(): ItemCotacao {
   return {
     produto_id: null, produto_nome: '', fornecedor: null, quantidade: 0, unidade: 'TON',
     preco_tabela: 0, desconto: 0, frete: 0, data_inicial: null, data_final: null,
-    margem: 0, comissao: 0, preco_cliente: 0, vencimento: null,
+    margem: 0, comissao: 0, preco_cliente: 0, vencimento: null, vencimento_obs: false,
   }
 }
 
@@ -173,6 +174,10 @@ export const brl = (n: number) => n.toLocaleString('pt-BR', { style: 'currency',
 export const num = (n: number, casas = 2) => n.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas })
 export const pct = (n: number, casas = 1) => `${(n * 100).toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas })}%`
 export const dataCurta = (d: string | null) => (d ? new Date(d + 'T12:00').toLocaleDateString('pt-BR') : '—')
+export const VIDE_OBS = 'Vide OBS'
+// Texto do vencimento nos documentos: data ou "Vide OBS" quando há parcelas
+export const textoVencimento = (it: Pick<ItemCotacao, 'vencimento' | 'data_final' | 'vencimento_obs'>) =>
+  (it.vencimento_obs ? VIDE_OBS : dataCurta(it.vencimento || it.data_final))
 
 // Supabase devolve numeric como string: normaliza as linhas do banco
 type LinhaBanco = Record<string, unknown>
@@ -184,7 +189,7 @@ export function itemDoBanco(r: LinhaBanco): ItemCotacao {
     id: s(r.id) ?? undefined, produto_id: s(r.produto_id), produto_nome: s(r.produto_nome) ?? '', fornecedor: s(r.fornecedor),
     quantidade: n(r.quantidade), unidade: s(r.unidade), preco_tabela: n(r.preco_tabela), desconto: n(r.desconto), frete: n(r.frete),
     data_inicial: s(r.data_inicial), data_final: s(r.data_final), margem: n(r.margem), comissao: n(r.comissao),
-    preco_cliente: n(r.preco_cliente), vencimento: s(r.vencimento),
+    preco_cliente: n(r.preco_cliente), vencimento: s(r.vencimento), vencimento_obs: r.vencimento_obs === true,
   }
 }
 

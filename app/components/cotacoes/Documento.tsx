@@ -1,6 +1,6 @@
 'use client'
 
-import { ItemCotacao, ParametrosCotacao, calcularTotais, brl, num, pct, dataCurta } from '@/lib/cotacao'
+import { ItemCotacao, ParametrosCotacao, calcularTotais, brl, num, pct, dataCurta, textoVencimento } from '@/lib/cotacao'
 
 // Os três documentos que a planilha gera a partir da aba COTAÇÃO:
 // ORÇAMENTO (para o cliente), PEDIDO CLIENTE (pedido de compra Verde Agro) e RESULT. (custos, interno).
@@ -159,7 +159,7 @@ export default function DocumentoCotacao({ tipo, dados, itens, param, embutida =
                   <td>{it.unidade}</td>
                   <td className="n">{brl(it.preco_cliente)}</td>
                   <td className="n">{brl(tot.calc[i].total)}</td>
-                  <td>{dataCurta(it.vencimento || it.data_final)}</td>
+                  <td>{textoVencimento(it)}</td>
                 </tr>
               ))}
             </tbody>

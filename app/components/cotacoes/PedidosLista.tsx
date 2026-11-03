@@ -70,7 +70,7 @@ export default function PedidosLista({ base }: { base: string }) {
       setPedidos((data ?? []).map(c => {
         const itens = ((c.itens ?? []) as Record<string, unknown>[]).map(itemDoBanco)
         const a = Array.isArray(c.autor) ? c.autor[0] : c.autor
-        const vencs = itens.map(i => i.vencimento || i.data_final).filter(Boolean).sort() as string[]
+        const vencs = itens.filter(i => !i.vencimento_obs).map(i => i.vencimento || i.data_final).filter(Boolean).sort() as string[]
         return {
           id: c.id, numero: c.numero, cliente_nome: c.cliente_nome, empresa_rural: c.empresa_rural, criado_por: c.criado_por,
           autor: a?.nome_completo ?? '—', created_at: c.created_at, pedido_status: c.pedido_status, pagamento_status: c.pagamento_status,

@@ -15,7 +15,7 @@ import { elementoParaPdf } from '@/lib/pdf'
 import EnvioPdfModal from '@/app/components/EnvioPdfModal'
 import {
   ItemCotacao, ParametrosCotacao, PARAMETROS_PADRAO, STATUS_COTACAO, etapaDe, CalculoItem, MOTIVOS_PERDA, PEDIDO_STATUS, PAGAMENTO_STATUS,
-  calcularTotais, itemVazio, itemDoBanco, parametrosDoBanco, brl, num, pct, dataCurta, precoMinimo, abaixoDoMinimo, menorMargem,
+  calcularTotais, itemVazio, itemDoBanco, parametrosDoBanco, brl, num, pct, dataCurta, textoVencimento, VIDE_OBS, precoMinimo, abaixoDoMinimo, menorMargem,
 } from '@/lib/cotacao'
 
 type ClienteOpcao = { id: string; nome: string; nome_fazenda: string | null; cidade: string | null; estado: string | null; cpf_cnpj: string | null; telefone: string | null; inscricao_produtor: string | null }
@@ -319,7 +319,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
     const ult = origem ?? itens[itens.length - 1]
     const nova = origem
       ? { ...origem, id: undefined, _k: novaChave() }
-      : comChave({ ...itemVazio(), data_inicial: ult?.data_inicial ?? hojeISO(), data_final: ult?.data_final ?? null, vencimento: ult?.vencimento ?? null, margem: ult?.margem ?? 0, comissao: ult?.comissao ?? 0, frete: ult?.frete ?? 0 })
+      : comChave({ ...itemVazio(), data_inicial: ult?.data_inicial ?? hojeISO(), data_final: ult?.data_final ?? null, vencimento: ult?.vencimento ?? null, vencimento_obs: ult?.vencimento_obs ?? false, margem: ult?.margem ?? 0, comissao: ult?.comissao ?? 0, frete: ult?.frete ?? 0 })
     setItens(l => {
       if (!origem) return [...l, nova]
       const idx = l.findIndex(x => x._k === origem._k)
@@ -1178,7 +1178,7 @@ function linhasParaBanco(itens: ItemCotacao[]) {
     ordem, produto_id: it.produto_id, produto_nome: it.produto_nome.trim(), fornecedor: it.fornecedor,
     quantidade: it.quantidade, unidade: it.unidade, preco_tabela: it.preco_tabela, desconto: it.desconto, frete: it.frete,
     data_inicial: it.data_inicial || null, data_final: it.data_final || null, margem: it.margem, comissao: it.comissao,
-    preco_cliente: it.preco_cliente, vencimento: it.vencimento || it.data_final || null,
+    preco_cliente: it.preco_cliente, vencimento: it.vencimento || it.data_final || null, vencimento_obs: !!it.vencimento_obs,
   }))
 }
 
@@ -1225,7 +1225,7 @@ function ItemCard({ it, idx, c, admin, produtos, aberto, minimo, abaixo, histori
         <button className="ce-item-resumo" onClick={onAlternar}>
           <span>{it.fornecedor || 'Sem fornecedor'}</span>
           <span>{num(it.quantidade, it.quantidade % 1 ? 2 : 0)} {it.unidade} × {brl(it.preco_cliente)}</span>
-          <span>venc. {dataCurta(it.vencimento || it.data_final)}</span>
+          <span>venc. {textoVencimento(it)}</span>
           {abaixo && <span className="ui-badge ui-badge-cancelada">abaixo do mínimo</span>}
           {faltaQtd && <span className="ui-badge ui-badge-cancelada">sem quantidade</span>}
           <b>{brl(c.total)}</b>
@@ -1287,13 +1287,17 @@ function ItemCard({ it, idx, c, admin, produtos, aberto, minimo, abaixo, histori
             </label>
             <label className="ce-venc">
               Vencimento
-              <input type="date" className="ui-input" value={it.vencimento ?? it.data_final ?? ''} onChange={e => onMudar({ vencimento: e.target.value || null })} {...nav} />
+              {it.vencimento_obs
+                ? <input className="ui-input" value={VIDE_OBS} readOnly title="Parcelas descritas na observação do orçamento" {...nav} />
+                : <input type="date" className="ui-input" value={it.vencimento ?? it.data_final ?? ''} onChange={e => onMudar({ vencimento: e.target.value || null })} {...nav} />}
               <div className="ce-chips" role="group" aria-label="Vencimento em dias">
                 {VENCIMENTOS.map(d => {
                   const data = somarDias(it.data_inicial || hojeISO(), d)
-                  return <button key={d} type="button" className={(it.vencimento ?? it.data_final) === data ? 'ativo' : ''} onClick={e => { e.preventDefault(); onMudar({ vencimento: data }) }} title={`Vence em ${dataCurta(data)}`}>{d}d</button>
+                  return <button key={d} type="button" className={!it.vencimento_obs && (it.vencimento ?? it.data_final) === data ? 'ativo' : ''} onClick={e => { e.preventDefault(); onMudar({ vencimento: data, vencimento_obs: false }) }} title={`Vence em ${dataCurta(data)}`}>{d}d</button>
                 })}
+                <button type="button" className={it.vencimento_obs ? 'ativo' : ''} onClick={e => { e.preventDefault(); onMudar({ vencimento_obs: !it.vencimento_obs }) }} title="Pagamento em várias parcelas: descreva na observação do orçamento">Vide OBS</button>
               </div>
+              {it.vencimento_obs && <small className="ce-venc-obs">Descreva as parcelas na observação do orçamento</small>}
             </label>
             <div className="ce-total"><span>Total</span><b>{brl(c.total)}</b></div>
           </div>
@@ -1411,6 +1415,7 @@ const EDITOR_CSS = `
   .ce-pc .ui-input.abaixo{border-color:#f0b4ab;background:#fffafa}
   .ce-venc .ui-input{padding:.6rem .5rem;font-size:.78rem}
   .ce-venc .ce-chips{margin-top:.3rem}
+  .ce-venc-obs{display:block;margin-top:.25rem;font-size:.62rem;font-weight:600;color:#8a6d1f}
   .ce-total{text-align:right;display:flex;flex-direction:column;gap:.15rem;align-self:end}
   .ce-total span{font-size:.64rem;font-weight:600;color:#8f978f}
   .ce-total b{font-size:1.15rem;color:#162a1e;white-space:nowrap}
