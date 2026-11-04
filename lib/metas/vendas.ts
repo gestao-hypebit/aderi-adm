@@ -79,7 +79,6 @@ export type FiltrosVendas = {
   de: string        // AAAA-MM (competência inicial)
   ate: string       // AAAA-MM
   unidade: string
-  consultor: string
   grupo: string
   modalidade: string
   tipo: string
@@ -100,7 +99,6 @@ export async function buscarVendas(supabase: SupabaseClient, f: FiltrosVendas): 
     if (f.de) q = q.gte('competencia', f.de + '-01')
     if (f.ate) q = q.lte('competencia', ultimoDia(f.ate))
     if (f.unidade) q = q.eq('unidade_id', Number(f.unidade))
-    if (f.consultor) q = q.eq('consultor_id', f.consultor)
     if (f.grupo) q = q.eq('grupo_id', Number(f.grupo))
     if (f.modalidade) q = q.eq('modalidade', f.modalidade)
     if (f.tipo) q = q.eq('tipo', f.tipo)

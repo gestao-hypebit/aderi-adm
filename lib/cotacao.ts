@@ -16,8 +16,9 @@ export type ItemCotacao = {
   quantidade: number    // [C]
   unidade: string | null // [D]
   preco_tabela: number  // [E]
-  desconto: number      // [F]
+  desconto: number      // [F] saiu da tela; só cotações antigas ainda têm valor aqui
   frete: number         // [I] por unidade
+  descarga: number      // por unidade; entra no custo junto com o frete
   data_inicial: string | null // [K]
   data_final: string | null   // [L]
   margem: number        // [M] fração (0,05 = 5%)
@@ -32,7 +33,7 @@ export const PARAMETROS_PADRAO: ParametrosCotacao = { ptax: 1, juros_mes: 0.022,
 export function itemVazio(): ItemCotacao {
   return {
     produto_id: null, produto_nome: '', fornecedor: null, quantidade: 0, unidade: 'TON',
-    preco_tabela: 0, desconto: 0, frete: 0, data_inicial: null, data_final: null,
+    preco_tabela: 0, desconto: 0, frete: 0, descarga: 0, data_inicial: null, data_final: null,
     margem: 0, comissao: 0, preco_cliente: 0, vencimento: null, vencimento_obs: false,
   }
 }
@@ -50,47 +51,49 @@ export function calcularItem(it: ItemCotacao, p: ParametrosCotacao) {
   const markup = (it.margem || 0) + (it.comissao || 0)
 
   const precoLiquido = ((it.preco_tabela || 0) - (it.desconto || 0)) * (p.ptax || 0)          // [H]
-  const frete = it.frete || 0                                                                 // [I]
+  const freteDescarga = (it.frete || 0) + (it.descarga || 0)                                  // [I] + descarga
+  const custoUnitario = precoLiquido + freteDescarga                                          // tabela + frete + descarga
   // [J] base de financiamento. A planilha tem duas versões (linha 17 divide, as demais
   // multiplicam); usamos a divisão, mesma lógica do preço final [Q].
-  const baseFinanc = div(precoLiquido + frete, 1 - markup)
+  const baseFinanc = div(custoUnitario, 1 - markup)
   const prazoDias = dias(it.data_inicial, it.data_final)                                      // [L-K]
   const financiamento = baseFinanc * prazoDias * ((p.juros_mes || 0) / 30)                    // [O]
-  const baseCusto = precoLiquido + frete + financiamento                                      // [P]
+  const baseCusto = custoUnitario + financiamento                                             // [P]
   const precoSugerido = div(baseCusto, 1 - markup)                                            // [Q]
   const total = q * R                                                                         // [S]
 
   // por unidade
-  const resultadoUnit = R - precoLiquido - frete                                              // [Y]
+  const resultadoUnit = R - custoUnitario                                                     // [Y]
   // [Z] a planilha usa o preço de tabela [E]; usamos o preço líquido [H], como no total [AG],
   // para não distorcer quando há desconto ou PTAX diferente de 1.
   const icmsUnit = R * p.aliquota_icms - precoLiquido * p.aliquota_icms
   const irUnit = resultadoUnit * p.aliquota_ir                                                // [AA]
   const impostoUnit = icmsUnit + irUnit                                                       // [AB]
 
-  const margemBruta = div(R - precoLiquido - frete - financiamento - R * (it.comissao || 0), R)            // [U]
-  const margemLiquida = div(R - precoLiquido - frete - financiamento - impostoUnit - R * (it.comissao || 0), R) // [V]
+  const margemBruta = div(R - custoUnitario - financiamento - R * (it.comissao || 0), R)            // [U]
+  const margemLiquida = div(R - custoUnitario - financiamento - impostoUnit - R * (it.comissao || 0), R) // [V]
   const diferenca = R - precoSugerido                                                         // [W]
 
   // totais (quantidade × unidade) — colunas AF..AK e aba RESULT.
-  const resultadoTotal = total - (precoLiquido + frete) * q                                   // [AF]
+  const resultadoTotal = total - custoUnitario * q                                            // [AF]
   const icmsTotal = total * p.aliquota_icms - precoLiquido * q * p.aliquota_icms              // [AG]
   const irTotal = resultadoTotal * p.aliquota_ir                                              // [AH]
   const impostoTotal = icmsTotal + irTotal                                                    // [AI]
 
   const compraTotal = precoLiquido * q
-  const freteTotal = frete * q
+  const freteTotal = (it.frete || 0) * q
+  const descargaTotal = (it.descarga || 0) * q
   const financTotal = financiamento * q
   const comissaoTotal = total * (it.comissao || 0)
-  const custoTotal = compraTotal + freteTotal + financTotal + comissaoTotal + impostoTotal
+  const custoTotal = compraTotal + freteTotal + descargaTotal + financTotal + comissaoTotal + impostoTotal
   const resultadoLiquido = total - custoTotal
 
   return {
-    precoLiquido, baseFinanc, prazoDias, financiamento, baseCusto, precoSugerido, total,
+    precoLiquido, custoUnitario, baseFinanc, prazoDias, financiamento, baseCusto, precoSugerido, total,
     resultadoUnit, icmsUnit, irUnit, impostoUnit, margemBruta, margemLiquida, diferenca,
     resultadoTotal, icmsTotal, irTotal, impostoTotal,
     pctImpostoResultado: div(impostoTotal, resultadoTotal), pctImpostoVenda: div(impostoTotal, total),
-    compraTotal, freteTotal, financTotal, comissaoTotal, custoTotal, resultadoLiquido,
+    compraTotal, freteTotal, descargaTotal, financTotal, comissaoTotal, custoTotal, resultadoLiquido,
     pctResultado: div(resultadoLiquido, total),
   }
 }
@@ -108,6 +111,7 @@ export function calcularTotais(itens: ItemCotacao[], p: ParametrosCotacao) {
     venda,
     compra: soma(c => c.compraTotal),
     frete: soma(c => c.freteTotal),
+    descarga: soma(c => c.descargaTotal),
     financiamento: soma(c => c.financTotal),
     comissao: soma(c => c.comissaoTotal),
     imposto: soma(c => c.impostoTotal),
@@ -187,7 +191,7 @@ const s = (v: unknown) => (v == null ? null : String(v))
 export function itemDoBanco(r: LinhaBanco): ItemCotacao {
   return {
     id: s(r.id) ?? undefined, produto_id: s(r.produto_id), produto_nome: s(r.produto_nome) ?? '', fornecedor: s(r.fornecedor),
-    quantidade: n(r.quantidade), unidade: s(r.unidade), preco_tabela: n(r.preco_tabela), desconto: n(r.desconto), frete: n(r.frete),
+    quantidade: n(r.quantidade), unidade: s(r.unidade), preco_tabela: n(r.preco_tabela), desconto: n(r.desconto), frete: n(r.frete), descarga: n(r.descarga),
     data_inicial: s(r.data_inicial), data_final: s(r.data_final), margem: n(r.margem), comissao: n(r.comissao),
     preco_cliente: n(r.preco_cliente), vencimento: s(r.vencimento), vencimento_obs: r.vencimento_obs === true,
   }
@@ -204,7 +208,7 @@ export function precoMinimo(it: ItemCotacao, p: ParametrosCotacao, margemMinima:
   const c = calcularItem(it, p)
   const divisor = 1 - p.aliquota_icms - p.aliquota_ir - (it.comissao || 0) - margemMinima
   if (divisor <= 0) return null
-  const custo = c.precoLiquido + (it.frete || 0) + c.financiamento - c.precoLiquido * p.aliquota_icms - (c.precoLiquido + (it.frete || 0)) * p.aliquota_ir
+  const custo = c.custoUnitario + c.financiamento - c.precoLiquido * p.aliquota_icms - c.custoUnitario * p.aliquota_ir
   return Math.max(0, custo / divisor)
 }
 

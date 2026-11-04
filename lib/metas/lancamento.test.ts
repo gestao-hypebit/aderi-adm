@@ -1,6 +1,35 @@
 import { describe, expect, it } from 'vitest'
-import { completarEdicao, dataPadrao, resumirMes } from './lancamento'
+import { casaNumero, casaTexto, completarEdicao, dataPadrao, resumirMes } from './lancamento'
 import type { VendaRow } from './vendas'
+
+describe('filtros por coluna', () => {
+  it('texto ignora acento e maiúscula', () => {
+    expect(casaTexto('João Victor', 'joao')).toBe(true)
+    expect(casaTexto('Gabriel', 'joao')).toBe(false)
+    expect(casaTexto(null, 'joao')).toBe(false)
+    expect(casaTexto(null, '')).toBe(true)
+  })
+  it('número contém o que foi digitado, com ou sem ponto de milhar', () => {
+    expect(casaNumero(1500.5, '1500')).toBe(true)
+    expect(casaNumero(1500.5, '1.500,50')).toBe(true)
+    expect(casaNumero(1500.5, '999')).toBe(false)
+    expect(casaNumero(null, '1')).toBe(false)
+    expect(casaNumero(null, '')).toBe(true)
+  })
+  it('número compara com >, <, >=, <= e =', () => {
+    expect(casaNumero(1500, '>1000')).toBe(true)
+    expect(casaNumero(1500, '> 1.000,00')).toBe(true)
+    expect(casaNumero(1500, '<1000')).toBe(false)
+    expect(casaNumero(1000, '>=1000')).toBe(true)
+    expect(casaNumero(1000, '<=999')).toBe(false)
+    expect(casaNumero(7.5, '=7,5')).toBe(true)
+    expect(casaNumero(null, '>0')).toBe(false)
+  })
+  it('operador sozinho não esconde as linhas enquanto digita', () => {
+    expect(casaNumero(1500, '>')).toBe(true)
+    expect(casaNumero(null, '>')).toBe(true)
+  })
+})
 
 const FERT = 3
 const venda = (v: Partial<VendaRow> = {}): VendaRow => ({

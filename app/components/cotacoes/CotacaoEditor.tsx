@@ -319,7 +319,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
     const ult = origem ?? itens[itens.length - 1]
     const nova = origem
       ? { ...origem, id: undefined, _k: novaChave() }
-      : comChave({ ...itemVazio(), data_inicial: ult?.data_inicial ?? hojeISO(), data_final: ult?.data_final ?? null, vencimento: ult?.vencimento ?? null, vencimento_obs: ult?.vencimento_obs ?? false, margem: ult?.margem ?? 0, comissao: ult?.comissao ?? 0, frete: ult?.frete ?? 0 })
+      : comChave({ ...itemVazio(), data_inicial: ult?.data_inicial ?? hojeISO(), data_final: ult?.data_final ?? null, vencimento: ult?.vencimento ?? null, vencimento_obs: ult?.vencimento_obs ?? false, margem: ult?.margem ?? 0, comissao: ult?.comissao ?? 0, frete: ult?.frete ?? 0, descarga: ult?.descarga ?? 0 })
     setItens(l => {
       if (!origem) return [...l, nova]
       const idx = l.findIndex(x => x._k === origem._k)
@@ -371,6 +371,14 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
       setErro(`Informe a quantidade de "${semQtd.produto_nome}" antes de seguir.`)
       setFechados(f => { const n = new Set(f); n.delete(semQtd._k); return n })
       setTimeout(() => document.querySelector<HTMLInputElement>(`[data-qtd="${semQtd._k}"]`)?.focus(), 50)
+      return null
+    }
+    // Preço ao cliente é obrigatório; só não trava marcar como perdida nem reabrir uma perdida
+    const semPreco = statusDesejado !== 'perdida' && statusSalvo !== 'perdida' && validos.find(i => !(i.preco_cliente > 0))
+    if (semPreco) {
+      setErro(`Informe o preço ao cliente de "${semPreco.produto_nome}".`)
+      setFechados(f => { const n = new Set(f); n.delete(semPreco._k); return n })
+      setTimeout(() => document.querySelector<HTMLInputElement>(`[data-preco="${semPreco._k}"]`)?.focus(), 50)
       return null
     }
     if (!admin && statusDesejado === 'aprovada' && statusDesejado !== statusSalvo) {
@@ -628,7 +636,7 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
       obs_pedido: cab.obs_pedido || null, validade: somarDias(hojeISO(), config.validade_cotacao_dias), ptax_modo: cab.ptax_modo, ...param,
     }).select('id').single()
     if (error || !data) { setErro('Erro ao duplicar.'); return }
-    await supabase.rpc('salvar_itens_cotacao', { p_cotacao: data.id, p_itens: linhasParaBanco(itens.filter(i => i.produto_nome.trim())) })
+    await supabase.rpc('salvar_itens_cotacao', { p_cotacao: data.id, p_itens: linhasParaBanco(itens.filter(i => i.produto_nome.trim()).map(i => ({ ...i, desconto: 0 }))) })
     router.push(`${base}/${data.id}`)
   }
 
@@ -1176,7 +1184,7 @@ function Trilha({ etapa, enviou }: { etapa: string; enviou: boolean }) {
 function linhasParaBanco(itens: ItemCotacao[]) {
   return itens.map((it, ordem) => ({
     ordem, produto_id: it.produto_id, produto_nome: it.produto_nome.trim(), fornecedor: it.fornecedor,
-    quantidade: it.quantidade, unidade: it.unidade, preco_tabela: it.preco_tabela, desconto: it.desconto, frete: it.frete,
+    quantidade: it.quantidade, unidade: it.unidade, preco_tabela: it.preco_tabela, desconto: it.desconto, frete: it.frete, descarga: it.descarga,
     data_inicial: it.data_inicial || null, data_final: it.data_final || null, margem: it.margem, comissao: it.comissao,
     preco_cliente: it.preco_cliente, vencimento: it.vencimento || it.data_final || null, vencimento_obs: !!it.vencimento_obs,
   }))
@@ -1205,6 +1213,7 @@ function ItemCard({ it, idx, c, admin, produtos, aberto, minimo, abaixo, histori
   const semPreco = !it.preco_cliente
   const abaixoSugerido = !semPreco && c.diferenca < -0.005
   const faltaQtd = !!it.produto_nome.trim() && !(it.quantidade > 0)
+  const faltaPreco = !!it.produto_nome.trim() && !(it.preco_cliente > 0)
   const focarQtd = () => document.querySelector<HTMLInputElement>(`[data-qtd="${it._k}"]`)?.focus()
 
   return (
@@ -1228,6 +1237,7 @@ function ItemCard({ it, idx, c, admin, produtos, aberto, minimo, abaixo, histori
           <span>venc. {textoVencimento(it)}</span>
           {abaixo && <span className="ui-badge ui-badge-cancelada">abaixo do mínimo</span>}
           {faltaQtd && <span className="ui-badge ui-badge-cancelada">sem quantidade</span>}
+          {faltaPreco && <span className="ui-badge ui-badge-cancelada">sem preço</span>}
           <b>{brl(c.total)}</b>
         </button>
       ) : (
@@ -1241,10 +1251,11 @@ function ItemCard({ it, idx, c, admin, produtos, aberto, minimo, abaixo, histori
               <div className="ce-bloco-tit">Custo <small>por {(it.unidade || 'un.').toLowerCase()}</small></div>
               <div className="ce-f3">
                 <label>Tabela<NumInput className="ui-input" valor={it.preco_tabela} onChange={v => onMudar({ preco_tabela: v })} inputProps={nav} /></label>
-                <label>Desconto<NumInput className="ui-input" valor={it.desconto} onChange={v => onMudar({ desconto: v })} inputProps={nav} /></label>
                 <label>Frete<NumInput className="ui-input" valor={it.frete} onChange={v => onMudar({ frete: v })} inputProps={nav} /></label>
+                <label>Descarga<NumInput className="ui-input" valor={it.descarga} onChange={v => onMudar({ descarga: v })} inputProps={nav} /></label>
               </div>
-              <div className="ce-calc"><span>Preço líquido</span><b>{brl(c.precoLiquido)}</b></div>
+              {it.desconto !== 0 && <div className="ce-calc"><span>Desconto antigo (já abatido)</span><b>{brl(it.desconto)}</b></div>}
+              <div className="ce-calc"><span>Total</span><b>{brl(c.custoUnitario)}</b></div>
             </div>
 
             <div className="ce-bloco">
@@ -1281,9 +1292,10 @@ function ItemCard({ it, idx, c, admin, produtos, aberto, minimo, abaixo, histori
               </div>
               {faltaQtd && <small className="ce-qtd-aviso">Informe a quantidade</small>}
             </label>
-            <label className="ce-pc">
-              Preço ao cliente
-              <NumInput className={`ui-input ${abaixo || abaixoSugerido ? 'abaixo' : ''}`} valor={it.preco_cliente} onChange={v => onMudar({ preco_cliente: v })} placeholder={num(c.precoSugerido)} inputProps={nav} />
+            <label className={`ce-pc ${faltaPreco ? 'falta' : ''}`}>
+              Preço ao cliente *
+              <NumInput className={`ui-input ${abaixo || abaixoSugerido ? 'abaixo' : ''}`} valor={it.preco_cliente} onChange={v => onMudar({ preco_cliente: v })} placeholder={num(c.precoSugerido)} inputProps={{ ...nav, 'data-preco': it._k, required: true }} />
+              {faltaPreco && <small className="ce-qtd-aviso">Informe o preço</small>}
             </label>
             <label className="ce-venc">
               Vencimento
@@ -1382,6 +1394,8 @@ const EDITOR_CSS = `
   .ce-qtd-campo.falta .ce-qtd{border-color:#e8907f;background:#fff7f5}
   .ce-qtd-campo.falta .ce-qtd .ui-input{background:#fff7f5}
   .ce-qtd-aviso{font-size:.62rem;font-weight:600;color:#c0392b}
+  .ce-pc.falta{color:#c0392b}
+  .ce-pc.falta .ui-input{border-color:#e8907f;background:#fff7f5}
   .ce-und{width:46px;flex-shrink:0;border:none;border-left:1px solid #f2efea;background:#faf8f5;padding:.5rem .4rem;font-family:inherit;font-size:.7rem;font-weight:600;color:#5b6660;text-align:center;outline:none;align-self:stretch}
   .ce-item-acoes{display:flex;gap:.15rem}
   .ce-ico{width:32px;height:32px;border:none;background:none;border-radius:8px;color:#8f978f;cursor:pointer;display:flex;align-items:center;justify-content:center}

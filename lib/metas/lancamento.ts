@@ -3,6 +3,7 @@
 // NEGÓCIOS, DIF/CONV, MODALIDADE, FERTILIZANTES - TONELADAS).
 import { resumirVendas, type ResumoVendas } from './calculo'
 import { inferirToneladas } from './importacao/toneladas'
+import { normalizar } from './nomes'
 import { faltandoNaVenda, type VendaRow } from './vendas'
 
 export type CamposEditaveis = Pick<VendaRow,
@@ -78,6 +79,32 @@ export function resumirMes(
     linhas: vendas.length,
     canceladas: vendas.length - ativas.length,
   }
+}
+
+// Filtros por coluna da grade. Texto: "contém", sem diferenciar acento nem maiúscula.
+export function casaTexto(valor: string | null | undefined, filtro: string) {
+  return normalizar(valor).includes(normalizar(filtro))
+}
+
+// Número: ">1000", "<=50", "=7,5" comparam; qualquer outra coisa é "contém" (ponto de milhar é ignorado)
+export function casaNumero(n: number | null, filtro: string) {
+  const f = filtro.trim()
+  if (!f) return true
+  const op = f.match(/^(>=|<=|>|<|=)\s*(.*)$/)
+  if (op) {
+    const alvo = Number(op[2].replace(/\./g, '').replace(',', '.'))
+    if (!op[2].trim() || isNaN(alvo)) return true // ainda digitando
+    if (n == null) return false
+    switch (op[1]) {
+      case '>': return n > alvo
+      case '<': return n < alvo
+      case '>=': return n >= alvo
+      case '<=': return n <= alvo
+      default: return Math.abs(n - alvo) < 0.005
+    }
+  }
+  if (n == null) return false
+  return n.toLocaleString('pt-BR', { useGrouping: false, minimumFractionDigits: 2, maximumFractionDigits: 3 }).includes(f.replace(/\./g, ''))
 }
 
 // Data padrão de uma linha nova: hoje, se hoje cai no mês; senão o dia 1

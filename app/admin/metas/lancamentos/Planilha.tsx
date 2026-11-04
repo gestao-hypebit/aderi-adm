@@ -8,8 +8,9 @@ import NumInput from '@/app/components/cotacoes/NumInput'
 import { brl } from '@/lib/cotacao'
 import { calcularVenda } from '@/lib/metas/calculo'
 import type { DadosCadastro } from '@/lib/metas/cadastros'
+import { dataBR } from '@/lib/csv'
 import { baixarXlsx, type ColunaExcel } from '@/lib/metas/excel'
-import { completarEdicao, dataPadrao, resumirMes, type CamposEditaveis } from '@/lib/metas/lancamento'
+import { casaNumero, casaTexto, completarEdicao, dataPadrao, resumirMes, type CamposEditaveis } from '@/lib/metas/lancamento'
 import { MODALIDADES, TIPOS, normalizar } from '@/lib/metas/nomes'
 import { buscarTodas, competenciaBR, faltandoNaVenda, MODALIDADE_ROTULO, vendaDoBanco, type VendaRow } from '@/lib/metas/vendas'
 import { Kpi, pct } from '../Comum'
@@ -92,6 +93,76 @@ function SelectCel({ valor, opcoes, onSalvar, nav, largura }: { valor: string | 
 }
 
 type Opcoes = { grupos: { valor: string; rotulo: string }[]; consultores: { valor: string; rotulo: string }[]; modalidades: { valor: string; rotulo: string }[]; tipos: { valor: string; rotulo: string }[] }
+
+// Colunas da grade, na ordem da tabela: título no cabeçalho e o filtro de cada uma
+type Calculo = ReturnType<typeof calcularVenda>
+type Coluna = {
+  id: string
+  titulo: string
+  num?: boolean
+  inicioGrupo?: boolean
+  calculada?: boolean
+  opcoes?: { valor: string; rotulo: string }[]
+  casa: (v: VendaRow, c: Calculo, filtro: string) => boolean
+}
+type ExtraColuna = Pick<Coluna, 'inicioGrupo' | 'calculada'>
+const SEM_VALOR = '__sem_valor'
+
+const colTexto = (id: string, titulo: string, valor: (v: VendaRow) => string | null): Coluna =>
+  ({ id, titulo, casa: (v, _, f) => casaTexto(valor(v), f) })
+const colData = (id: string, titulo: string, valor: (v: VendaRow) => string | null) => colTexto(id, titulo, v => dataBR(valor(v)))
+const colNum = (id: string, titulo: string, valor: (v: VendaRow, c: Calculo) => number | null, extra: ExtraColuna = {}): Coluna =>
+  ({ id, titulo, num: true, ...extra, casa: (v, c, f) => casaNumero(valor(v, c), f) })
+// Calculada: com custo pendente a célula fica "—", então não casa com nenhum número
+const colCalc = (id: string, titulo: string, valor: (c: Calculo) => number | null, extra: ExtraColuna = {}) =>
+  colNum(id, titulo, (_, c) => (c.custo_pendente ? null : valor(c)), { calculada: true, ...extra })
+const colCalcPct = (id: string, titulo: string, valor: (c: Calculo) => number | null) =>
+  colCalc(id, titulo, c => { const n = valor(c); return n == null ? null : n * 100 })
+const colSelect = (id: string, titulo: string, valor: (v: VendaRow) => string | number | null, opcoes: Coluna['opcoes']): Coluna =>
+  ({ id, titulo, opcoes, casa: (v, _, f) => (f === SEM_VALOR ? valor(v) == null : String(valor(v)) === f) })
+
+function montarColunas(dados: DadosCadastro, opcoes: Opcoes): Coluna[] {
+  return [
+    colData('data', 'Data', v => v.data),
+    colTexto('dav', 'DAV', v => v.dav),
+    colTexto('cliente', 'Cliente', v => v.cliente),
+    colTexto('produto', 'Produto', v => v.produto),
+    colNum('qtd', 'Qtd.', v => v.quantidade),
+    colNum('unit', 'Unit R$', v => v.preco_unitario),
+    colNum('fat', 'Faturamento', v => v.faturamento),
+    // inclui inativos: linha antiga também precisa ser achada
+    colSelect('grupo', 'Grupo', v => v.grupo_id, dados.grupos.map(g => ({ valor: String(g.id), rotulo: g.nome }))),
+    colSelect('consultor', 'Consultor', v => v.consultor_id, dados.consultores.map(c => ({ valor: c.id, rotulo: c.nome }))),
+    colSelect('modalidade', 'Modalidade', v => v.modalidade, opcoes.modalidades),
+    colSelect('tipo', 'D/C', v => v.tipo, opcoes.tipos),
+    colNum('custo', 'Custo unit.', v => v.custo_unitario, { inicioGrupo: true }),
+    colNum('frete', 'Frete unit.', v => v.frete_unitario),
+    colNum('desc', 'Desc. unit.', v => v.desconto_unitario),
+    colData('pgto', 'Pgto comp.', v => v.data_pagamento_compra),
+    colData('receb', 'Pgto receb.', v => v.data_recebimento),
+    colNum('imp', 'Imp. %', v => v.aliquota_imposto * 100),
+    colNum('ton', 'Ton.', v => v.toneladas),
+    colCalc('custoTotalUnit', 'Custo unit. total', c => c.custo_unit_total, { inicioGrupo: true }),
+    colCalc('compra', 'Total compra', c => c.total_compra),
+    colNum('dias', 'Dias', (_, c) => c.dias_financiamento, { calculada: true }),
+    colCalc('fin', 'Total fin.', c => c.custo_financeiro),
+    colCalc('total', 'Total R$', c => c.custo_total),
+    colCalc('bruto', 'Result. bruto', c => c.resultado_bruto),
+    colCalcPct('mBruta', 'Mar. bruta', c => c.margem_bruta),
+    colCalc('imposto', 'Imposto', c => c.imposto),
+    colCalc('result', 'Result.', c => c.resultado_apos_imposto),
+    colCalcPct('mLiq', 'Marg. %', c => c.margem_liquida),
+    colCalc('base', 'Base comiss.', c => c.base_comissao),
+    colCalcPct('pctCom', 'Com. %', c => c.percentual_comissao),
+    colCalc('com', 'Vlr com.', c => c.comissao),
+    colCalc('lucro', 'Lucro', c => c.lucro),
+    colCalcPct('pctLucro', '% cont.', c => c.lucro_pct),
+  ]
+}
+
+function classeColuna(c: Coluna) {
+  return [c.num && 'dir', c.calculada && 'lc-cab-calc', c.inicioGrupo && 'lc-grupo-ini'].filter(Boolean).join(' ') || undefined
+}
 
 type LinhaProps = {
   v: VendaRow
@@ -201,6 +272,7 @@ export default function Planilha({ dados, mesInicial, filtroInicial }: { dados: 
   const [erro, setErro] = useState('')
   const [filtro, setFiltro] = useState<Filtro>(filtroInicial)
   const [busca, setBusca] = useState('')
+  const [filtrosColuna, setFiltrosColuna] = useState<Record<string, string>>({})
   const [calculos, setCalculos] = useState(true)
   const [status, setStatus] = useState<Record<string, Status>>({})
   const [selecao, setSelecao] = useState<Set<string>>(new Set())
@@ -304,14 +376,22 @@ export default function Planilha({ dados, mesInicial, filtroInicial }: { dados: 
 
   const editar = useCallback((id: string, campos: Partial<CamposEditaveis>) => editarVarias([id], campos), [editarVarias])
 
+  const colunas = useMemo(() => montarColunas(dados, opcoes), [dados, opcoes])
+  const colunasVisiveis = useMemo(() => (calculos ? colunas : colunas.filter(c => !c.calculada)), [colunas, calculos])
+  // Coluna escondida ("Mostrar cálculos" desligado) não filtra: seria um filtro invisível
+  const colunasFiltradas = useMemo(() => colunasVisiveis.filter(c => filtrosColuna[c.id]?.trim()), [colunasVisiveis, filtrosColuna])
+
   const visiveis = useMemo(() => {
     const b = normalizar(busca)
     return vendas.filter(v => {
       if (filtro === 'completar' && (v.cancelada || !faltandoNaVenda(v).length)) return false
       if (filtro === 'custo' && (v.cancelada || !calcularVenda(v).custo_pendente)) return false
-      return !b || normalizar(`${v.cliente} ${v.produto} ${v.dav ?? ''}`).includes(b)
+      if (b && !normalizar(`${v.cliente} ${v.produto} ${v.dav ?? ''}`).includes(b)) return false
+      if (!colunasFiltradas.length) return true
+      const c = calcularVenda(v)
+      return colunasFiltradas.every(col => col.casa(v, c, filtrosColuna[col.id]))
     })
-  }, [vendas, filtro, busca])
+  }, [vendas, filtro, busca, colunasFiltradas, filtrosColuna])
 
   const visiveisRef = useRef(visiveis)
   useEffect(() => { visiveisRef.current = visiveis }, [visiveis])
@@ -353,7 +433,7 @@ export default function Planilha({ dados, mesInicial, filtroInicial }: { dados: 
       const i = vs.findIndex(v => v.id === base.id)
       return [...vs.slice(0, i + 1), nova, ...vs.slice(i + 1)]
     })
-    if (!base) { setFiltro('todas'); setBusca(''); focarNova.current = nova.id }
+    if (!base) { setFiltro('todas'); setBusca(''); setFiltrosColuna({}); focarNova.current = nova.id }
   }, [mes, dados.config, supabase])
   const duplicar = useCallback((v: VendaRow) => { novaLinha(v) }, [novaLinha])
   const pedirExclusao = useCallback((v: VendaRow) => setExcluir([v]), [])
@@ -497,7 +577,14 @@ export default function Planilha({ dados, mesInicial, filtroInicial }: { dados: 
         .lc-lote{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;background:var(--laranja-suave);border:1px solid var(--laranja-borda);border-radius:var(--raio);padding:.55rem .8rem;margin-bottom:.75rem;font-size:.76rem}
         .lc-wrap{background:var(--superficie);border:1px solid var(--borda-suave);border-radius:var(--raio-lg);box-shadow:var(--sombra);overflow:auto;max-height:72vh}
         .lc-tab{border-collapse:separate;border-spacing:0;font-size:.74rem;min-width:100%}
-        .lc-tab th{position:sticky;top:0;z-index:2;background:#faf8f5;text-align:left;font-size:.6rem;font-weight:600;color:var(--texto-3);text-transform:uppercase;letter-spacing:.06em;padding:.55rem .35rem;border-bottom:1px solid var(--borda);white-space:nowrap}
+        .lc-tab thead{position:sticky;top:0;z-index:2}
+        .lc-tab thead tr:first-child th{border-bottom:none;padding-bottom:.2rem}
+        .lc-tab .lc-filtros th{padding:.15rem .2rem .4rem}
+        .lc-filtro{display:block;width:100%;min-width:0;box-sizing:border-box;font-family:var(--fonte);font-size:.68rem;font-weight:400;text-transform:none;letter-spacing:0;color:var(--texto);background:#fff;border:1px solid var(--borda-suave);border-radius:5px;padding:.2rem .3rem;outline:none}
+        .lc-filtro:focus{border-color:var(--laranja)}
+        .lc-filtro.ativo{border-color:var(--laranja);background:var(--laranja-suave)}
+        .lc-limpar{display:flex;align-items:center;justify-content:center;width:100%;height:22px;border:none;border-radius:5px;background:var(--laranja-suave);color:#b03a2e;font-size:.85rem;line-height:1;cursor:pointer}
+        .lc-tab th{background:#faf8f5;text-align:left;font-size:.6rem;font-weight:600;color:var(--texto-3);text-transform:uppercase;letter-spacing:.06em;padding:.55rem .35rem;border-bottom:1px solid var(--borda);white-space:nowrap}
         .lc-tab td{padding:.12rem .2rem;border-bottom:1px solid var(--borda-suave);white-space:nowrap;vertical-align:middle;background:var(--superficie)}
         .lc-tab th.dir,.lc-tab td.lc-calc{text-align:right}
         .lc-tab .lc-fixa{position:sticky;left:0;z-index:1}
@@ -638,15 +725,34 @@ export default function Planilha({ dados, mesInicial, filtroInicial }: { dados: 
                     />
                   </span>
                 </th>
-                <th>Data</th><th>DAV</th><th>Cliente</th><th>Produto</th><th className="dir">Qtd.</th><th className="dir">Unit R$</th><th className="dir">Faturamento</th>
-                <th>Grupo</th><th>Consultor</th><th>Modalidade</th><th>D/C</th>
-                <th className="dir lc-grupo-ini">Custo unit.</th><th className="dir">Frete unit.</th><th className="dir">Desc. unit.</th><th>Pgto comp.</th><th>Pgto receb.</th><th className="dir">Imp. %</th><th className="dir">Ton.</th>
-                {calculos && <>
-                  <th className="dir lc-cab-calc lc-grupo-ini">Custo unit. total</th><th className="dir lc-cab-calc">Total compra</th><th className="dir lc-cab-calc">Dias</th>
-                  <th className="dir lc-cab-calc">Total fin.</th><th className="dir lc-cab-calc">Total R$</th><th className="dir lc-cab-calc">Result. bruto</th><th className="dir lc-cab-calc">Mar. bruta</th>
-                  <th className="dir lc-cab-calc">Imposto</th><th className="dir lc-cab-calc">Result.</th><th className="dir lc-cab-calc">Marg. %</th><th className="dir lc-cab-calc">Base comiss.</th>
-                  <th className="dir lc-cab-calc">Com. %</th><th className="dir lc-cab-calc">Vlr com.</th><th className="dir lc-cab-calc">Lucro</th><th className="dir lc-cab-calc">% cont.</th>
-                </>}
+                {colunasVisiveis.map(c => <th key={c.id} className={classeColuna(c)}>{c.titulo}</th>)}
+                <th />
+              </tr>
+              <tr className="lc-filtros">
+                <th className="lc-fixa">
+                  {colunasFiltradas.length > 0 && <button type="button" className="lc-limpar" title="Limpar filtros das colunas" aria-label="Limpar filtros das colunas" onClick={() => setFiltrosColuna({})}>×</button>}
+                </th>
+                {colunasVisiveis.map(c => {
+                  const valor = filtrosColuna[c.id] ?? ''
+                  const mudar = (s: string) => setFiltrosColuna(f => ({ ...f, [c.id]: s }))
+                  const cls = `lc-filtro${valor.trim() ? ' ativo' : ''}`
+                  return (
+                    <th key={c.id} className={classeColuna(c)}>
+                      {c.opcoes ? (
+                        <select className={cls} value={valor} onChange={e => mudar(e.target.value)} aria-label={`Filtrar ${c.titulo}`}>
+                          <option value="">Todos</option>
+                          <option value={SEM_VALOR}>(em branco)</option>
+                          {c.opcoes.map(o => <option key={o.valor} value={o.valor}>{o.rotulo}</option>)}
+                        </select>
+                      ) : (
+                        <input
+                          className={cls} size={1} value={valor} onChange={e => mudar(e.target.value)} placeholder="Filtrar" aria-label={`Filtrar ${c.titulo}`}
+                          title={c.num ? 'Digite um valor ou use >, <, = (ex.: >1000)' : undefined}
+                        />
+                      )}
+                    </th>
+                  )
+                })}
                 <th />
               </tr>
             </thead>
@@ -689,6 +795,7 @@ export default function Planilha({ dados, mesInicial, filtroInicial }: { dados: 
         <span><span className="lc-informado">azul</span> faturamento informado, diferente de qtd × unitário</span>
         <span><span className="lc-fora">roxo</span> data fora do mês (soma neste mês)</span>
         <span>Enter desce na mesma coluna · Shift+clique seleciona um intervalo</span>
+        <span>Filtro de número aceita &gt;, &lt; e = (ex.: &gt;1000)</span>
       </div>
 
       <ConfirmDialog

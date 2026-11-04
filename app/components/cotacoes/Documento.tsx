@@ -126,13 +126,13 @@ export default function DocumentoCotacao({ tipo, dados, itens, param, embutida =
       <div className="pr-tab-wrap">
         {tipo === 'resultado' ? (
           <table className="pr-itens">
-            <thead><tr><th>Produto</th><th className="n">Quant.</th><th className="n">Compra forn.</th><th className="n">Frete</th><th className="n">Financ.</th><th className="n">Comis. vend.</th><th className="n">Total imposto</th><th className="n">Total custo</th><th className="n">Venda</th><th className="n">Result.</th><th className="n">%</th></tr></thead>
+            <thead><tr><th>Produto</th><th className="n">Quant.</th><th className="n">Compra forn.</th><th className="n">Frete +<br />descarga</th><th className="n">Financ.</th><th className="n">Comis. vend.</th><th className="n">Total imposto</th><th className="n">Total custo</th><th className="n">Venda</th><th className="n">Result.</th><th className="n">%</th></tr></thead>
             <tbody>
               {validos.map((it, i) => {
                 const k = tot.calc[i]
                 return (
                   <tr key={i}>
-                    <td>{it.produto_nome}</td><td className="n">{num(it.quantidade)}</td><td className="n">{brl(k.compraTotal)}</td><td className="n">{brl(k.freteTotal)}</td>
+                    <td>{it.produto_nome}</td><td className="n">{num(it.quantidade)}</td><td className="n">{brl(k.compraTotal)}</td><td className="n">{brl(k.freteTotal + k.descargaTotal)}</td>
                     <td className="n">{brl(k.financTotal)}</td><td className="n">{brl(k.comissaoTotal)}</td><td className="n">{brl(k.impostoTotal)}</td><td className="n">{brl(k.custoTotal)}</td>
                     <td className="n">{brl(k.total)}</td><td className={`n ${k.resultadoLiquido < 0 ? 'neg' : ''}`}>{brl(k.resultadoLiquido)}</td><td className={`n ${k.resultadoLiquido < 0 ? 'neg' : ''}`}>{pct(k.pctResultado, 2)}</td>
                   </tr>
@@ -141,7 +141,7 @@ export default function DocumentoCotacao({ tipo, dados, itens, param, embutida =
             </tbody>
             <tfoot>
               <tr>
-                <td>Total</td><td className="n">{num(tot.quantidade)}</td><td className="n">{brl(tot.compra)}</td><td className="n">{brl(tot.frete)}</td><td className="n">{brl(tot.financiamento)}</td>
+                <td>Total</td><td className="n">{num(tot.quantidade)}</td><td className="n">{brl(tot.compra)}</td><td className="n">{brl(tot.frete + tot.descarga)}</td><td className="n">{brl(tot.financiamento)}</td>
                 <td className="n">{brl(tot.comissao)}</td><td className="n">{brl(tot.imposto)}</td><td className="n">{brl(tot.custo)}</td><td className="n">{brl(tot.venda)}</td>
                 <td className={`n ${tot.resultado < 0 ? 'neg' : ''}`}>{brl(tot.resultado)}</td><td className={`n ${tot.resultado < 0 ? 'neg' : ''}`}>{pct(tot.pctResultado, 2)}</td>
               </tr>

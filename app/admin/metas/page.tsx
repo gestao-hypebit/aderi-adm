@@ -32,7 +32,6 @@ export default function PainelMetasPage() {
   const [ano, setAno] = useState(anoAtual)
   const [mesRef, setMesRef] = useState(Number(hojeSP().slice(5, 7)))
   const [unidade, setUnidade] = useState('')
-  const [consultor, setConsultor] = useState('')
   const [grupo, setGrupo] = useState('')
   const [visao, setVisao] = useState<Visao>('ano')
   const [porUnidade, setPorUnidade] = useState(false)
@@ -93,30 +92,24 @@ export default function PainelMetasPage() {
   }, [ano])
 
   const painel = useMemo(() => dados && montarPainel({
-    filtro: { ano, mes_ref: mesRef, unidade: unidade ? Number(unidade) : undefined, consultor: consultor || undefined, grupo: grupo ? Number(grupo) : undefined },
+    filtro: { ano, mes_ref: mesRef, unidade: unidade ? Number(unidade) : undefined, grupo: grupo ? Number(grupo) : undefined },
     metas, vendas, anterior,
     grupos: dados.grupos.map(g => ({ id: g.id, nome: g.nome })),
     unidades: dados.unidades.map(u => ({ id: u.id, nome: `${u.codigo} · ${u.nome}` })),
     consultores: dados.consultores.map(c => ({ id: c.id, nome: c.nome, unidade_id: c.unidade_id })),
-  }), [dados, ano, mesRef, unidade, consultor, grupo, metas, vendas, anterior])
+  }), [dados, ano, mesRef, unidade, grupo, metas, vendas, anterior])
 
   // Pedido em aberto → consultor (pelo usuário que criou a cotação) → unidade
   const emPedido = useMemo(() => {
     if (!dados) return { valor: 0, qtd: 0 }
-    const unidadeFiltro = consultor ? dados.consultores.find(c => c.id === consultor)?.unidade_id : unidade ? Number(unidade) : null
-    const lista = pedidos.filter(p => {
-      const c = dados.consultores.find(x => x.profile_id === p.consultor_id)
-      if (consultor) return c?.id === consultor
-      return unidadeFiltro == null || c?.unidade_id === unidadeFiltro
-    })
+    const lista = pedidos.filter(p => !unidade || dados.consultores.find(x => x.profile_id === p.consultor_id)?.unidade_id === Number(unidade))
     return { valor: lista.reduce((s, p) => s + p.valor, 0), qtd: lista.length }
-  }, [pedidos, dados, unidade, consultor])
+  }, [pedidos, dados, unidade])
 
   const lim = dados?.config
   const faixa = (p: number | null) => faixaAtingimento(p, lim?.limite_amarelo, lim?.limite_verde)
   const mesNome = MESES_CURTOS[mesRef - 1]
   const mesSeguinte = MESES_CURTOS[Math.min(12, mesRef + 1) - 1]
-  const consultoresFiltro = (dados?.consultores ?? []).filter(c => !unidade || c.unidade_id === Number(unidade))
 
   const sufixo = `${ano}-${String(mesRef).padStart(2, '0')}`
   async function exportarPdf() {
@@ -188,16 +181,9 @@ export default function PainelMetasPage() {
           </div>
           <div className="ui-field">
             <label className="ui-label">Unidade</label>
-            <select className="ui-select ui-select-sm" value={unidade} onChange={e => { setUnidade(e.target.value); setConsultor('') }}>
+            <select className="ui-select ui-select-sm" value={unidade} onChange={e => setUnidade(e.target.value)}>
               <option value="">Todas</option>
               {dados?.unidades.map(u => <option key={u.id} value={u.id}>{u.codigo} · {u.nome}</option>)}
-            </select>
-          </div>
-          <div className="ui-field">
-            <label className="ui-label">Consultor</label>
-            <select className="ui-select ui-select-sm" value={consultor} onChange={e => setConsultor(e.target.value)}>
-              <option value="">Todos</option>
-              {consultoresFiltro.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
             </select>
           </div>
           <div className="ui-field">
@@ -208,7 +194,6 @@ export default function PainelMetasPage() {
             </select>
           </div>
         </div>
-        {consultor && <div className="ui-hint" style={{ marginBottom: '.75rem' }}>A meta é da unidade do consultor; o realizado é só o dele.</div>}
       </div>
 
       {carregando || !painel || !t ? <div className="ui-skeleton" style={{ height: 420 }} /> : (
@@ -216,7 +201,6 @@ export default function PainelMetasPage() {
           <div className="ui-hint" style={{ margin: '0 0 .75rem' }}>
             Aderi Agro · Metas {ano} · referência {mesNome}
             {unidade && ` · unidade ${dados?.unidades.find(u => u.id === Number(unidade))?.codigo}`}
-            {consultor && ` · ${dados?.consultores.find(c => c.id === consultor)?.nome}`}
             {grupo && ` · ${dados?.grupos.find(g => g.id === Number(grupo))?.nome}`}
             {' · gerado em '}{new Date().toLocaleDateString('pt-BR')}
           </div>
@@ -226,6 +210,32 @@ export default function PainelMetasPage() {
             <Kpi rotulo="Desvio do ciclo" valor={brl(t.desvio_ciclo)} sub={`${pct(t.pct_desvio_ciclo)} sobre a meta jan–${mesNome}`} />
             <Kpi rotulo={`Para fechar jan–${mesSeguinte}`} valor={brl(t.precisa_proximo_mes)} sub={`meta acumulada ${brl(t.meta_ciclo_mais_1)}`} />
             <Kpi rotulo="Em pedido" valor={brl(emPedido.valor)} sub={`${emPedido.qtd} pedido(s) fechado(s), fora do realizado`} />
+          </div>
+
+          <div className="ui-card ui-card-pad" style={{ marginBottom: '1.25rem' }}>
+            <div className="ui-card-title" style={{ marginBottom: '.6rem' }}>Ranking por % da meta do ano</div>
+            {painel.ranking.map((r, i) => {
+              const fx = faixa(r.pct)
+              return (
+                <div key={r.id} className="mt-rank">
+                  <span><strong>{i + 1}.</strong> {r.nome}</span>
+                  <div className="mt-barra"><span style={{ width: `${Math.min(100, (r.pct ?? 0) * 100)}%`, background: fx ? FAIXA[fx].cor : '#ccc' }} /></div>
+                  <span>{pct(r.pct)} <SeloFaixa faixa={fx} /></span>
+                </div>
+              )
+            })}
+            {painel.consultores.length > 0 && (
+              <>
+                <div className="ui-section-label" style={{ margin: '1rem 0 .4rem' }}>Consultores</div>
+                {painel.consultores.map(c => (
+                  <div key={c.id} className="mt-rank" style={{ gridTemplateColumns: '1fr auto auto' }}>
+                    <span>{c.nome}</span>
+                    <span>{brl(c.realizado)}</span>
+                    <span className="ui-cel-mudo" title="sobre a meta da unidade">{pct(c.pct_meta_unidade)} da unidade</span>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
 
           <div className="ui-card" style={{ marginBottom: '1.25rem' }}>
@@ -248,34 +258,7 @@ export default function PainelMetasPage() {
             <Divisao titulo="Verde Agro × Venda Direta" partes={[['Verde Agro', painel.modalidade.VERDE_AGRO, '#1a7f4b'], ['Venda Direta', painel.modalidade.VENDA_DIRETA, '#E67E22']]} />
           </div>
 
-          <div className="mt-grade">
-            <ToneladasMes toneladas={painel.toneladas} />
-            <div className="ui-card ui-card-pad">
-              <div className="ui-card-title" style={{ marginBottom: '.6rem' }}>Ranking por % da meta do ano</div>
-              {painel.ranking.map((r, i) => {
-                const fx = faixa(r.pct)
-                return (
-                  <div key={r.id} className="mt-rank">
-                    <span><strong>{i + 1}.</strong> {r.nome}</span>
-                    <div className="mt-barra"><span style={{ width: `${Math.min(100, (r.pct ?? 0) * 100)}%`, background: fx ? FAIXA[fx].cor : '#ccc' }} /></div>
-                    <span>{pct(r.pct)} <SeloFaixa faixa={fx} /></span>
-                  </div>
-                )
-              })}
-              {painel.consultores.length > 0 && (
-                <>
-                  <div className="ui-section-label" style={{ margin: '1rem 0 .4rem' }}>Consultores</div>
-                  {painel.consultores.map(c => (
-                    <div key={c.id} className="mt-rank" style={{ gridTemplateColumns: '1fr auto auto' }}>
-                      <span>{c.nome}</span>
-                      <span>{brl(c.realizado)}</span>
-                      <span className="ui-cel-mudo" title="sobre a meta da unidade">{pct(c.pct_meta_unidade)} da unidade</span>
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
-          </div>
+          <div style={{ marginBottom: '1.25rem' }}><ToneladasMes toneladas={painel.toneladas} /></div>
 
           <div className="mt-grade">
             <TabelaResultado titulo="Resultado por consultor" linhas={painel.resultadoPorConsultor} />

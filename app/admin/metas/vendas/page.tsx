@@ -29,7 +29,7 @@ export default function VendasPage() {
   const supabase = createClient()
   const [dados, setDados] = useState<DadosCadastro | null>(null)
   const [filtros, setFiltros] = useState<FiltrosVendas>(() => ({
-    de: mesAtual().slice(0, 4) + '-01', ate: mesAtual(), unidade: '', consultor: '', grupo: '', modalidade: '', tipo: '', cliente: '', custoPendente: false, aCompletar: false, canceladas: false,
+    de: mesAtual().slice(0, 4) + '-01', ate: mesAtual(), unidade: '', grupo: '', modalidade: '', tipo: '', cliente: '', custoPendente: false, aCompletar: false, canceladas: false,
   }))
   const [vendas, setVendas] = useState<VendaRow[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -54,7 +54,6 @@ export default function VendasPage() {
   const consultor = (id: string | null) => dados?.consultores.find(c => c.id === id)?.nome ?? ''
   const unidade = (id: number | null) => dados?.unidades.find(u => u.id === id)?.codigo ?? ''
   const grupo = (id: number | null) => dados?.grupos.find(g => g.id === id)?.nome ?? ''
-  const consultoresFiltro = (dados?.consultores ?? []).filter(c => !filtros.unidade || c.unidade_id === Number(filtros.unidade))
 
   async function exportar() {
     const col = (titulo: string, formato?: ColunaExcel['formato']): ColunaExcel => ({ titulo, formato })
@@ -104,16 +103,9 @@ export default function VendasPage() {
           </div>
           <div className="ui-field">
             <label className="ui-label">Unidade</label>
-            <select className="ui-select ui-select-sm" value={filtros.unidade} onChange={e => setFiltros(x => ({ ...x, unidade: e.target.value, consultor: '' }))}>
+            <select className="ui-select ui-select-sm" value={filtros.unidade} onChange={e => f('unidade', e.target.value)}>
               <option value="">Todas</option>
               {dados?.unidades.map(u => <option key={u.id} value={u.id}>{u.codigo} · {u.nome}</option>)}
-            </select>
-          </div>
-          <div className="ui-field">
-            <label className="ui-label">Consultor</label>
-            <select className="ui-select ui-select-sm" value={filtros.consultor} onChange={e => f('consultor', e.target.value)}>
-              <option value="">Todos</option>
-              {consultoresFiltro.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
             </select>
           </div>
           <div className="ui-field">
