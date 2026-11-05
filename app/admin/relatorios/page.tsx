@@ -38,6 +38,9 @@ const RELATORIOS = [
   { href: '/admin/relatorios/km', titulo: 'KM e combustível', Icon: IconRoute, cor: '#162a1e', fundo: '#eef1ef',
     desc: 'Rodagem, consumo (km/L), custo por km e por visita, por consultor e por mês, com a lista de lançamentos para conferir e excluir.',
     perguntas: ['Quem consome mais?', 'Quanto gasto por visita?'] },
+  { href: '/admin/metas/comissoes', titulo: 'Comissões', Icon: IconDoc, cor: '#E67E22', fundo: '#fdf3e9',
+    desc: 'Quanto cada consultor vendeu e quanto tem a receber no período, com PDF para baixar e a lista de vendas de cada um.',
+    perguntas: ['Quanto tenho que pagar?', 'Quanto cada um vendeu?'] },
 ]
 
 export default function RelatoriosPage() {
