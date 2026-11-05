@@ -51,6 +51,14 @@ describe('montarPainel (sintético)', () => {
     expect(p.porUnidade.find(u => u.id === 2)!.pct).toBeNull()
     expect(p.ranking.map(r => r.id)).toEqual([1])
   })
+  it('consultor herda a meta da unidade; falta e % sobre ela', () => {
+    const aderi = p.consultores.find(c => c.id === 'Aderi Agro')!
+    expect(aderi).toMatchObject({ nome: 'Aderi Agro', meta_ano: 1200, realizado: 200, falta: 1000 })
+    expect(aderi.pct).toBeCloseTo(200 / 1200, 10)
+    expect(aderi.pct_falta).toBeCloseTo(1000 / 1200, 10)
+    const gabriel = p.consultores.find(c => c.id === 'Gabriel')!
+    expect(gabriel).toMatchObject({ meta_ano: 0, realizado: 80, pct: null })
+  })
   it('evolução mensal inclui meses depois da referência e o ano anterior', () => {
     expect(p.mensal[0]).toEqual({ mes: 1, meta: 100, realizado: 150, anterior: 120 })
     expect(p.mensal[3].realizado).toBe(400)

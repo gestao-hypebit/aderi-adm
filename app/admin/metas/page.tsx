@@ -227,13 +227,9 @@ export default function PainelMetasPage() {
             {painel.consultores.length > 0 && (
               <>
                 <div className="ui-section-label" style={{ margin: '1rem 0 .4rem' }}>Consultores</div>
-                {painel.consultores.map(c => (
-                  <div key={c.id} className="mt-rank" style={{ gridTemplateColumns: '1fr auto auto' }}>
-                    <span>{c.nome}</span>
-                    <span>{brl(c.realizado)}</span>
-                    <span className="ui-cel-mudo" title="sobre a meta da unidade">{pct(c.pct_meta_unidade)} da unidade</span>
-                  </div>
-                ))}
+                <div style={{ overflowX: 'auto' }}>
+                  <TabelaMeta linhas={painel.consultores} visao="ano" faixa={faixa} rotulo="Consultor" />
+                </div>
               </>
             )}
           </div>
@@ -284,7 +280,7 @@ function SeloFaixa({ faixa }: { faixa: Faixa | null }) {
   return <span className="mt-faixa" style={{ background: f.fundo, color: f.texto }}><span className="mt-dot" style={{ background: f.cor, width: 6, height: 6, borderRadius: '50%', display: 'inline-block' }} />{f.rotulo}</span>
 }
 
-function TabelaMeta({ linhas, total, visao, faixa, rotulo }: { linhas: LinhaMeta[]; total: LinhaMeta; visao: Visao; faixa: (p: number | null) => Faixa | null; rotulo: string }) {
+function TabelaMeta({ linhas, total, visao, faixa, rotulo }: { linhas: LinhaMeta[]; total?: LinhaMeta; visao: Visao; faixa: (p: number | null) => Faixa | null; rotulo: string }) {
   const cols: { titulo: string; valor: (l: LinhaMeta) => React.ReactNode }[] =
     visao === 'ano' ? [
       { titulo: 'Meta', valor: l => brl(l.meta_ano) },
@@ -309,7 +305,7 @@ function TabelaMeta({ linhas, total, visao, faixa, rotulo }: { linhas: LinhaMeta
     <table className="mt-tabela">
       <thead><tr><th>{rotulo}</th>{cols.map(c => <th key={c.titulo}>{c.titulo}</th>)}</tr></thead>
       <tbody>{linhas.map(l => <tr key={l.id}><td>{l.nome}</td>{cols.map(c => <td key={c.titulo}>{c.valor(l)}</td>)}</tr>)}</tbody>
-      <tfoot><tr><td>Total</td>{cols.map(c => <td key={c.titulo}>{c.valor(total)}</td>)}</tr></tfoot>
+      {total && <tfoot><tr><td>Total</td>{cols.map(c => <td key={c.titulo}>{c.valor(total)}</td>)}</tr></tfoot>}
     </table>
   )
 }

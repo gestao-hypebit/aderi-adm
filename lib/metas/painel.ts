@@ -50,7 +50,7 @@ export type Painel = {
   modalidade: { VERDE_AGRO: number; VENDA_DIRETA: number }
   toneladas: number[]   // por mês
   ranking: (LinhaMeta & { tipo: 'unidade' })[]
-  consultores: { id: string; nome: string; unidade_id: number; realizado: number; pct_meta_unidade: number | null }[]
+  consultores: LinhaMeta[]
   resultadoPorConsultor: { id: string; nome: string; resumo: ResumoVendas }[]
   resultadoPorGrupo: { id: number; nome: string; resumo: ResumoVendas }[]
 }
@@ -131,11 +131,8 @@ export function montarPainel(args: {
 
   const consultoresLinhas = consultores
     .filter(c => (unidadeFiltro == null || c.unidade_id === unidadeFiltro) && (f.consultor == null || c.id === f.consultor))
-    .map(c => {
-      const realizado = realizadoDe(noCiclo.filter(v => v.consultor_id === c.id))
-      const metaUnidade = porUnidade.find(u => u.id === c.unidade_id)?.meta_ano ?? 0
-      return { id: String(c.id), nome: c.nome, unidade_id: c.unidade_id, realizado, pct_meta_unidade: div(realizado, metaUnidade) }
-    })
+    // Não há meta por consultor: ele herda a meta da unidade dele
+    .map(c => linha(String(c.id), c.nome, metas.filter(m => m.unidade_id === c.unidade_id), realizadoDe(noCiclo.filter(v => v.consultor_id === c.id)), f.mes_ref))
     .filter(c => c.realizado !== 0)
     .sort((a, b) => b.realizado - a.realizado)
 

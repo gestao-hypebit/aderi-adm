@@ -55,12 +55,12 @@ export function abasPainel(p: Painel, ano: number, mesRef: number): AbaExcel[] {
     },
     {
       nome: 'Ranking',
-      colunas: [{ titulo: 'Unidade' }, { titulo: 'Meta do ano', formato: 'brl' }, { titulo: 'Realizado', formato: 'brl' }, { titulo: '% da meta', formato: 'pct' }],
+      colunas: [{ titulo: 'Unidade' }, ...COLUNAS_META.slice(0, 5)],
       linhas: [
-        ...p.ranking.map(r => [r.nome, r.meta_ano, r.realizado, r.pct]),
-        [null, null, null, null],
-        ['Consultor', null, 'Realizado', '% da meta da unidade'],
-        ...p.consultores.map(c => [c.nome, null, c.realizado, c.pct_meta_unidade]),
+        ...p.ranking.map(l => [l.nome, ...valoresMeta(l).slice(0, 5)]),
+        [null, null, null, null, null, null],
+        ['Consultor', ...COLUNAS_META.slice(0, 5).map(c => c.titulo)],
+        ...p.consultores.map(l => [l.nome, ...valoresMeta(l).slice(0, 5)]),
       ],
     },
     {
