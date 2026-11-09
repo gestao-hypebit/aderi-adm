@@ -7,6 +7,7 @@ import Tabela from '@/app/components/Tabela'
 import { brl } from '@/lib/cotacao'
 import { dataBR } from '@/lib/csv'
 import type { DadosCadastro } from '@/lib/metas/cadastros'
+import { OPERACAO_SEM_VENDA } from '@/lib/metas/importacao/erpVendasXlsx'
 import { CFOP_SEM_VENDA, faturamentoItem, normalizarDav, type ItemErp, type LeituraErp, type PedidoErp } from '@/lib/metas/importacao/erpEdpe'
 import { montarSugestor, type OrigemSugestao, type SugestaoProduto, type VendaHistorico } from '@/lib/metas/importacao/sugestoes'
 import { inferirToneladas } from '@/lib/metas/importacao/toneladas'
@@ -82,6 +83,7 @@ export default function ImportarErp({ leitura, dados, onCancelar, onRecarregarCa
       const motivos: string[] = []
       if (!novos.length) motivos.push('já está no sistema')
       if (CFOP_SEM_VENDA.includes(p.cfop)) motivos.push(`CFOP ${p.cfop} (remessa sem venda)`)
+      if (p.operacao && OPERACAO_SEM_VENDA.test(p.operacao)) motivos.push(`${p.operacao} (não é venda)`)
       if (p.situacao && p.situacao !== 'S') motivos.push(`situação "${p.situacao}" no ERP`)
       if (!p.data) motivos.push('sem data')
       return { p, itens, novos, motivos, sugConsultor: sugestor.consultor(p.vendedor, p.cliente_codigo, p.cliente) }
@@ -137,7 +139,7 @@ export default function ImportarErp({ leitura, dados, onCancelar, onRecarregarCa
       itens_ja_existentes: marcados.flatMap(x => x.itens.filter(i => i.existe).map(i => ({ dav: x.p.dav, produto: i.item.descricao }))),
     }
     const { data: imp, error } = await supabase.from('importacoes').insert({
-      layout: 'erp-edpe010', arquivo: leitura.arquivo, linhas_lidas: leitura.pedidos.reduce((s, p) => s + p.itens.length, 0),
+      layout: leitura.formato, arquivo: leitura.arquivo, linhas_lidas: leitura.pedidos.reduce((s, p) => s + p.itens.length, 0),
       linhas_importadas: itensGravar.length, linhas_ignoradas: leitura.pedidos.reduce((s, p) => s + p.itens.length, 0) - itensGravar.length, relatorio,
     }).select('id').single()
     if (error || !imp) { setGravando(false); setErro('Não foi possível registrar a importação.'); return }
@@ -149,7 +151,7 @@ export default function ImportarErp({ leitura, dados, onCancelar, onRecarregarCa
         produto, produto_codigo: item.produto_codigo, quantidade: item.quantidade, preco_unitario: item.preco_unitario,
         faturamento: faturamentoItem(item), grupo_id: sugestao.grupo_id, tipo: sugestao.tipo, consultor_id: escolha(p).consultor_id,
         // o ERP é o faturamento da loja: Verde Agro. Venda direta vem dos relatórios das fábricas.
-        modalidade: 'VERDE_AGRO', vendedor_codigo: p.vendedor || null, custo_unitario: null,
+        modalidade: 'VERDE_AGRO', vendedor_codigo: p.vendedor || null, custo_unitario: item.custo_unitario ?? null,
         toneladas: sugestao.grupo_id != null && sugestao.grupo_id === fertilizantesId ? inferirToneladas(produto, item.quantidade, item.preco_unitario).toneladas : null,
         observacao: item.observacao || null, linha_origem: item.linha, importacao_id: imp.id,
         taxa_juros_mensal: dados.config.taxa_juros_mensal, aliquota_imposto: dados.config.aliquota_imposto, fator_comissao: dados.config.fator_comissao,
@@ -171,6 +173,7 @@ export default function ImportarErp({ leitura, dados, onCancelar, onRecarregarCa
 
   if (!sugestor || !existentes) return erro ? <div className="ui-alert ui-alert-erro">{erro}</div> : <div className="ui-skeleton" style={{ height: 320 }} />
 
+  const comCusto = leitura.formato === 'erp-vendas-xlsx'
   const diferenca = leitura.total_geral == null ? null : leitura.total_geral - somaLida
 
   return (
@@ -186,7 +189,7 @@ export default function ImportarErp({ leitura, dados, onCancelar, onRecarregarCa
           </div>
           <div className="ui-field">
             <label className="ui-label">Arquivo</label>
-            <div>{leitura.arquivo} · relatório do ERP (EDPE010) · {leitura.pedidos.length} pedidos</div>
+            <div>{leitura.arquivo} · {comCusto ? 'relatório de vendas do ERP (.xlsx)' : 'relatório do ERP (EDPE010)'} · {leitura.pedidos.length} pedidos</div>
             {leitura.avisos.map(a => <div key={a} className="ui-hint">{a}</div>)}
           </div>
         </div>
@@ -249,7 +252,7 @@ export default function ImportarErp({ leitura, dados, onCancelar, onRecarregarCa
             <>{x.novos.length}{x.novos.length !== x.itens.length && <div className="ui-cel-sub">{x.itens.length - x.novos.length} já no sistema</div>}</>
           ) },
           { id: 'total', titulo: 'Total', alinhar: 'dir', celula: x => brl(x.p.total), ordenar: (a, b) => a.p.total - b.p.total },
-          { id: 'sit', titulo: 'Situação', celula: x => (x.motivos.length ? <span className="ui-cel-sub laranja">{x.motivos.join(' · ')}</span> : <span className="ui-cel-sub">{x.p.condicao}</span>) },
+          { id: 'sit', titulo: 'Situação', celula: x => (x.motivos.length ? <span className="ui-cel-sub laranja">{x.motivos.join(' · ')}</span> : <span className="ui-cel-sub">{[x.p.operacao, x.p.condicao].filter(Boolean).join(' · ')}</span>) },
         ]}
       />
 
@@ -274,7 +277,7 @@ export default function ImportarErp({ leitura, dados, onCancelar, onRecarregarCa
 
       <div className="ui-card ui-card-pad" style={{ marginTop: '1.25rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
         <span className="ui-hint" style={{ margin: 0 }}>
-          Custo, frete e datas de pagamento não vêm do ERP: complete na planilha de {competencia ? competenciaBR(`${competencia}-01`) : 'lançamentos'} depois de importar.
+          {comCusto ? 'O custo veio do ERP; frete e datas de pagamento não:' : 'Custo, frete e datas de pagamento não vêm do ERP:'} complete na planilha de {competencia ? competenciaBR(`${competencia}-01`) : 'lançamentos'} depois de importar.
         </span>
         <div style={{ display: 'flex', gap: '.5rem' }}>
           <button className="ui-btn ui-btn-ghost" onClick={onCancelar} disabled={gravando}>Cancelar</button>

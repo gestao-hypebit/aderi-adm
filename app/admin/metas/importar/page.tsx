@@ -12,6 +12,7 @@ import { LAYOUTS, lerWorkbook } from '@/lib/metas/importacao/planilhaAd'
 import { buscarTodas, competenciaBR } from '@/lib/metas/vendas'
 import { chaveDuplicidade, conciliar, resolverLeitura, type LinhaValida } from '@/lib/metas/importacao/resolver'
 import { decodificarCsv, lerEdpe, type LeituraErp } from '@/lib/metas/importacao/erpEdpe'
+import { lerVendasErpXlsx } from '@/lib/metas/importacao/erpVendasXlsx'
 import { Kpi } from '../Comum'
 import ImportarErp from './ImportarErp'
 import type { LeituraPlanilha } from '@/lib/metas/importacao/tipos'
@@ -100,6 +101,14 @@ export default function ImportarVendasPage() {
       const ExcelJS = (await import('exceljs')).default
       const wb = new ExcelJS.Workbook()
       await wb.xlsx.load(await f.arrayBuffer())
+      // Relatório de vendas do ERP em .xlsx (uma linha por item): mesmo fluxo do EDPE010
+      const erp = lerVendasErpXlsx(wb, f.name)
+      if (erp) {
+        if (!erp.pedidos.length) throw new Error('O relatório de vendas do ERP não tem nenhum pedido.')
+        setLeituraErp(erp)
+        setLendo(false)
+        return
+      }
       const l = lerWorkbook(wb, f.name, layoutId)
       if (!l.linhas.length) throw new Error('Nenhuma linha de venda encontrada. Confira se a aba tem a linha de cabeçalho com "Data:" na coluna A.')
       setLeitura(l)
@@ -185,7 +194,7 @@ export default function ImportarVendasPage() {
       <div className="ui-page-header">
         <div>
           <div className="ui-title">Importar vendas</div>
-          <div className="ui-sub">Relatório do ERP (EDPE010, .csv) ou planilha mensal AD (.xlsx). Confira a prévia antes de gravar.</div>
+          <div className="ui-sub">Relatório do ERP (EDPE010 em .csv ou relatório de vendas em .xlsx) ou planilha mensal AD (.xlsx). Confira a prévia antes de gravar.</div>
         </div>
       </div>
 
@@ -209,7 +218,7 @@ export default function ImportarVendasPage() {
           </div>
         </div>
         <div className="ui-hint">
-          O relatório do ERP preenche data, DAV, cliente, produto, quantidade e preço, e sugere consultor, grupo e D/C pelo histórico.
+          O relatório do ERP preenche data, DAV, cliente, produto, quantidade e preço (e o custo, no relatório de vendas .xlsx), e sugere consultor, grupo e D/C pelo histórico.
           As vendas entram &quot;a completar&quot; e você termina (custo, frete, datas) na tela de <Link href="/admin/metas/lancamentos">Lançamentos</Link>.
         </div>
       </div>
@@ -369,7 +378,7 @@ export default function ImportarVendasPage() {
             ]}
             colunas={[
               { id: 'quando', titulo: 'Quando', celula: h => new Date(h.created_at).toLocaleString('pt-BR'), largura: '160px' },
-              { id: 'arquivo', titulo: 'Arquivo', celula: h => <><span className="ui-cel-txt">{h.arquivo}</span><div className="ui-cel-sub">{h.layout === 'erp-edpe010' ? 'Relatório do ERP' : 'Planilha AD'}{h.relatorio?.competencia ? ` · ${competenciaBR(h.relatorio.competencia.slice(0, 7) + '-01')}` : ''}</div></> },
+              { id: 'arquivo', titulo: 'Arquivo', celula: h => <><span className="ui-cel-txt">{h.arquivo}</span><div className="ui-cel-sub">{h.layout.startsWith('erp-') ? 'Relatório do ERP' : 'Planilha AD'}{h.relatorio?.competencia ? ` · ${competenciaBR(h.relatorio.competencia.slice(0, 7) + '-01')}` : ''}</div></> },
               { id: 'qtd', titulo: 'Vendas', celula: h => <>{h.linhas_importadas}{(noSistema[h.id]?.qtd ?? 0) !== h.linhas_importadas && <div className="ui-cel-sub">{noSistema[h.id]?.qtd ?? 0} no sistema</div>}</>, alinhar: 'dir' },
               { id: 'imp', titulo: 'Importado', celula: h => (h.relatorio?.conciliacao ? brl(h.relatorio.conciliacao.importado) : '—'), alinhar: 'dir', ocultar: 'celular' },
               { id: 'pl', titulo: 'Total planilha', celula: h => (h.relatorio?.conciliacao?.total_planilha != null ? brl(h.relatorio.conciliacao.total_planilha) : '—'), alinhar: 'dir', ocultar: 'tablet' },

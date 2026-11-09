@@ -16,6 +16,7 @@ export type ItemErp = {
   preco_unitario: number
   desconto: number        // valor; nos arquivos vistos sempre vazio
   observacao: string
+  custo_unitario?: number | null  // só no relatório de vendas em .xlsx
 }
 
 export type PedidoErp = {
@@ -29,11 +30,13 @@ export type PedidoErp = {
   situacao: string        // "S" na maioria; "N" em poucos (TODO(cliente): o que significa?)
   cfop: string
   condicao: string
+  operacao?: string       // "Cfg." do relatório de vendas em .xlsx, ex.: "1 - VENDAS"
   itens: ItemErp[]
 }
 
 export type LeituraErp = {
   arquivo: string
+  formato: 'erp-edpe010' | 'erp-vendas-xlsx'
   pedidos: PedidoErp[]
   total_geral: number | null
   avisos: string[]
@@ -129,7 +132,7 @@ export function lerEdpe(texto: string, arquivo: string): LeituraErp {
     const soma = p.itens.reduce((s, it) => s + faturamentoItem(it), 0)
     if (Math.abs(soma - p.total) > 0.01) avisos.push(`DAV ${p.dav}: soma dos itens (${soma.toFixed(2)}) difere do total do pedido (${p.total.toFixed(2)}).`)
   }
-  return { arquivo, pedidos: comItens, total_geral, avisos }
+  return { arquivo, formato: 'erp-edpe010', pedidos: comItens, total_geral, avisos }
 }
 
 export const faturamentoItem = (it: ItemErp) => it.quantidade * it.preco_unitario - it.desconto
