@@ -20,7 +20,16 @@ export default function LoginPage() {
     setCarregando(true)
     setErro('')
     const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha })
-    if (error) { setErro('Email ou senha incorretos.'); setCarregando(false); return }
+    if (error) {
+      // "Email not confirmed": a conta existe, mas ninguém clicou no link de confirmação
+      setErro(/not confirmed/i.test(error.message)
+        ? 'Seu e-mail ainda não foi confirmado. Clique no link que chegou no seu e-mail ou peça ao administrador para liberar o login.'
+        : /rate limit|too many/i.test(error.message)
+          ? 'Muitas tentativas. Aguarde alguns minutos e tente de novo.'
+          : 'Email ou senha incorretos.')
+      setCarregando(false)
+      return
+    }
 
     // Verifica o role do usuário para direcionar ao lugar certo
     const { data: profile } = await supabase

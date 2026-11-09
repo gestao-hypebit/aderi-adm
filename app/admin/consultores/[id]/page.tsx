@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Tabela from '@/app/components/Tabela'
 import ConfirmDialog from '../../_ui/ConfirmDialog'
@@ -11,6 +11,7 @@ import { ETAPAS, etapaDe, calcularTotais, itemDoBanco, parametrosDoBanco, brl } 
 import FunilCotacoes from '@/app/components/cotacoes/FunilCotacoes'
 import { linkWhatsApp } from '@/lib/contato'
 import PeriodoSeletor from '@/app/components/PeriodoSeletor'
+import { acessoCompleto } from '@/lib/permissoes'
 
 type Perfil = { id: string; nome_completo: string | null; cargo: string | null; telefone: string | null; role: string; ativo: boolean | null; created_at: string | null; permissoes?: string[] | null }
 type Visita = {
@@ -48,6 +49,9 @@ function IconPhone() {
 function IconPower() {
   return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
 }
+function IconTrash() {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+}
 function IconClipboard() {
   return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
 }
@@ -77,6 +81,14 @@ export default function AdminConsultorDetalhe() {
   const [confirmarStatus, setConfirmarStatus] = useState(false)
   const [salvandoStatus, setSalvandoStatus] = useState(false)
   const [souEu, setSouEu] = useState(false)
+  const router = useRouter()
+  // Só o administrador completo exclui, desativa e vê/libera o login (o banco também confere)
+  const [completo, setCompleto] = useState(false)
+  const [login, setLogin] = useState<{ email: string; confirmado: boolean; ultimo_login: string | null } | null>(null)
+  const [confirmarExcluir, setConfirmarExcluir] = useState(false)
+  const [excluindo, setExcluindo] = useState(false)
+  const [liberando, setLiberando] = useState(false)
+  const [msgAcao, setMsgAcao] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
 
   useEffect(() => {
     async function carregar() {
@@ -94,6 +106,14 @@ export default function AdminConsultorDetalhe() {
           .eq('criado_por', id).order('created_at', { ascending: false }),
       ])
       setSouEu(user?.id === id)
+      const { data: eu } = await supabase.from('profiles').select('*').eq('id', user?.id ?? '').single()
+      const ehCompleto = acessoCompleto(eu)
+      setCompleto(ehCompleto)
+      if (ehCompleto) {
+        // sem a migration 20261109120000 a função não existe: só não mostra o status do login
+        const { data: l } = await supabase.rpc('login_usuario', { p_id: id })
+        setLogin(Array.isArray(l) && l[0] ? l[0] : null)
+      }
       setPerfil(p)
       setVisitas((v ?? []) as Visita[])
       setCriados((c ?? []) as ClienteCriado[])
@@ -168,6 +188,30 @@ export default function AdminConsultorDetalhe() {
     setConfirmarStatus(false)
   }
 
+  // Conta criada pela administração fica travada até a pessoa clicar no link do e-mail
+  async function liberarLogin() {
+    setLiberando(true); setMsgAcao(null)
+    const { error } = await supabase.rpc('liberar_login_usuario', { p_id: id })
+    setLiberando(false)
+    if (error) { setMsgAcao({ tipo: 'erro', texto: `Não foi possível liberar o login. (${error.message})` }); return }
+    setLogin(l => (l ? { ...l, confirmado: true } : l))
+    setMsgAcao({ tipo: 'ok', texto: 'Login liberado. A pessoa já pode entrar com o e-mail e a senha cadastrados.' })
+  }
+
+  async function excluir() {
+    setExcluindo(true); setMsgAcao(null)
+    const { error } = await supabase.rpc('excluir_usuario', { p_id: id })
+    setExcluindo(false)
+    setConfirmarExcluir(false)
+    if (error) {
+      setMsgAcao({ tipo: 'erro', texto: /excluir_usuario/.test(error.message) && /function|função/i.test(error.message)
+        ? 'Rode a migration 20261109120000_excluir_usuario.sql no SQL Editor do Supabase para poder excluir.'
+        : error.message })
+      return
+    }
+    router.push('/admin/consultores')
+  }
+
   if (carregando) {
     return (
       <div>
@@ -235,12 +279,35 @@ export default function AdminConsultorDetalhe() {
           : 'A pessoa não consegue mais entrar no sistema e deixa de aparecer para novos agendamentos. Visitas, clientes e histórico são mantidos.'}
       </ConfirmDialog>
 
+      <ConfirmDialog
+        aberto={confirmarExcluir}
+        titulo={`Excluir ${nome}?`}
+        confirmarTexto="Excluir de vez"
+        perigo
+        carregando={excluindo}
+        onConfirmar={excluir}
+        onCancelar={() => setConfirmarExcluir(false)}
+      >
+        A conta é apagada e o e-mail fica livre para um novo cadastro. Não dá para desfazer.
+        Só funciona para quem ainda não tem visitas, cotações nem KM; quem já trabalhou no sistema deve ser desativado.
+        {criados.length > 0 && ` Os ${criados.length} cliente(s) cadastrados por esta pessoa continuam no sistema, em seu nome.`}
+      </ConfirmDialog>
+
       <div className="cs-wrap">
         <div className="ui-breadcrumb">
           <Link href="/admin/consultores"><IconArrowLeft /> Consultores</Link>
           <span className="ui-breadcrumb-sep">/</span>
           <span className="ui-breadcrumb-atual">{nome}</span>
         </div>
+
+        {msgAcao && <div className={`ui-alert ${msgAcao.tipo === 'ok' ? 'ui-alert-ok' : 'ui-alert-erro'}`}>{msgAcao.texto}</div>}
+
+        {login && !login.confirmado && !inativo && (
+          <div className="cs-inativo" style={{ background: '#fdf3e9', borderColor: '#f5d9bd', color: '#a85512', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+            <span>Login travado: o e-mail {login.email} ainda não foi confirmado, por isso a pessoa não consegue entrar.</span>
+            <button className="ui-btn ui-btn-primary ui-btn-sm" onClick={liberarLogin} disabled={liberando}>{liberando ? 'Liberando...' : 'Liberar login'}</button>
+          </div>
+        )}
 
         {inativo && (
           <div className="cs-inativo">
@@ -261,15 +328,19 @@ export default function AdminConsultorDetalhe() {
             <div className="cs-meta">
               <span>{perfil.cargo || 'Consultor de campo'}</span>
               {perfil.telefone && <><span className="ui-dot-sep" /><a href={`tel:${perfil.telefone.replace(/\D/g, '')}`}><IconPhone />{perfil.telefone}</a></>}
+              {login && <><span className="ui-dot-sep" /><span>{login.email} · {login.ultimo_login ? `último acesso ${new Date(login.ultimo_login).toLocaleDateString('pt-BR')}` : 'nunca entrou'}</span></>}
               {perfil.created_at && <><span className="ui-dot-sep" /><span>Desde {new Date(perfil.created_at).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace(' de ', ' ').replace('.', '')}</span></>}
             </div>
           </div>
           <div className="cs-acoes">
             <Link href={`/admin/consultores/${perfil.id}/editar`} className="ui-btn ui-btn-ghost ui-btn-sm"><IconEdit /> Editar</Link>
-            {!souEu && (
+            {!souEu && completo && (
               <button className={`ui-btn ui-btn-sm ${inativo ? 'ui-btn-secondary' : 'ui-btn-danger'}`} onClick={() => setConfirmarStatus(true)}>
                 <IconPower /> {inativo ? 'Reativar' : 'Desativar'}
               </button>
+            )}
+            {!souEu && completo && (
+              <button className="ui-btn ui-btn-ghost ui-btn-sm" style={{ color: '#c0392b' }} onClick={() => setConfirmarExcluir(true)}><IconTrash /> Excluir</button>
             )}
             <button className="ui-btn ui-btn-ghost ui-btn-sm" onClick={abrirTransferencia} title="Passar os clientes deste consultor para outro">Transferir carteira</button>
             <Link href={`/admin/agenda?func=${perfil.id}`} className="ui-btn ui-btn-secondary ui-btn-sm"><IconCalendar /> Agenda</Link>

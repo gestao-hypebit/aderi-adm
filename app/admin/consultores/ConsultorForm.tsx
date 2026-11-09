@@ -49,6 +49,8 @@ export default function ConsultorForm({ consultorId }: Props) {
   const [erro, setErro] = useState('')
   const [criado, setCriado] = useState<{ id: string; email: string; senha: string; precisaConfirmar: boolean } | null>(null)
   const [copiado, setCopiado] = useState(false)
+  const [liberando, setLiberando] = useState(false)
+  const [erroLiberar, setErroLiberar] = useState('')
 
   useEffect(() => {
     async function carregar() {
@@ -158,6 +160,16 @@ export default function ConsultorForm({ consultorId }: Props) {
     setSalvando(false)
   }
 
+  // Dispensa o clique no link de confirmação: a conta entra direto com a senha inicial
+  async function liberarLogin() {
+    if (!criado) return
+    setLiberando(true); setErroLiberar('')
+    const { error } = await supabase.rpc('liberar_login_usuario', { p_id: criado.id })
+    setLiberando(false)
+    if (error) { setErroLiberar(`Não foi possível liberar o login. (${error.message})`); return }
+    setCriado({ ...criado, precisaConfirmar: false })
+  }
+
   async function copiarAcesso() {
     if (!criado) return
     const texto = `Acesso ao sistema Aderi Agro\nE-mail: ${criado.email}\nSenha: ${criado.senha}\n${location.origin}/login`
@@ -180,14 +192,18 @@ export default function ConsultorForm({ consultorId }: Props) {
         <div className="ui-title" style={{ fontSize: '1.25rem' }}>Consultor cadastrado</div>
         <div className="ui-sub">
           {criado.precisaConfirmar
-            ? <>Enviamos um e-mail de confirmação para <b>{criado.email}</b>. O consultor precisa clicar no link antes do primeiro acesso.</>
+            ? <>Enviamos um e-mail de confirmação para <b>{criado.email}</b>. O login fica travado até a pessoa clicar no link{gerenciaAcesso ? ', ou você pode liberar agora.' : '.'}</>
             : <>A conta já está ativa. Envie os dados de acesso abaixo para o consultor.</>}
         </div>
         <div style={{ background: '#faf8f5', border: '1px solid #f2efea', borderRadius: 12, padding: '1rem 1.1rem', margin: '1.3rem 0', fontSize: '.82rem', lineHeight: 1.9 }}>
           <div><span style={{ color: '#8f978f' }}>E-mail:</span> <b>{criado.email}</b></div>
           <div><span style={{ color: '#8f978f' }}>Senha inicial:</span> <b style={{ fontFamily: 'monospace', fontSize: '.92rem' }}>{criado.senha}</b></div>
         </div>
+        {erroLiberar && <div className="ui-alert ui-alert-erro">{erroLiberar}</div>}
         <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
+          {criado.precisaConfirmar && gerenciaAcesso && (
+            <button className="ui-btn ui-btn-primary" onClick={liberarLogin} disabled={liberando}>{liberando ? 'Liberando...' : 'Liberar login agora'}</button>
+          )}
           <button className="ui-btn ui-btn-secondary" onClick={copiarAcesso}><IconCopy /> {copiado ? 'Copiado!' : 'Copiar dados de acesso'}</button>
           <Link href={`/admin/consultores/${criado.id}`} className="ui-btn ui-btn-primary">Abrir ficha do consultor</Link>
         </div>
