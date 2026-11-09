@@ -44,7 +44,8 @@ function Icone({ tipo }: { tipo: Item['icone'] }) {
   return <svg {...p}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
 }
 
-export default function CommandPalette({ aberto, onFechar }: { aberto: boolean; onFechar: () => void }) {
+// podeAbrir: filtra pelas telas liberadas ao usuário (acesso personalizado)
+export default function CommandPalette({ aberto, onFechar, podeAbrir = () => true }: { aberto: boolean; onFechar: () => void; podeAbrir?: (href: string) => boolean }) {
   const router = useRouter()
   const [termo, setTermo] = useState('')
   const [ativo, setAtivo] = useState(0)
@@ -87,7 +88,8 @@ export default function CommandPalette({ aberto, onFechar }: { aberto: boolean; 
 
   const resultados = useMemo(() => {
     const t = semAcento(termo.trim())
-    if (!t) return [...ACOES, ...PAGINAS]
+    const ok = (i: Item) => podeAbrir(i.href.split('?')[0])
+    if (!t) return [...ACOES, ...PAGINAS].filter(ok)
     const casa = (i: Item) => semAcento(i.titulo).includes(t) || semAcento(i.sub ?? '').includes(t)
     const porGrupo = (g: string, max: number) => (dados ?? []).filter(i => i.grupo === g && casa(i)).slice(0, max)
     return [
@@ -96,8 +98,8 @@ export default function CommandPalette({ aberto, onFechar }: { aberto: boolean; 
       ...porGrupo('Consultores', 4),
       ...porGrupo('Visitas', 6),
       ...PAGINAS.filter(casa),
-    ]
-  }, [termo, dados])
+    ].filter(ok)
+  }, [termo, dados, podeAbrir])
 
   useEffect(() => {
     listaRef.current?.querySelector<HTMLElement>(`[data-idx="${ativo}"]`)?.scrollIntoView({ block: 'nearest' })

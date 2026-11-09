@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { podeRota, telaInicial } from '@/lib/permissoes'
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -26,7 +27,7 @@ export async function proxy(request: NextRequest) {
   const rotasPublicas = ['/login', '/cadastro', '/nova-senha']
 
   // Não logado tentando acessar área protegida
-  if (!user && (path.startsWith('/dashboard') || path.startsWith('/imprimir'))) {
+  if (!user && (path.startsWith('/dashboard') || path.startsWith('/imprimir') || path.startsWith('/admin'))) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
@@ -41,6 +42,21 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  // Acesso personalizado: só as telas liberadas no cadastro do usuário.
+  // ('*' para continuar funcionando antes de a coluna permissoes existir no banco)
+  if (user && path.startsWith('/admin')) {
+    const { data: perfil } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    if (perfil?.role === 'admin' && perfil.ativo !== false && !podeRota(perfil, path)) {
+      const destino = telaInicial(perfil)
+      // sem nenhuma tela liberada o layout mostra o aviso
+      if (destino && destino !== path) {
+        const resposta = NextResponse.redirect(new URL(destino, request.url))
+        supabaseResponse.cookies.getAll().forEach(c => resposta.cookies.set(c))
+        return resposta
+      }
+    }
+  }
+
   // Logado tentando acessar rotas públicas
   if (user && rotasPublicas.includes(path)) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
@@ -50,5 +66,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/imprimir/:path*', '/login', '/cadastro', '/nova-senha'],
+  matcher: ['/admin', '/admin/:path*', '/dashboard/:path*', '/imprimir/:path*', '/login', '/cadastro', '/nova-senha'],
 }

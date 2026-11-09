@@ -13,6 +13,7 @@ import EntregasPedido from './EntregasPedido'
 import DocumentoCotacao, { DOC_CSS, type DadosDocumento, type TipoDocumento } from './Documento'
 import { elementoParaPdf } from '@/lib/pdf'
 import EnvioPdfModal from '@/app/components/EnvioPdfModal'
+import { ehGestao } from '@/lib/permissoes'
 import {
   ItemCotacao, ParametrosCotacao, PARAMETROS_PADRAO, STATUS_COTACAO, etapaDe, CalculoItem, MOTIVOS_PERDA, PEDIDO_STATUS, PAGAMENTO_STATUS,
   calcularTotais, itemVazio, itemDoBanco, parametrosDoBanco, brl, num, pct, dataCurta, textoVencimento, VIDE_OBS, precoMinimo, abaixoDoMinimo, menorMargem,
@@ -163,16 +164,16 @@ export default function CotacaoEditor({ cotacaoId, base }: Props) {
     async function carregar() {
       const { data: { user } } = await supabase.auth.getUser()
       const [{ data: perfil }, { data: prods }, { data: clis }, { data: cfg }] = await Promise.all([
-        supabase.from('profiles').select('role, nome_completo, telefone').eq('id', user?.id ?? '').single(),
+        supabase.from('profiles').select('*').eq('id', user?.id ?? '').single(),
         supabase.from('produtos').select('id, nome, fornecedor, unidade, preco_tabela').eq('ativo', true).order('nome'),
         supabase.from('clientes').select('id, nome, nome_fazenda, cidade, estado, cpf_cnpj, telefone, inscricao_produtor').order('nome'),
         supabase.from('configuracoes').select('margem_minima, validade_cotacao_dias, dias_followup').eq('id', 1).maybeSingle(),
       ])
       const conf = cfg ? { margem_minima: Number(cfg.margem_minima), validade_cotacao_dias: cfg.validade_cotacao_dias, dias_followup: cfg.dias_followup } : CONFIG_PADRAO
       setConfig(conf)
-      setAdmin(perfil?.role === 'admin')
+      setAdmin(ehGestao(perfil))
       // resultado (custos) é só da gestão; o pedido o consultor acompanha sem editar
-      if (perfil?.role !== 'admin') setAba(a => (a === 'resultado' ? 'cotacao' : a))
+      if (!ehGestao(perfil)) setAba(a => (a === 'resultado' ? 'cotacao' : a))
       setProdutos((prods ?? []).map(p => ({ ...p, preco_tabela: Number(p.preco_tabela) })))
       const listaClientes = (clis ?? []) as ClienteOpcao[]
       setClientes(listaClientes)

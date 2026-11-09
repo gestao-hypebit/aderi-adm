@@ -9,6 +9,7 @@ import FunilCotacoes from './FunilCotacoes'
 import { baixarCsv } from '@/lib/csv'
 import { ATALHO_PADRAO, calcRange, descreverPeriodo } from '@/lib/dateUtils'
 import { ETAPAS, etapaDe, calcularTotais, itemDoBanco, parametrosDoBanco, brl, pct, type Etapa } from '@/lib/cotacao'
+import { pode } from '@/lib/permissoes'
 
 // Acompanhamento das cotações por etapa: quantas há em cada uma, há quanto tempo estão paradas,
 // quanto tempo cada passagem leva e como cada consultor está. Admin vê a equipe; consultor vê as dele.
@@ -79,7 +80,7 @@ export default function AcompanhamentoCotacoes({ base, voltar }: Props) {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     const [{ data: perfil }, { data }, { data: cfg }] = await Promise.all([
-      supabase.from('profiles').select('role').eq('id', user?.id ?? '').single(),
+      supabase.from('profiles').select('*').eq('id', user?.id ?? '').single(),
       supabase.from('cotacoes')
         .select('id, numero, status, aprovacao_status, criado_por, cliente_nome, created_at, updated_at, enviada_em, aprovado_em, aprovacao_pedida_em, efetivada_em, perdida_em, motivo_perda, ptax, juros_mes, aliquota_icms, aliquota_ir, autor:profiles!cotacoes_criado_por_fkey(nome_completo), itens:cotacao_itens(*)')
         .gte('created_at', periodo.inicio).lte('created_at', periodo.fim + 'T23:59:59')
@@ -88,7 +89,7 @@ export default function AcompanhamentoCotacoes({ base, voltar }: Props) {
     ])
     const follow = cfg?.dias_followup ?? 3
     setDiasFollow(follow)
-    setAdmin(perfil?.role === 'admin')
+    setAdmin(pode(perfil, 'acompanhamento', 'cotacoes', 'aprovacoes', 'pedidos'))
     setCots((data ?? []).map(c => {
       const a = Array.isArray(c.autor) ? c.autor[0] : c.autor
       const dados = {

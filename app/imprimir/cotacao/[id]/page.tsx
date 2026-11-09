@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ItemCotacao, ParametrosCotacao, itemDoBanco, parametrosDoBanco } from '@/lib/cotacao'
 import DocumentoCotacao, { DOC_CSS, TITULO_DOC, type DadosDocumento, type TipoDocumento } from '@/app/components/cotacoes/Documento'
+import { ehGestao } from '@/lib/permissoes'
 
 type Carregado = { dados: DadosDocumento; itens: ItemCotacao[]; param: ParametrosCotacao; bloqueado: boolean }
 
@@ -20,12 +21,12 @@ function Conteudo() {
     async function carregar() {
       const { data: { user } } = await supabase.auth.getUser()
       const [{ data: perfil }, { data: cot }, { data: its }] = await Promise.all([
-        supabase.from('profiles').select('role').eq('id', user?.id ?? '').single(),
+        supabase.from('profiles').select('*').eq('id', user?.id ?? '').single(),
         supabase.from('cotacoes').select('*, autor:profiles!cotacoes_criado_por_fkey(nome_completo, telefone)').eq('id', id).single(),
         supabase.from('cotacao_itens').select('*').eq('cotacao_id', id).order('ordem'),
       ])
       if (!cot) { setErro('Cotação não encontrada.'); return }
-      const ehAdmin = perfil?.role === 'admin'
+      const ehAdmin = ehGestao(perfil)
       const itens = (its ?? []).map(itemDoBanco)
       const param = parametrosDoBanco(cot)
       // mesma regra do editor: consultor só gera o orçamento depois da aprovação da gestão (a margem não trava por enquanto)

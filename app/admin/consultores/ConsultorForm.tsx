@@ -5,6 +5,7 @@ import { createClient as createBrowserClient } from '@/lib/supabase/client'
 import { createClient as createIsolatedClient } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { GRUPOS_TELAS, MODELOS, TELAS, acessoCompleto, limparPermissoes } from '@/lib/permissoes'
 
 function IconArrowLeft() {
   return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
@@ -39,6 +40,10 @@ export default function ConsultorForm({ consultorId }: Props) {
   const [form, setForm] = useState({ nome_completo: '', email: '', senha: '', cargo: '', telefone: '', role: 'colaborador', ativo: true })
   const [nomeOriginal, setNomeOriginal] = useState('')
   const [souEu, setSouEu] = useState(false)
+  // Telas liberadas no acesso personalizado (form.role === 'personalizado' → role 'admin' com lista)
+  const [permissoes, setPermissoes] = useState<string[]>([])
+  // Só o administrador completo muda papel, status e permissões (o banco também confere)
+  const [gerenciaAcesso, setGerenciaAcesso] = useState(false)
   const [carregandoDados, setCarregandoDados] = useState(true)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
@@ -48,8 +53,11 @@ export default function ConsultorForm({ consultorId }: Props) {
   useEffect(() => {
     async function carregar() {
       const { data: { user } } = await supabase.auth.getUser()
+      const { data: eu } = await supabase.from('profiles').select('*').eq('id', user?.id ?? '').single()
+      setGerenciaAcesso(acessoCompleto(eu))
       if (consultorId) {
-        const { data } = await supabase.from('profiles').select('nome_completo, cargo, telefone, role, ativo').eq('id', consultorId).single()
+        // '*' para continuar funcionando antes de a coluna permissoes existir no banco
+        const { data } = await supabase.from('profiles').select('*').eq('id', consultorId).single()
         if (data) {
           setNomeOriginal(data.nome_completo || '')
           setForm(f => ({
@@ -57,9 +65,10 @@ export default function ConsultorForm({ consultorId }: Props) {
             nome_completo: data.nome_completo || '',
             cargo: data.cargo || '',
             telefone: data.telefone || '',
-            role: data.role || 'colaborador',
+            role: data.role === 'admin' && Array.isArray(data.permissoes) ? 'personalizado' : data.role || 'colaborador',
             ativo: data.ativo !== false,
           }))
+          setPermissoes(Array.isArray(data.permissoes) ? data.permissoes : [])
         }
         setSouEu(user?.id === consultorId)
       } else {
@@ -78,19 +87,30 @@ export default function ConsultorForm({ consultorId }: Props) {
     e.preventDefault()
     setErro('')
     if (!form.nome_completo.trim()) { setErro('Informe o nome.'); return }
+    if (form.role === 'personalizado' && !limparPermissoes(permissoes).length) { setErro('Marque pelo menos uma tela que a pessoa pode acessar.'); return }
     setSalvando(true)
 
-    const perfil = {
+    const dados = {
       nome_completo: form.nome_completo.trim(),
       cargo: form.cargo.trim() || null,
       telefone: form.telefone.trim() || null,
-      role: form.role,
-      ativo: form.ativo,
     }
+    const acesso = {
+      role: form.role === 'colaborador' ? 'colaborador' : 'admin',
+      ativo: form.ativo,
+      permissoes: form.role === 'personalizado' ? limparPermissoes(permissoes) : null,
+    }
+    const perfil = gerenciaAcesso ? { ...dados, ...acesso } : dados
 
     if (editando) {
       const { error } = await supabase.from('profiles').update(perfil).eq('id', consultorId)
-      if (error) { setErro('Não foi possível salvar. Verifique se você tem permissão de administrador.'); setSalvando(false); return }
+      if (error) {
+        setErro(/permissoes/.test(error.message)
+          ? 'O banco ainda não tem as permissões por tela. Rode a migration 20261109090000_permissoes_usuario.sql no SQL Editor do Supabase.'
+          : 'Não foi possível salvar. Verifique se você tem permissão de administrador.')
+        setSalvando(false)
+        return
+      }
       router.push(`/admin/consultores/${consultorId}`)
       return
     }
@@ -126,7 +146,13 @@ export default function ConsultorForm({ consultorId }: Props) {
     }
 
     // O perfil é criado pela trigger handle_new_user; completa cargo, telefone e papel.
-    await supabase.from('profiles').update(perfil).eq('id', data.user.id)
+    const { error: errPerfil } = await supabase.from('profiles').update(perfil).eq('id', data.user.id)
+    if (errPerfil && form.role !== 'colaborador') {
+      // conta criada mas sem o papel: avisa em vez de deixar como consultor sem perceber
+      setErro(`A conta foi criada, mas não foi possível salvar o acesso (${errPerfil.message}). Abra a ficha do consultor e edite o acesso.`)
+      setSalvando(false)
+      return
+    }
 
     setCriado({ id: data.user.id, email: form.email.trim(), senha: form.senha, precisaConfirmar: !data.session })
     setSalvando(false)
@@ -181,7 +207,15 @@ export default function ConsultorForm({ consultorId }: Props) {
         .csf-secao-desc{font-size:.7rem;color:#8f978f;margin-top:.1rem}
         .csf-senha{display:flex;gap:.5rem}
         .csf-senha .ui-input{font-family:monospace;font-size:.9rem;letter-spacing:.04em}
-        .csf-papel{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+        .csf-papel{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
+        .csf-telas{margin-top:1rem;border:1.5px solid #eae5de;border-radius:12px;padding:1rem}
+        .csf-modelos{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;margin-bottom:.4rem}
+        .csf-grupo{margin-top:.8rem}
+        .csf-grupo-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;font-size:.62rem;font-weight:600;color:#8f978f;letter-spacing:.12em;text-transform:uppercase;margin-bottom:.35rem}
+        .csf-grupo-head button{background:none;border:none;color:#E67E22;font-family:inherit;font-size:.66rem;font-weight:600;cursor:pointer;letter-spacing:0;text-transform:none}
+        .csf-tela{display:flex;gap:.6rem;align-items:flex-start;padding:.45rem .5rem;border-radius:8px;cursor:pointer}
+        .csf-tela:hover{background:#faf8f5}
+        .csf-tela input{margin-top:.2rem;accent-color:#E67E22}
         .csf-papel-opt{text-align:left;border:1.5px solid #eae5de;border-radius:12px;padding:.85rem 1rem;background:#fff;cursor:pointer;font-family:'Poppins',sans-serif;transition:all .15s}
         .csf-papel-opt:hover{border-color:#cfc8bd}
         .csf-papel-opt.ativo{border-color:#E67E22;background:#fffaf5;box-shadow:0 0 0 3px rgba(230,126,34,.12)}
@@ -194,6 +228,7 @@ export default function ConsultorForm({ consultorId }: Props) {
         .csf-toggle.on::after{transform:translateX(20px)}
         .csf-toggle:disabled{opacity:.5;cursor:not-allowed}
         .csf-actions{display:flex;gap:.6rem;justify-content:flex-end;padding:1rem 1.5rem;background:#faf8f5;border-radius:0 0 16px 16px}
+        @media(max-width:760px){.csf-papel{grid-template-columns:1fr}}
         @media(max-width:600px){.csf-secao{padding:1.15rem 1.1rem}.csf-actions{padding:1rem 1.1rem}.csf-papel{grid-template-columns:1fr}.csf-actions .ui-btn{flex:1}}
       `}</style>
 
@@ -279,6 +314,7 @@ export default function ConsultorForm({ consultorId }: Props) {
               {[
                 ['colaborador', 'Consultor', 'Vê e registra apenas as próprias visitas e clientes, no app de campo.'],
                 ['admin', 'Administrador', 'Acesso total: todos os clientes, consultores, visitas e relatórios.'],
+                ['personalizado', 'Acesso personalizado', 'Entra na administração, mas só nas telas que você marcar abaixo.'],
               ].map(([valor, titulo, desc]) => (
                 <button
                   type="button"
@@ -287,7 +323,7 @@ export default function ConsultorForm({ consultorId }: Props) {
                   aria-checked={form.role === valor}
                   className={`csf-papel-opt ${form.role === valor ? 'ativo' : ''}`}
                   onClick={() => atualizar('role', valor)}
-                  disabled={souEu}
+                  disabled={souEu || !gerenciaAcesso}
                 >
                   <div className="csf-papel-titulo">{titulo}</div>
                   <div className="csf-papel-desc">{desc}</div>
@@ -295,6 +331,47 @@ export default function ConsultorForm({ consultorId }: Props) {
               ))}
             </div>
             {souEu && <div className="ui-hint">Você não pode alterar o seu próprio papel nem desativar a sua conta.</div>}
+            {!souEu && !gerenciaAcesso && <div className="ui-hint">Só um administrador com acesso total pode mudar o papel e as telas desta pessoa.</div>}
+
+            {form.role === 'personalizado' && (
+              <div className="csf-telas">
+                <div className="csf-modelos">
+                  <span className="ui-hint" style={{ margin: 0 }}>Marcar modelo:</span>
+                  {MODELOS.map(m => (
+                    <button key={m.nome} type="button" className="ui-btn ui-btn-secondary ui-btn-sm" disabled={souEu || !gerenciaAcesso} onClick={() => setPermissoes(m.chaves)}>{m.nome}</button>
+                  ))}
+                </div>
+                {GRUPOS_TELAS.map(g => {
+                  const telas = TELAS.filter(t => t.grupo === g)
+                  const todas = telas.every(t => permissoes.includes(t.chave))
+                  return (
+                    <div key={g} className="csf-grupo">
+                      <div className="csf-grupo-head">
+                        <span>{g}</span>
+                        {!souEu && gerenciaAcesso && (
+                          <button type="button" onClick={() => setPermissoes(ps => (todas ? ps.filter(p => !telas.some(t => t.chave === p)) : [...new Set([...ps, ...telas.map(t => t.chave)])]))}>
+                            {todas ? 'Desmarcar todas' : 'Marcar todas'}
+                          </button>
+                        )}
+                      </div>
+                      {telas.map(t => (
+                        <label key={t.chave} className="csf-tela">
+                          <input type="checkbox" checked={permissoes.includes(t.chave)} disabled={souEu || !gerenciaAcesso}
+                            onChange={e => setPermissoes(ps => (e.target.checked ? [...ps, t.chave] : ps.filter(p => p !== t.chave)))} />
+                          <span>
+                            <span className="csf-papel-titulo">{t.label}</span>
+                            <span className="csf-papel-desc" style={{ display: 'block', marginTop: 0 }}>{t.descricao}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )
+                })}
+                <div className="ui-hint" style={{ marginTop: '.8rem' }}>
+                  O banco de dados confere o mesmo acesso: a pessoa não lê nem grava dados de telas que não foram liberadas.
+                </div>
+              </div>
+            )}
 
             {editando && (
               <div className="csf-switch" style={{ marginTop: '1rem' }}>
@@ -304,7 +381,7 @@ export default function ConsultorForm({ consultorId }: Props) {
                     {form.ativo ? 'A pessoa consegue entrar no sistema.' : 'Acesso bloqueado. O histórico de visitas é mantido.'}
                   </div>
                 </div>
-                <button type="button" className={`csf-toggle ${form.ativo ? 'on' : ''}`} onClick={() => atualizar('ativo', !form.ativo)} disabled={souEu} aria-pressed={form.ativo} aria-label="Acesso ativo" />
+                <button type="button" className={`csf-toggle ${form.ativo ? 'on' : ''}`} onClick={() => atualizar('ativo', !form.ativo)} disabled={souEu || !gerenciaAcesso} aria-pressed={form.ativo} aria-label="Acesso ativo" />
               </div>
             )}
 

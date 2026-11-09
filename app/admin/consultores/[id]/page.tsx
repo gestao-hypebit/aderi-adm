@@ -12,7 +12,7 @@ import FunilCotacoes from '@/app/components/cotacoes/FunilCotacoes'
 import { linkWhatsApp } from '@/lib/contato'
 import PeriodoSeletor from '@/app/components/PeriodoSeletor'
 
-type Perfil = { id: string; nome_completo: string | null; cargo: string | null; telefone: string | null; role: string; ativo: boolean | null; created_at: string | null }
+type Perfil = { id: string; nome_completo: string | null; cargo: string | null; telefone: string | null; role: string; ativo: boolean | null; created_at: string | null; permissoes?: string[] | null }
 type Visita = {
   id: string
   data_visita: string
@@ -83,7 +83,7 @@ export default function AdminConsultorDetalhe() {
       const { inicio, fim } = calcRange('este-mes')
       const [{ data: { user } }, { data: p }, { data: v }, { data: c }, { data: km }, { data: q }] = await Promise.all([
         supabase.auth.getUser(),
-        supabase.from('profiles').select('id, nome_completo, cargo, telefone, role, ativo, created_at').eq('id', id).single(),
+        supabase.from('profiles').select('*').eq('id', id).single(),
         supabase.from('visitas')
           .select(`id, data_visita, hora_visita, status, motivo_visita, cliente:clientes(${CAMPOS_CLIENTE})`)
           .eq('funcionario_id', id)
@@ -256,7 +256,7 @@ export default function AdminConsultorDetalhe() {
           <div className="cs-titulo">
             <div className="cs-nome">
               {nome}
-              <span className={`ui-badge ${perfil.role === 'admin' ? 'ui-badge-agendada' : 'ui-badge-neutro'}`}>{perfil.role === 'admin' ? 'Administrador' : 'Consultor'}</span>
+              <span className={`ui-badge ${perfil.role === 'admin' ? 'ui-badge-agendada' : 'ui-badge-neutro'}`}>{perfil.role !== 'admin' ? 'Consultor' : perfil.permissoes ? 'Acesso personalizado' : 'Administrador'}</span>
             </div>
             <div className="cs-meta">
               <span>{perfil.cargo || 'Consultor de campo'}</span>

@@ -9,6 +9,7 @@ import { ETAPAS, etapaDe, type Etapa, PEDIDO_STATUS, calcularTotais, itemDoBanco
 import { ATALHO_PADRAO, calcRange, hojeISO } from '@/lib/dateUtils'
 import PeriodoSeletor from '@/app/components/PeriodoSeletor'
 import NumInput from './NumInput'
+import { ehGestao, pode } from '@/lib/permissoes'
 
 type Linha = {
   id: string
@@ -120,6 +121,8 @@ export default function CotacoesLista({ base, fase = 'cotacoes' }: { base: strin
   const supabase = createClient()
   const [linhas, setLinhas] = useState<Linha[]>([])
   const [admin, setAdmin] = useState(false)
+  const [gestao, setGestao] = useState(false) // configura a margem mínima (tela de Aprovações)
+  const [verProdutos, setVerProdutos] = useState(false)
   const [carregando, setCarregando] = useState(true)
   const [busca, setBusca] = useState('')
   const [status, setStatus] = useState('')
@@ -137,7 +140,7 @@ export default function CotacoesLista({ base, fase = 'cotacoes' }: { base: strin
     async function carregar() {
       const { data: { user } } = await supabase.auth.getUser()
       const [{ data: perfil }, { data: cots }, { data: cfg }] = await Promise.all([
-        supabase.from('profiles').select('role').eq('id', user?.id ?? '').single(),
+        supabase.from('profiles').select('*').eq('id', user?.id ?? '').single(),
         supabase
           .from('cotacoes')
           .select('id, numero, status, cliente_nome, empresa_rural, cidade, created_at, criado_por, ptax, juros_mes, aliquota_icms, aliquota_ir, aprovacao_status, enviada_em, validade, pedido_status, pagamento_status, motivo_perda, autor:profiles!cotacoes_criado_por_fkey(nome_completo), itens:cotacao_itens(*)')
@@ -145,7 +148,9 @@ export default function CotacoesLista({ base, fase = 'cotacoes' }: { base: strin
         supabase.from('configuracoes').select('margem_minima, validade_cotacao_dias, dias_followup').eq('id', 1).maybeSingle(),
       ])
       if (cfg) setConfig({ margem_minima: Number(cfg.margem_minima), validade_cotacao_dias: cfg.validade_cotacao_dias, dias_followup: cfg.dias_followup })
-      setAdmin(perfil?.role === 'admin')
+      setAdmin(pode(perfil, 'cotacoes', 'aprovacoes', 'orcamentos', 'pedidos'))
+      setGestao(ehGestao(perfil))
+      setVerProdutos(pode(perfil, 'produtos'))
       setLinhas((cots ?? []).map(c => {
         const a = Array.isArray(c.autor) ? c.autor[0] : c.autor
         const itens = ((c.itens ?? []) as Record<string, unknown>[]).map(itemDoBanco)
@@ -250,8 +255,8 @@ export default function CotacoesLista({ base, fase = 'cotacoes' }: { base: strin
           </div>
         </div>
         <div className="ui-header-actions">
-          {admin && base.startsWith('/admin') && fase === 'cotacoes' && <button className="ui-btn ui-btn-ghost" onClick={() => { setConfigForm(config); setConfigAberta(true) }}><IconGear /> Configurações</button>}
-          {admin && base.startsWith('/admin') && fase === 'cotacoes' && <Link href="/admin/produtos" className="ui-btn ui-btn-secondary"><IconBox /> Produtos</Link>}
+          {gestao && base.startsWith('/admin') && fase === 'cotacoes' && <button className="ui-btn ui-btn-ghost" onClick={() => { setConfigForm(config); setConfigAberta(true) }}><IconGear /> Configurações</button>}
+          {verProdutos && base.startsWith('/admin') && fase === 'cotacoes' && <Link href="/admin/produtos" className="ui-btn ui-btn-secondary"><IconBox /> Produtos</Link>}
           {fase === 'cotacoes' && <Link href={`${base}/nova`} className="ui-btn ui-btn-primary"><IconPlus /> Nova cotação</Link>}
         </div>
       </div>

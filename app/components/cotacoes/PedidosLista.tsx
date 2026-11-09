@@ -7,6 +7,7 @@ import Tabela from '@/app/components/Tabela'
 import { baixarCsv } from '@/lib/csv'
 import { hojeISO } from '@/lib/dateUtils'
 import { PAGAMENTO_STATUS, PEDIDO_STATUS, brl, calcularTotais, itemDoBanco, parametrosDoBanco, saldoPorProduto, totaisPorUnidade, qtd, type SaldoProduto } from '@/lib/cotacao'
+import { pode } from '@/lib/permissoes'
 
 // Pedidos = cotações em que o cliente aprovou o orçamento. A lista acompanha faturamento, entregas (cargas e saldo)
 // e pagamento; o registro em si é editado na aba "Pedido" da cotação.
@@ -57,7 +58,7 @@ export default function PedidosLista({ base }: { base: string }) {
     async function carregar() {
       const { data: { user } } = await supabase.auth.getUser()
       const [{ data: perfil }, { data }, { data: cargas }] = await Promise.all([
-        supabase.from('profiles').select('role').eq('id', user?.id ?? '').single(),
+        supabase.from('profiles').select('*').eq('id', user?.id ?? '').single(),
         supabase.from('cotacoes')
           .select('id, numero, cliente_nome, empresa_rural, criado_por, created_at, pedido_status, pagamento_status, nota_fiscal, faturado_em, entregue_em, pago_em, valor_recebido, ptax, juros_mes, aliquota_icms, aliquota_ir, autor:profiles!cotacoes_criado_por_fkey(nome_completo), itens:cotacao_itens(*)')
           .eq('status', 'efetivada')
@@ -66,7 +67,7 @@ export default function PedidosLista({ base }: { base: string }) {
       ])
       const porPedido = new Map<string, { produto_nome: string; unidade: string | null; quantidade: number }[]>()
       ;(cargas ?? []).forEach(e => { const l = porPedido.get(e.cotacao_id) ?? []; l.push({ ...e, quantidade: Number(e.quantidade) }); porPedido.set(e.cotacao_id, l) })
-      setAdmin(perfil?.role === 'admin')
+      setAdmin(pode(perfil, 'pedidos', 'cotacoes'))
       setPedidos((data ?? []).map(c => {
         const itens = ((c.itens ?? []) as Record<string, unknown>[]).map(itemDoBanco)
         const a = Array.isArray(c.autor) ? c.autor[0] : c.autor
