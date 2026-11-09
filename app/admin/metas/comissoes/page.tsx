@@ -7,7 +7,8 @@ import Tabela from '@/app/components/Tabela'
 import { brl } from '@/lib/cotacao'
 import { baixarArquivo } from '@/lib/pdf'
 import { carregarCadastros, type DadosCadastro } from '@/lib/metas/cadastros'
-import { montarRelatorioComissoes, periodoBR, type ConsultorComissao } from '@/lib/metas/comissoes'
+import { montarRelatorioComissoes, periodoBR, type ConsultorComissao, type VendaComissao } from '@/lib/metas/comissoes'
+import { dataBR } from '@/lib/csv'
 import { gerarPdfComissoes } from '@/lib/metas/comissoesPdf'
 import { buscarVendas, competenciaBR, type VendaRow } from '@/lib/metas/vendas'
 import { Kpi, pct } from '../Comum'
@@ -17,6 +18,12 @@ function mesAnterior() {
   const [a, m] = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }).split('-').map(Number)
   return m === 1 ? `${a - 1}-12` : `${a}-${String(m - 1).padStart(2, '0')}`
 }
+
+type LinhaVenda = VendaComissao & { consultor: string }
+
+const qtdBR = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 3 })
+const soma = (vs: LinhaVenda[], f: (v: LinhaVenda) => number | null) => vs.reduce((s, v) => s + (f(v) ?? 0), 0)
+const semCustoCel = <span style={{ color: 'var(--texto-4)' }}>—</span>
 
 async function carregarLogo() {
   try {
@@ -59,6 +66,8 @@ export default function ComissoesPage() {
   const semCusto = t.realizado - t.faturamento_com_custo
   const pronto = !carregando && !!dados && rel.consultores.length > 0
   const nomeConsultor = dados?.consultores.find(c => c.id === consultor)?.nome
+  const linhasVendas = useMemo<LinhaVenda[]>(() => rel.consultores.flatMap(c => c.vendas.map(v => ({ ...v, consultor: c.nome }))), [rel])
+  const comCusto = linhasVendas.filter(v => !v.custo_pendente)
 
   function mudarPeriodo(novoDe: string, novoAte: string) {
     if (novoDe && novoAte) setCarregando(true)
@@ -155,6 +164,40 @@ export default function ComissoesPage() {
           { id: 'pend', titulo: 'Sem custo', celula: c => c.resumo.qtd_custo_pendente, alinhar: 'dir', ocultar: 'celular' },
           { id: 'comissao', titulo: 'Comissão a pagar', celula: c => <strong>{brl(c.resumo.comissao)}</strong>, alinhar: 'dir', ordenar: (a, b) => a.resumo.comissao - b.resumo.comissao },
         ]}
+      />
+
+      <div className="ui-title" style={{ fontSize: '1rem', margin: '1.75rem 0 .75rem' }}>Vendas do período</div>
+      <Tabela<LinhaVenda>
+        linhas={linhasVendas}
+        chave={v => v.id}
+        carregando={carregando}
+        paginar={false}
+        reiniciar={`${de}|${ate}|${consultor}`}
+        vazio="Nenhuma venda nesse período."
+        colunas={[
+          ...(consultor ? [] : [{ id: 'consultor', titulo: 'Consultor', celula: (v: LinhaVenda) => v.consultor, ordenar: (a: LinhaVenda, b: LinhaVenda) => a.consultor.localeCompare(b.consultor, 'pt-BR') }]),
+          { id: 'cliente', titulo: 'Cliente', celula: v => v.cliente, ordenar: (a, b) => a.cliente.localeCompare(b.cliente, 'pt-BR') },
+          { id: 'dav', titulo: 'DAV', celula: v => v.dav ?? '—', ordenar: (a, b) => (a.dav ?? '').localeCompare(b.dav ?? '', 'pt-BR', { numeric: true }) },
+          { id: 'data', titulo: 'Data DAV', celula: v => dataBR(v.data), ordenar: (a, b) => a.data.localeCompare(b.data) },
+          { id: 'produto', titulo: 'Produto', celula: v => v.produto, ordenar: (a, b) => a.produto.localeCompare(b.produto, 'pt-BR') },
+          { id: 'qtd', titulo: 'Qtd.', celula: v => qtdBR(v.quantidade), alinhar: 'dir', ordenar: (a, b) => a.quantidade - b.quantidade },
+          { id: 'bruto', titulo: 'Valor bruto', celula: v => brl(v.faturamento), alinhar: 'dir', ordenar: (a, b) => a.faturamento - b.faturamento },
+          { id: 'custo', titulo: 'Custo total', celula: v => (v.custo_pendente ? <span style={{ color: 'var(--laranja)' }}>sem custo</span> : brl(v.custo_total ?? 0)), alinhar: 'dir', ordenar: (a, b) => (a.custo_total ?? -Infinity) - (b.custo_total ?? -Infinity) },
+          { id: 'resultado', titulo: 'Resultado', celula: v => (v.custo_pendente ? semCustoCel : brl(v.resultado ?? 0)), alinhar: 'dir', ordenar: (a, b) => (a.resultado ?? -Infinity) - (b.resultado ?? -Infinity) },
+          { id: 'margem', titulo: 'Margem', celula: v => (v.custo_pendente ? semCustoCel : pct(v.margem_liquida)), alinhar: 'dir', ordenar: (a, b) => (a.margem_liquida ?? -Infinity) - (b.margem_liquida ?? -Infinity) },
+          { id: 'comissao', titulo: 'Comissão', celula: v => (v.custo_pendente ? semCustoCel : <strong>{brl(v.comissao ?? 0)}</strong>), alinhar: 'dir', ordenar: (a, b) => (a.comissao ?? -Infinity) - (b.comissao ?? -Infinity) },
+        ]}
+        rodape={
+          <tr>
+            <td colSpan={consultor ? 4 : 5}><strong>Total ({linhasVendas.length} venda(s))</strong></td>
+            <td className="dir"><strong>{qtdBR(soma(linhasVendas, v => v.quantidade))}</strong></td>
+            <td className="dir"><strong>{brl(soma(linhasVendas, v => v.faturamento))}</strong></td>
+            <td className="dir"><strong>{brl(soma(comCusto, v => v.custo_total))}</strong></td>
+            <td className="dir"><strong>{brl(soma(comCusto, v => v.resultado))}</strong></td>
+            <td className="dir"><strong>{pct(t.margem_liquida)}</strong></td>
+            <td className="dir"><strong>{brl(t.comissao)}</strong></td>
+          </tr>
+        }
       />
     </>
   )

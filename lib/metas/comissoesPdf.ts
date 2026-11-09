@@ -32,11 +32,15 @@ const COLS_RESUMO: Coluna[] = [
   { titulo: 'Com custo', largura: 29, direita: true }, { titulo: 'Margem líq.', largura: 18, direita: true }, { titulo: 'Sem custo', largura: 16, direita: true },
   { titulo: 'Comissão a pagar', largura: 27, direita: true },
 ]
+// Valores sem "R$" na lista de vendas: são 10 colunas na largura de um A4 em pé
 const COLS_VENDAS: Coluna[] = [
-  { titulo: 'Data', largura: 17 }, { titulo: 'DAV', largura: 16 }, { titulo: 'Cliente', largura: 41 }, { titulo: 'Produto', largura: 41 },
-  { titulo: 'Faturamento', largura: 25, direita: true }, { titulo: 'Margem', largura: 13, direita: true }, { titulo: '% com.', largura: 12, direita: true },
-  { titulo: 'Comissão', largura: 21, direita: true },
+  { titulo: 'Cliente', largura: 31 }, { titulo: 'DAV', largura: 12 }, { titulo: 'Data DAV', largura: 15 }, { titulo: 'Produto', largura: 31 },
+  { titulo: 'Qtd.', largura: 12, direita: true }, { titulo: 'Valor bruto', largura: 19, direita: true }, { titulo: 'Custo total', largura: 19, direita: true },
+  { titulo: 'Resultado', largura: 18, direita: true }, { titulo: 'Margem', largura: 12, direita: true }, { titulo: 'Comissão', largura: 17, direita: true },
 ]
+
+const num = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const qtd = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 3 })
 
 const pct = (n: number | null | undefined, casas = 1) =>
   n == null || !Number.isFinite(n) ? '-' : `${(n * 100).toLocaleString('pt-BR', { maximumFractionDigits: casas })}%`
@@ -176,13 +180,19 @@ export async function gerarPdfComissoes(rel: RelatorioComissoes, op: Opcoes): Pr
       cabecalho(COLS_VENDAS)
       for (const v of c.vendas) {
         novaLinha(COLS_VENDAS)
+        const comCusto = !v.custo_pendente
         linha(COLS_VENDAS, [
-          dataBR(v.data), v.dav ?? '-', v.cliente, v.produto, brl(v.faturamento),
-          pct(v.margem_liquida), pct(v.percentual_comissao, 2), v.custo_pendente ? 'sem custo' : brl(v.comissao ?? 0),
-        ], { cor: v.custo_pendente ? MUDO : TEXTO })
+          v.cliente, v.dav ?? '-', dataBR(v.data), v.produto, qtd(v.quantidade), num(v.faturamento),
+          comCusto ? num(v.custo_total ?? 0) : 'sem custo', comCusto ? num(v.resultado ?? 0) : '-',
+          pct(v.margem_liquida), comCusto ? num(v.comissao ?? 0) : '-',
+        ], { cor: comCusto ? TEXTO : MUDO })
       }
+      const somar = (f: (v: (typeof c.vendas)[number]) => number | null) => c.vendas.reduce((s, v) => s + (v.custo_pendente ? 0 : f(v) ?? 0), 0)
       novaLinha(COLS_VENDAS)
-      linha(COLS_VENDAS, ['Total', '', '', '', brl(c.resumo.realizado), pct(c.resumo.margem_liquida), '', brl(c.resumo.comissao)], { negrito: true, fundo: FUNDO_CABECALHO })
+      linha(COLS_VENDAS, [
+        'Total', '', '', '', qtd(c.vendas.reduce((s, v) => s + v.quantidade, 0)), num(c.resumo.realizado),
+        num(somar(v => v.custo_total)), num(somar(v => v.resultado)), pct(c.resumo.margem_liquida), num(c.resumo.comissao),
+      ], { negrito: true, fundo: FUNDO_CABECALHO })
     }
   }
 

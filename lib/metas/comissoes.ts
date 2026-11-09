@@ -11,7 +11,10 @@ export type VendaComissao = {
   dav: string | null
   cliente: string
   produto: string
+  quantidade: number
   faturamento: number
+  custo_total: number | null
+  resultado: number | null   // após imposto, igual à coluna "Result." dos lançamentos
   custo_pendente: boolean
   margem_liquida: number | null
   percentual_comissao: number | null
@@ -42,7 +45,8 @@ export function montarRelatorioComissoes(vendas: VendaRow[], consultores: { id: 
       vendas: [...lista].sort((a, b) => a.data.localeCompare(b.data) || (a.dav ?? '').localeCompare(b.dav ?? '')).map(v => {
         const c = calcularVenda(v)
         return {
-          id: v.id, data: v.data, dav: v.dav, cliente: v.cliente, produto: v.produto, faturamento: c.faturamento,
+          id: v.id, data: v.data, dav: v.dav, cliente: v.cliente, produto: v.produto, quantidade: v.quantidade,
+          faturamento: c.faturamento, custo_total: c.custo_total, resultado: c.resultado_apos_imposto,
           custo_pendente: c.custo_pendente, margem_liquida: c.margem_liquida, percentual_comissao: c.percentual_comissao, comissao: c.comissao,
         }
       }),

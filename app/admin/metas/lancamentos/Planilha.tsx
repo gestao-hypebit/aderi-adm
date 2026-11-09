@@ -520,10 +520,11 @@ export default function Planilha({ dados, mesInicial, filtroInicial }: { dados: 
 
   const resumo = useMemo(() => resumirMes(vendas, dados, fertilizantesId), [vendas, dados, fertilizantesId])
   const totaisVisiveis = useMemo(() => {
-    const t = { fat: 0, compra: 0, fin: 0, custo: 0, imposto: 0, comissao: 0, lucro: 0, ton: 0 }
+    const t = { qtd: 0, fat: 0, compra: 0, fin: 0, custo: 0, imposto: 0, comissao: 0, lucro: 0, ton: 0 }
     for (const v of visiveis) {
       if (v.cancelada) continue
       const c = calcularVenda(v)
+      t.qtd += v.quantidade || 0
       t.fat += c.faturamento
       t.ton += v.toneladas ?? 0
       t.compra += c.total_compra ?? 0
@@ -559,7 +560,7 @@ export default function Planilha({ dados, mesInicial, filtroInicial }: { dados: 
           c.resultado_apos_imposto, c.margem_liquida, c.base_comissao, c.percentual_comissao, c.comissao, c.lucro, c.lucro_pct, v.toneladas,
           v.cancelada ? 'Cancelada' : falta.length ? `A completar: ${falta.join(', ')}` : c.custo_pendente ? 'Custo pendente' : '']
       }),
-      total: ['Total', null, null, null, null, null, resumo.total],
+      total: ['Total', null, null, null, vendas.reduce((s, v) => s + (v.cancelada ? 0 : v.quantidade || 0), 0), null, resumo.total],
     }])
   }
 
@@ -772,7 +773,8 @@ export default function Planilha({ dados, mesInicial, filtroInicial }: { dados: 
             {visiveis.length > 0 && (
               <tfoot>
                 <tr>
-                  <td className="lc-fixa" /><td colSpan={6}>Total {visiveis.length !== vendas.length ? `(${visiveis.length} linhas filtradas)` : ''}</td>
+                  <td className="lc-fixa" /><td colSpan={4}>Total {visiveis.length !== vendas.length ? `(${visiveis.length} linhas filtradas)` : ''}</td>
+                  <td style={{ textAlign: 'right' }}>{totaisVisiveis.qtd.toLocaleString('pt-BR', { maximumFractionDigits: 3 })}</td><td />
                   <td style={{ textAlign: 'right' }}>{num(totaisVisiveis.fat)}</td>
                   <td colSpan={10} /><td style={{ textAlign: 'right' }}>{totaisVisiveis.ton ? totaisVisiveis.ton.toLocaleString('pt-BR', { maximumFractionDigits: 3 }) : ''}</td>
                   {calculos && <>
