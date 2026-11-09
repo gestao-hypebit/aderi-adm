@@ -132,10 +132,13 @@ export default function ConsultorForm({ consultorId }: Props) {
     if (error || !data.user) {
       const msg = error?.message ?? ''
       setErro(
-        /rate limit/i.test(msg) ? 'Muitos cadastros em pouco tempo. Aguarde alguns minutos e tente de novo.'
+        /rate limit/i.test(msg) ? 'Muitos cadastros em pouco tempo (o Supabase limita os e-mails de confirmação por hora). Aguarde e tente de novo, ou desligue "Confirm email" no Supabase.'
         : /registered|exists/i.test(msg) ? 'Já existe uma conta com este e-mail.'
-        : /password/i.test(msg) ? 'Senha fraca. Use pelo menos 6 caracteres.'
-        : 'Não foi possível criar a conta. Verifique o e-mail e tente novamente.'
+        : /sending.*email|not authorized/i.test(msg) ? `O Supabase não conseguiu enviar o e-mail de confirmação (${msg}). Desligue "Confirm email" em Authentication → Sign In / Providers → Email, ou configure um SMTP próprio.`
+        : /signups? not allowed|disabled/i.test(msg) ? 'O cadastro de novos usuários está desligado no Supabase (Authentication → Sign In / Providers → "Allow new users to sign up").'
+        : /invalid/i.test(msg) && /email/i.test(msg) ? `O Supabase recusou este e-mail (${msg}). Confira se está escrito certo e se o domínio existe.`
+        : /password/i.test(msg) ? `Senha recusada pelo Supabase (${msg}).`
+        : `Não foi possível criar a conta. Erro do Supabase: ${msg || 'sem detalhes'}`
       )
       setSalvando(false)
       return
