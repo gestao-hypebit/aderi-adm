@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import ConfirmDialog from '@/app/admin/_ui/ConfirmDialog'
 import { carregarCadastros, type DadosCadastro } from '@/lib/metas/cadastros'
@@ -16,6 +16,10 @@ function IconArrowLeft() {
 export default function EditarVendaPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  // Volta para onde a venda foi aberta (ex.: lançamentos do mês); só caminhos internos da administração
+  const pedido = useSearchParams().get('voltar')
+  const voltar = pedido && pedido.startsWith('/admin/') && !pedido.startsWith('//') ? pedido : '/admin/metas/vendas'
+  const deLancamentos = voltar.startsWith('/admin/metas/lancamentos')
   const supabase = createClient()
   const [dados, setDados] = useState<DadosCadastro | null>(null)
   const [venda, setVenda] = useState<VendaRow | null>(null)
@@ -43,14 +47,14 @@ export default function EditarVendaPage() {
     setExecutando(false)
     setConfirmar(null)
     if (error) { setErro('Não foi possível concluir a ação.'); return }
-    if (confirmar === 'excluir') { router.push('/admin/metas/vendas'); return }
+    if (confirmar === 'excluir') { router.push(voltar); return }
     setVenda({ ...venda, cancelada: !venda.cancelada })
   }
 
   return (
     <>
       <div className="ui-breadcrumb">
-        <Link href="/admin/metas/vendas"><IconArrowLeft /> Vendas</Link>
+        <Link href={voltar}><IconArrowLeft /> {deLancamentos ? 'Lançamentos' : 'Vendas'}</Link>
         <span className="ui-breadcrumb-sep">/</span>
         <span className="ui-breadcrumb-atual">Editar venda</span>
       </div>
@@ -68,7 +72,7 @@ export default function EditarVendaPage() {
       </div>
       {erro && <div className="ui-alert ui-alert-erro">{erro}</div>}
       {venda?.cancelada && <div className="ui-alert ui-alert-erro">Venda cancelada: não conta no realizado nem nos indicadores.</div>}
-      {dados && venda ? <VendaForm key={venda.id} dados={dados} venda={venda} /> : !erro && <div className="ui-skeleton" style={{ height: 320 }} />}
+      {dados && venda ? <VendaForm key={venda.id} dados={dados} venda={venda} voltar={voltar} /> : !erro && <div className="ui-skeleton" style={{ height: 320 }} />}
 
       <ConfirmDialog
         aberto={!!confirmar}

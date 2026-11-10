@@ -28,15 +28,16 @@ const FIO = '#e4e0d9'
 const FUNDO_CABECALHO = '#f4f2ed'
 
 const COLS_RESUMO: Coluna[] = [
-  { titulo: 'Consultor', largura: 54 }, { titulo: 'Vendas', largura: 13, direita: true }, { titulo: 'Vendido', largura: 29, direita: true },
-  { titulo: 'Com custo', largura: 29, direita: true }, { titulo: 'Margem líq.', largura: 18, direita: true }, { titulo: 'Sem custo', largura: 16, direita: true },
-  { titulo: 'Comissão a pagar', largura: 27, direita: true },
+  { titulo: 'Consultor', largura: 44 }, { titulo: 'Vendas', largura: 13, direita: true }, { titulo: 'Vendido', largura: 27, direita: true },
+  { titulo: 'Com custo', largura: 27, direita: true }, { titulo: 'Margem líq.', largura: 18, direita: true }, { titulo: '% com.', largura: 14, direita: true },
+  { titulo: 'Sem custo', largura: 16, direita: true }, { titulo: 'Comissão a pagar', largura: 27, direita: true },
 ]
-// Valores sem "R$" na lista de vendas: são 10 colunas na largura de um A4 em pé
+// Valores sem "R$" na lista de vendas: são 11 colunas na largura de um A4 em pé
 const COLS_VENDAS: Coluna[] = [
-  { titulo: 'Cliente', largura: 31 }, { titulo: 'DAV', largura: 12 }, { titulo: 'Data DAV', largura: 15 }, { titulo: 'Produto', largura: 31 },
-  { titulo: 'Qtd.', largura: 12, direita: true }, { titulo: 'Valor bruto', largura: 19, direita: true }, { titulo: 'Custo total', largura: 19, direita: true },
-  { titulo: 'Resultado', largura: 18, direita: true }, { titulo: 'Margem', largura: 12, direita: true }, { titulo: 'Comissão', largura: 17, direita: true },
+  { titulo: 'Cliente', largura: 27 }, { titulo: 'DAV', largura: 12 }, { titulo: 'Data DAV', largura: 15 }, { titulo: 'Produto', largura: 26 },
+  { titulo: 'Qtd.', largura: 12, direita: true }, { titulo: 'Valor bruto', largura: 18, direita: true }, { titulo: 'Custo total', largura: 18, direita: true },
+  { titulo: 'Resultado', largura: 17, direita: true }, { titulo: 'Margem', largura: 12, direita: true }, { titulo: '% com.', largura: 12, direita: true },
+  { titulo: 'Comissão', largura: 17, direita: true },
 ]
 
 const num = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -44,6 +45,9 @@ const qtd = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 3 
 
 const pct = (n: number | null | undefined, casas = 1) =>
   n == null || !Number.isFinite(n) ? '-' : `${(n * 100).toLocaleString('pt-BR', { maximumFractionDigits: casas })}%`
+
+// % médio de comissão de um conjunto de vendas: comissão ÷ vendido com custo
+const pctComissao = (r: { comissao: number; faturamento_com_custo: number }) => pct(r.faturamento_com_custo ? r.comissao / r.faturamento_com_custo : null, 2)
 
 // As fontes padrão do PDF só têm o alfabeto latino; o resto sairia como lixo
 const limpar = (s: string) => s.replace(/[  ]/g, ' ').replace(/[–—−]/g, '-').replace(/[^\x20-\x7e¡-ÿ]/g, '')
@@ -155,14 +159,15 @@ export async function gerarPdfComissoes(rel: RelatorioComissoes, op: Opcoes): Pr
   for (const c of rel.consultores) {
     novaLinha(COLS_RESUMO)
     const r = c.resumo
-    linha(COLS_RESUMO, [c.nome, String(r.qtd_vendas), brl(r.realizado), brl(r.faturamento_com_custo), pct(r.margem_liquida), String(r.qtd_custo_pendente), brl(r.comissao)])
+    linha(COLS_RESUMO, [c.nome, String(r.qtd_vendas), brl(r.realizado), brl(r.faturamento_com_custo), pct(r.margem_liquida), pctComissao(r), String(r.qtd_custo_pendente), brl(r.comissao)])
   }
   novaLinha(COLS_RESUMO)
-  linha(COLS_RESUMO, ['Total', String(t.qtd_vendas), brl(t.realizado), brl(t.faturamento_com_custo), pct(t.margem_liquida), String(t.qtd_custo_pendente), brl(t.comissao)], { negrito: true, fundo: FUNDO_CABECALHO })
+  linha(COLS_RESUMO, ['Total', String(t.qtd_vendas), brl(t.realizado), brl(t.faturamento_com_custo), pct(t.margem_liquida), pctComissao(t), String(t.qtd_custo_pendente), brl(t.comissao)], { negrito: true, fundo: FUNDO_CABECALHO })
   y += 4
 
   paragrafo(
     'Como é calculado: comissão da venda = base de comissão × % de comissão, em que o % é a margem líquida da venda × o fator de comissão gravado nela. '
+    + 'No resumo e nos totais, o % de comissão é a média: comissão ÷ vendido com custo. '
     + 'Canceladas não entram. O relatório mostra o valor apurado no período e não desconta pagamentos já feitos.',
     7.5, MUDO,
   )
@@ -184,14 +189,14 @@ export async function gerarPdfComissoes(rel: RelatorioComissoes, op: Opcoes): Pr
         linha(COLS_VENDAS, [
           v.cliente, v.dav ?? '-', dataBR(v.data), v.produto, qtd(v.quantidade), num(v.faturamento),
           comCusto ? num(v.custo_total ?? 0) : 'sem custo', comCusto ? num(v.resultado ?? 0) : '-',
-          pct(v.margem_liquida), comCusto ? num(v.comissao ?? 0) : '-',
+          pct(v.margem_liquida), comCusto ? pct(v.percentual_comissao, 2) : '-', comCusto ? num(v.comissao ?? 0) : '-',
         ], { cor: comCusto ? TEXTO : MUDO })
       }
       const somar = (f: (v: (typeof c.vendas)[number]) => number | null) => c.vendas.reduce((s, v) => s + (v.custo_pendente ? 0 : f(v) ?? 0), 0)
       novaLinha(COLS_VENDAS)
       linha(COLS_VENDAS, [
         'Total', '', '', '', qtd(c.vendas.reduce((s, v) => s + v.quantidade, 0)), num(c.resumo.realizado),
-        num(somar(v => v.custo_total)), num(somar(v => v.resultado)), pct(c.resumo.margem_liquida), num(c.resumo.comissao),
+        num(somar(v => v.custo_total)), num(somar(v => v.resultado)), pct(c.resumo.margem_liquida), pctComissao(c.resumo), num(c.resumo.comissao),
       ], { negrito: true, fundo: FUNDO_CABECALHO })
     }
   }

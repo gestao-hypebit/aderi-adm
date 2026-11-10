@@ -161,6 +161,7 @@ export default function ComissoesPage() {
           { id: 'vendido', titulo: 'Vendido', celula: c => brl(c.resumo.realizado), alinhar: 'dir', ordenar: (a, b) => a.resumo.realizado - b.resumo.realizado },
           { id: 'custo', titulo: 'Com custo', celula: c => brl(c.resumo.faturamento_com_custo), alinhar: 'dir', ocultar: 'tablet' },
           { id: 'margem', titulo: 'Margem líq.', celula: c => pct(c.resumo.margem_liquida), alinhar: 'dir', ocultar: 'tablet' },
+          { id: 'pctCom', titulo: '% comissão', celula: c => pct(c.resumo.faturamento_com_custo ? c.resumo.comissao / c.resumo.faturamento_com_custo : null, 2), alinhar: 'dir', ordenar: (a, b) => (a.resumo.faturamento_com_custo ? a.resumo.comissao / a.resumo.faturamento_com_custo : -Infinity) - (b.resumo.faturamento_com_custo ? b.resumo.comissao / b.resumo.faturamento_com_custo : -Infinity) },
           { id: 'pend', titulo: 'Sem custo', celula: c => c.resumo.qtd_custo_pendente, alinhar: 'dir', ocultar: 'celular' },
           { id: 'comissao', titulo: 'Comissão a pagar', celula: c => <strong>{brl(c.resumo.comissao)}</strong>, alinhar: 'dir', ordenar: (a, b) => a.resumo.comissao - b.resumo.comissao },
         ]}
@@ -185,6 +186,7 @@ export default function ComissoesPage() {
           { id: 'custo', titulo: 'Custo total', celula: v => (v.custo_pendente ? <span style={{ color: 'var(--laranja)' }}>sem custo</span> : brl(v.custo_total ?? 0)), alinhar: 'dir', ordenar: (a, b) => (a.custo_total ?? -Infinity) - (b.custo_total ?? -Infinity) },
           { id: 'resultado', titulo: 'Resultado', celula: v => (v.custo_pendente ? semCustoCel : brl(v.resultado ?? 0)), alinhar: 'dir', ordenar: (a, b) => (a.resultado ?? -Infinity) - (b.resultado ?? -Infinity) },
           { id: 'margem', titulo: 'Margem', celula: v => (v.custo_pendente ? semCustoCel : pct(v.margem_liquida)), alinhar: 'dir', ordenar: (a, b) => (a.margem_liquida ?? -Infinity) - (b.margem_liquida ?? -Infinity) },
+          { id: 'pctCom', titulo: '% comissão', celula: v => (v.custo_pendente ? semCustoCel : pct(v.percentual_comissao, 2)), alinhar: 'dir', ordenar: (a, b) => (a.percentual_comissao ?? -Infinity) - (b.percentual_comissao ?? -Infinity) },
           { id: 'comissao', titulo: 'Comissão', celula: v => (v.custo_pendente ? semCustoCel : <strong>{brl(v.comissao ?? 0)}</strong>), alinhar: 'dir', ordenar: (a, b) => (a.comissao ?? -Infinity) - (b.comissao ?? -Infinity) },
         ]}
         rodape={
@@ -195,6 +197,7 @@ export default function ComissoesPage() {
             <td className="dir"><strong>{brl(soma(comCusto, v => v.custo_total))}</strong></td>
             <td className="dir"><strong>{brl(soma(comCusto, v => v.resultado))}</strong></td>
             <td className="dir"><strong>{pct(t.margem_liquida)}</strong></td>
+            <td className="dir" title="Comissão ÷ vendido com custo"><strong>{pct(t.faturamento_com_custo ? t.comissao / t.faturamento_com_custo : null, 2)}</strong></td>
             <td className="dir"><strong>{brl(t.comissao)}</strong></td>
           </tr>
         }

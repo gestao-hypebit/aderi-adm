@@ -243,7 +243,7 @@ const Linha = memo(function Linha({ v, i, mes, status, selecionada, calculos, fe
       <td className="lc-acoes">
         <button type="button" title="Duplicar linha" onClick={() => onDuplicar(v)}><IconCopy /></button>
         <button type="button" title={v.cancelada ? 'Reativar' : 'Cancelar (fica na planilha, não conta)'} onClick={() => ed({ cancelada: !v.cancelada })}><IconBan /></button>
-        <Link href={`/admin/metas/vendas/${v.id}`} title="Abrir venda"><IconOpen /></Link>
+        <Link href={`/admin/metas/vendas/${v.id}?voltar=${encodeURIComponent(`/admin/metas/lancamentos?mes=${mes}`)}`} title="Abrir venda (todos os campos, financeiro e comissão)"><IconOpen /></Link>
         <button type="button" title="Excluir linha" className="perigo" onClick={() => onExcluir(v)}><IconTrash /></button>
       </td>
     </tr>
