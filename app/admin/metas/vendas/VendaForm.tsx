@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import NumInput from '@/app/components/cotacoes/NumInput'
 import { brl } from '@/lib/cotacao'
-import { calcularVenda, type ParametrosVenda } from '@/lib/metas/calculo'
+import { ajustarResultado, AJUSTA, type Ajuste, type CampoAjustavel } from '@/lib/metas/ajusteReverso'
+import { calcularVenda, type ParametrosVenda, type VendaCalculavel } from '@/lib/metas/calculo'
 import type { DadosCadastro } from '@/lib/metas/cadastros'
 import { chaveDuplicidade } from '@/lib/metas/importacao/resolver'
 import { inferirToneladas } from '@/lib/metas/importacao/toneladas'
@@ -46,8 +47,10 @@ function IconTrash() {
   return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
 }
 
-// Conta da venda passo a passo, na ordem das colunas da planilha de lançamentos
-function Detalhamento({ c, params }: { c: ReturnType<typeof calcularVenda>; params: ParametrosVenda }) {
+// Conta da venda passo a passo, na ordem das colunas da planilha de lançamentos. Os valores
+// calculados também são editáveis: o valor digitado ajusta a entrada que o produz (ajusteReverso.ts).
+type Calc = ReturnType<typeof calcularVenda>
+function Detalhamento({ c, params, venda, onAjuste }: { c: Calc; params: ParametrosVenda; venda: VendaCalculavel; onAjuste: (a: Ajuste) => void }) {
   if (c.custo_pendente) {
     return (
       <div className="vf-pendente">
@@ -56,32 +59,52 @@ function Detalhamento({ c, params }: { c: ReturnType<typeof calcularVenda>; para
     )
   }
   const negativo = (n: number | null) => (n != null && n < 0 ? ' vf-neg' : '')
-  const linha = (rotulo: string, valor: string, como?: string, cls = '') => (
-    <div className={`vf-linha${cls}`}><span>{rotulo}{como && <small>{como}</small>}</span><strong>{valor}</strong></div>
+  const rotulo = (texto: string, como?: string) => <span>{texto}{como && <small>{como}</small>}</span>
+  const fixo = (texto: string, valor: string, como?: string, cls = '') => (
+    <div className={`vf-linha${cls}`}>{rotulo(texto, como)}<strong title="Resultado da conta: muda quando as outras informações mudam">{valor}</strong></div>
   )
+  const campo = (texto: string, id: CampoAjustavel, como?: string, cls = '', tipo: 'brl' | 'pct' | 'dias' = 'brl') => {
+    const valor = c[id] ?? 0
+    return (
+      <div className={`vf-linha${cls}${negativo(valor)}`}>
+        {rotulo(texto, como)}
+        <span className="vf-campo" title={`Digite o valor desejado: ${AJUSTA[id]}`}>
+          <NumInput
+            className="ui-input ui-input-sm vf-num" valor={valor} pct={tipo === 'pct'} casas={tipo === 'dias' ? 0 : 2} placeholder="0"
+            onChange={n => { const a = ajustarResultado(venda, id, n); if (a) onAjuste(a) }}
+          />
+          {tipo === 'pct' && <em>%</em>}{tipo === 'dias' && <em>dias</em>}
+        </span>
+      </div>
+    )
+  }
   return (
     <div className="vf-detalhe">
       <div>
         <div className="vf-detalhe-titulo">Financeiro</div>
-        {linha('Faturamento', brl(c.faturamento))}
-        {linha('Custo unit. total', brl(c.custo_unit_total ?? 0), 'custo + frete + desconto')}
-        {linha('Total da compra', brl(c.total_compra ?? 0), 'qtd × custo unit. total')}
-        {linha('Prazo financiado', diasBR(c.dias_financiamento), 'recebimento − pagamento da compra')}
-        {linha('Custo financeiro', brl(c.custo_financeiro ?? 0), `total compra × dias × ${pct(params.taxa_juros_mensal)} ÷ 30`)}
-        {linha('Custo total', brl(c.custo_total ?? 0), 'compra + financeiro')}
-        {linha('Resultado bruto', brl(c.resultado_bruto ?? 0), `margem bruta ${pct(c.margem_bruta)}`, negativo(c.resultado_bruto))}
-        {linha('Imposto', brl(c.imposto ?? 0), `${pct(params.aliquota_imposto)} do resultado bruto`)}
-        {linha('Resultado após imposto', brl(c.resultado_apos_imposto ?? 0), `margem líquida ${pct(c.margem_liquida)}`, ' vf-forte' + negativo(c.resultado_apos_imposto))}
+        {fixo('Faturamento', brl(c.faturamento), 'edite em quantidade, preço ou faturamento acima')}
+        {campo('Custo unit. total', 'custo_unit_total', 'custo + frete + desconto')}
+        {campo('Total da compra', 'total_compra', 'qtd × custo unit. total')}
+        {campo('Prazo financiado', 'dias_financiamento', 'recebimento − pagamento da compra', '', 'dias')}
+        {campo('Custo financeiro', 'custo_financeiro', `total compra × dias × ${pct(params.taxa_juros_mensal)} ÷ 30`)}
+        {campo('Custo total', 'custo_total', 'compra + financeiro')}
+        {campo('Resultado bruto', 'resultado_bruto', 'faturamento − custo total')}
+        {campo('Margem bruta', 'margem_bruta', 'resultado bruto ÷ faturamento', '', 'pct')}
+        {campo('Imposto', 'imposto', `${pct(params.aliquota_imposto)} do resultado bruto`)}
+        {campo('Resultado após imposto', 'resultado_apos_imposto', 'resultado bruto − imposto', ' vf-forte')}
       </div>
       <div>
         <div className="vf-detalhe-titulo">Comissão e lucro</div>
-        {linha('Base de comissão', brl(c.base_comissao ?? 0), 'faturamento − imposto − financeiro − frete/desconto')}
-        {linha('Margem líquida', pct(c.margem_liquida))}
-        {linha('Fator de comissão', pct(params.fator_comissao))}
-        {linha('% de comissão', pct(c.percentual_comissao), 'margem líquida × fator', ' vf-forte')}
-        {linha('Comissão', brl(c.comissao ?? 0), 'base × % de comissão', ' vf-destaque' + negativo(c.comissao))}
-        {linha('Lucro', brl(c.lucro ?? 0), 'faturamento − custo total − imposto − comissão', ' vf-forte' + negativo(c.lucro))}
-        {linha('% de contribuição', pct(c.lucro_pct), 'lucro ÷ faturamento')}
+        {campo('Margem líquida', 'margem_liquida', 'resultado após imposto ÷ faturamento', '', 'pct')}
+        {fixo('Base de comissão', brl(c.base_comissao ?? 0), 'faturamento − imposto − financeiro − frete/desconto')}
+        {fixo('Fator de comissão', pct(params.fator_comissao), 'edite nos parâmetros acima')}
+        {campo('% de comissão', 'percentual_comissao', 'margem líquida × fator', ' vf-forte', 'pct')}
+        {campo('Comissão', 'comissao', 'base × % de comissão', ' vf-destaque')}
+        {fixo('Lucro', brl(c.lucro ?? 0), 'faturamento − custo total − imposto − comissão', ' vf-forte' + negativo(c.lucro))}
+        {fixo('% de contribuição', pct(c.lucro_pct), 'lucro ÷ faturamento')}
+        <div className="ui-hint" style={{ marginTop: '.5rem' }}>
+          Os valores com campo podem ser digitados: o sistema ajusta a informação de origem (custo, datas, juros, imposto ou fator) para chegar nele.
+        </div>
       </div>
     </div>
   )
@@ -129,11 +152,29 @@ export default function VendaForm({ dados, venda, voltar = '/admin/metas/vendas'
   const consultor = dados.consultores.find(c => c.id === consultorId)
   const unidade = dados.unidades.find(u => u.id === consultor?.unidade_id)
 
-  const calculos = useMemo(() => itens.map(it => calcularVenda({
+  const entradas = useMemo(() => itens.map((it): VendaCalculavel => ({
     ...params, quantidade: it.quantidade, preco_unitario: it.preco_unitario, faturamento: it.faturamento_fixo,
     custo_unitario: it.custo_unitario, frete_unitario: it.frete_unitario, desconto_unitario: it.desconto_unitario,
     data_pagamento_compra: it.data_pagamento_compra || null, data_recebimento: it.data_recebimento || null,
   })), [itens, params])
+  const calculos = useMemo(() => entradas.map(calcularVenda), [entradas])
+
+  // Valor calculado digitado no detalhamento: parâmetros vão para a venda, o resto para o item
+  function aplicarAjuste(chave: number, a: Ajuste) {
+    const { taxa_juros_mensal, aliquota_imposto, fator_comissao, custo_unitario, data_pagamento_compra, data_recebimento } = a
+    if (taxa_juros_mensal != null || aliquota_imposto != null || fator_comissao != null) {
+      setParams(p => ({
+        taxa_juros_mensal: taxa_juros_mensal ?? p.taxa_juros_mensal,
+        aliquota_imposto: aliquota_imposto ?? p.aliquota_imposto,
+        fator_comissao: fator_comissao ?? p.fator_comissao,
+      }))
+    }
+    const item: Partial<Item> = {}
+    if (custo_unitario != null) item.custo_unitario = custo_unitario
+    if (data_pagamento_compra) item.data_pagamento_compra = data_pagamento_compra
+    if (data_recebimento) item.data_recebimento = data_recebimento
+    if (Object.keys(item).length) mudarItem(chave, item)
+  }
 
   const toneladasDe = (it: Item) => it.grupo_id !== fertilizantes ? null : it.toneladas ?? inferirToneladas(it.produto, it.quantidade, it.preco_unitario).toneladas
   const total = calculos.reduce((s, c) => s + c.faturamento, 0)
@@ -242,7 +283,11 @@ export default function VendaForm({ dados, venda, voltar = '/admin/metas/vendas'
         .vf-linha strong{color:var(--texto);font-weight:600;white-space:nowrap}
         .vf-forte span{color:var(--texto);font-weight:600}
         .vf-destaque strong{color:#1a7f4b;font-size:.9rem}
-        .vf-neg strong{color:#c0392b}
+        .vf-campo{display:inline-flex;align-items:center;gap:.3rem;flex-shrink:0}
+        .vf-campo em{font-style:normal;font-size:.72rem;color:var(--texto-3)}
+        .vf-num{width:120px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+        .vf-neg .vf-num,.vf-neg strong{color:#c0392b}
+        .vf-destaque .vf-num{color:#1a7f4b}
         .vf-pendente{border-top:1px solid var(--borda-suave);padding-top:.75rem;font-size:.8rem;color:#7a52b3}
       `}</style>
 
@@ -410,7 +455,7 @@ export default function VendaForm({ dados, venda, voltar = '/admin/metas/vendas'
                 </div>
               )}
             </div>
-            <Detalhamento c={c} params={params} />
+            <Detalhamento c={c} params={params} venda={entradas[i]} onAjuste={a => aplicarAjuste(it.chave, a)} />
           </div>
         )
       })}

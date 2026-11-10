@@ -188,6 +188,7 @@ const Linha = memo(function Linha({ v, i, mes, status, selecionada, calculos, fe
   const ehFert = fertilizantesId != null && v.grupo_id === fertilizantesId
   const cls = ['lc-linha', v.cancelada && 'lc-cancelada', selecionada && 'lc-sel-linha', status === 'erro' && 'lc-erro'].filter(Boolean).join(' ')
   const vazio = <span className="lc-mudo">—</span>
+  const abrir = `/admin/metas/vendas/${v.id}?voltar=${encodeURIComponent(`/admin/metas/lancamentos?mes=${mes}`)}`
   const calc = (n: number | null, tipo: 'brl' | 'pct' | 'num' = 'brl') => (c.custo_pendente || n == null ? vazio : tipo === 'pct' ? pct(n, 2) : tipo === 'num' ? n.toLocaleString('pt-BR') : num(n))
 
   return (
@@ -199,6 +200,7 @@ const Linha = memo(function Linha({ v, i, mes, status, selecionada, calculos, fe
             className={`lc-dot ${status === 'erro' ? 'erro' : status === 'salvando' ? 'salvando' : falta.length ? 'falta' : c.custo_pendente ? 'custo' : 'ok'}`}
             title={status === 'erro' ? 'Não foi possível salvar esta linha' : status === 'salvando' ? 'Salvando...' : falta.length ? `A completar: ${falta.join(', ')}` : c.custo_pendente ? 'Custo pendente' : 'Completa'}
           />
+          <Link href={abrir} className="lc-abrir" title="Abrir a venda: todos os campos, financeiro e comissão"><IconOpen /> Abrir</Link>
         </span>
       </td>
       <td><DataCel valor={v.data} nav={nav(0)} fora={v.data.slice(0, 7) !== mes} onSalvar={s => s && ed({ data: s })} /></td>
@@ -243,7 +245,7 @@ const Linha = memo(function Linha({ v, i, mes, status, selecionada, calculos, fe
       <td className="lc-acoes">
         <button type="button" title="Duplicar linha" onClick={() => onDuplicar(v)}><IconCopy /></button>
         <button type="button" title={v.cancelada ? 'Reativar' : 'Cancelar (fica na planilha, não conta)'} onClick={() => ed({ cancelada: !v.cancelada })}><IconBan /></button>
-        <Link href={`/admin/metas/vendas/${v.id}?voltar=${encodeURIComponent(`/admin/metas/lancamentos?mes=${mes}`)}`} title="Abrir venda (todos os campos, financeiro e comissão)"><IconOpen /></Link>
+        <Link href={abrir} title="Abrir venda (todos os campos, financeiro e comissão)"><IconOpen /></Link>
         <button type="button" title="Excluir linha" className="perigo" onClick={() => onExcluir(v)}><IconTrash /></button>
       </td>
     </tr>
@@ -606,6 +608,8 @@ export default function Planilha({ dados, mesInicial, filtroInicial }: { dados: 
         .lc-forte{font-weight:600}
         .lc-mudo{color:var(--texto-4);padding:0 .4rem}
         .lc-ctrl{display:inline-flex;align-items:center;gap:.4rem;padding:0 .35rem}
+        .lc-abrir{display:inline-flex;align-items:center;gap:.25rem;font-size:.68rem;font-weight:600;color:var(--laranja);background:var(--laranja-suave);border:1px solid var(--laranja-borda);border-radius:6px;padding:.18rem .45rem;text-decoration:none;white-space:nowrap}
+        .lc-abrir:hover{background:var(--laranja);color:#fff;border-color:var(--laranja)}
         .lc-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
         .lc-dot.ok{background:#27ae60}.lc-dot.falta{background:var(--laranja)}.lc-dot.custo{background:#7a52b3}.lc-dot.salvando{background:#8f978f}.lc-dot.erro{background:#e74c3c}
         .lc-linha.lc-cancelada td{opacity:.45}
@@ -796,6 +800,7 @@ export default function Planilha({ dados, mesInicial, filtroInicial }: { dados: 
         <span><i className="lc-dot custo" /> custo pendente</span>
         <span><span className="lc-informado">azul</span> faturamento informado, diferente de qtd × unitário</span>
         <span><span className="lc-fora">roxo</span> data fora do mês (soma neste mês)</span>
+        <span><strong>Abrir</strong> (início da linha) mostra a venda completa, com financeiro e comissão</span>
         <span>Enter desce na mesma coluna · Shift+clique seleciona um intervalo</span>
         <span>Filtro de número aceita &gt;, &lt; e = (ex.: &gt;1000)</span>
       </div>
